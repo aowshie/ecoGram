@@ -1,5 +1,5 @@
 import sys
-from contextlib import contextmanager
+from contextlib import chdir, contextmanager
 from pathlib import Path
 from typing import Iterator
 
@@ -44,7 +44,8 @@ def locate(tree: Path, versions: dict) -> Path:
     sys.path.insert(0, str(tree / "build-system/Make"))
     from BazelLocation import calculate_sha256, locate_bazel
 
-    bazel = Path(locate_bazel(str(tree), None, None))
+    with chdir(tree):
+        bazel = Path(locate_bazel(str(tree), None, None))
     expected_hash = versions["bazel"].split(":", 1)[1]
     if calculate_sha256(str(bazel)) != expected_hash:
         raise RuntimeError("Downloaded Bazel does not match versions.json")
