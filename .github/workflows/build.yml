@@ -24,7 +24,6 @@ jobs:
     timeout-minutes: 150
     env:
       TREE: ${{ github.workspace }}/.work/swiftgram
-      ECOGRAM_BAZEL_CACHE: ${{ github.workspace }}/../bazel-cache
     steps:
       - uses: actions/checkout@v5
 
@@ -33,7 +32,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install tools
-        run: brew install ccache librsvg
+        run: |
+          brew install ccache librsvg
+          echo "ECOGRAM_BAZEL_CACHE=$RUNNER_TEMP/bazel-cache" >> "$GITHUB_ENV"
 
       - name: Prepare tree
         run: python -m Tools.ecogram prepare --tree "$TREE"

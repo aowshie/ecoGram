@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ecoGram <build@ecogram.app>
 Date: Wed, 18 Nov 2026 10:13:14 +0200
-Subject: [PATCH 3/3] launch: keep working without an app group container
+Subject: [PATCH] launch: keep working without an app group container
 
 
 diff --git a/submodules/TelegramUI/Sources/AppDelegate.swift b/submodules/TelegramUI/Sources/AppDelegate.swift

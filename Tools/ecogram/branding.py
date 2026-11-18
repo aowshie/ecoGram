@@ -1,5 +1,6 @@
 import re
 import shutil
+import struct
 from pathlib import Path
 
 from .config import branding
@@ -10,6 +11,10 @@ ICON_SOURCES = BRANDING / "Icon"
 COMPOSER_LAYERS = ("plane.svg", "braces.svg")
 ALTERNATE_ICONS = {"EcoDark": "dark.svg", "EcoLight": "light.svg"}
 ALTERNATE_SCALES = {2: 120, 3: 180}
+INTRO_DIRECTORIES = ("Telegram/Telegram-iOS/Resources/intro", "submodules/RMIntro/Sources/platform/ios/Resources")
+INTRO_LOGO = "telegram_sphere@2x.png"
+INTRO_OVERLAY = "telegram_plane1@2x.png"
+INTRO_CORNER_RATIO = 0.2237
 UPSTREAM_NAME = "Swiftgram"
 STRING_VALUE = re.compile(r"(<string>)([^<]*)(</string>)")
 STRINGS_ENTRY = re.compile(r'^(\s*"[^"]+"\s*=\s*")(.*)(";\s*)$', re.MULTILINE)
@@ -63,9 +68,46 @@ def _install_alternate_icons(tree: Path) -> None:
                  "--output", target / f"{name}@{scale}x.png", ICON_SOURCES / source])
 
 
+def _png_size(path: Path) -> tuple[int, int]:
+    return struct.unpack(">II", path.read_bytes()[16:24])
+
+
+def _svg_body(svg: str) -> str:
+    start = svg.index(">", svg.index("<svg")) + 1
+    return svg[start:svg.rindex("</svg>")]
+
+
+def _render_svg(svg: str, size: tuple[int, int], target: Path) -> None:
+    source = target.with_suffix(".svg")
+    source.write_text(svg, encoding="utf-8")
+    try:
+        run(["rsvg-convert", "--width", size[0], "--height", size[1], "--output", target, source])
+    finally:
+        source.unlink()
+
+
+def _install_intro(tree: Path) -> None:
+    body = _svg_body((ICON_SOURCES / "dark.svg").read_text(encoding="utf-8"))
+    radius = 1024 * INTRO_CORNER_RATIO
+    logo = (
+        '<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">'
+        f'<defs><clipPath id="ecogram-corners"><rect width="1024" height="1024" rx="{radius:.1f}"/></clipPath></defs>'
+        f'<g clip-path="url(#ecogram-corners)">{body}</g></svg>'
+    )
+    for directory in INTRO_DIRECTORIES:
+        logo_path = tree / directory / INTRO_LOGO
+        overlay_path = tree / directory / INTRO_OVERLAY
+        if not logo_path.exists() or not overlay_path.exists():
+            raise RuntimeError(f"{directory} no longer has the intro logo images")
+        _render_svg(logo, _png_size(logo_path), logo_path)
+        width, height = _png_size(overlay_path)
+        _render_svg(f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg"/>', (width, height), overlay_path)
+
+
 def install(tree: Path) -> None:
     name = branding().display_name
     _brand_build_file(tree, name)
     _brand_strings(tree, name)
     _install_composer_icon(tree)
     _install_alternate_icons(tree)
+    _install_intro(tree)

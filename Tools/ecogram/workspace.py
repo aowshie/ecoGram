@@ -42,7 +42,7 @@ def export_patches(tree: Path) -> int:
         stale.unlink()
     PATCHES.mkdir(exist_ok=True)
     git(
-        "format-patch", "--quiet", "--zero-commit", "--no-signature", "--no-stat", "--full-index",
+        "format-patch", "--no-numbered", "--quiet", "--zero-commit", "--no-signature", "--no-stat", "--full-index",
         "--output-directory", PATCHES, f"{BASE_TAG}..HEAD", "--", ".", ":(exclude)EcoGram",
         cwd=tree,
     )
@@ -56,3 +56,10 @@ def install_sources(tree: Path) -> None:
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(SOURCES, target, ignore=shutil.ignore_patterns(".DS_Store"))
+    resources = tree / "Telegram/Telegram-iOS/Resources/ecogram"
+    if resources.exists():
+        shutil.rmtree(resources)
+    resources.mkdir(parents=True)
+    for resource in SOURCES.glob("**/Resources/*"):
+        if resource.is_file():
+            shutil.copyfile(resource, resources / resource.name)

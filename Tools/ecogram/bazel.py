@@ -10,6 +10,7 @@ UNSIGNED_RC = "\n".join((
     "build --jobs=2",
     "build --worker_max_instances=SwiftCompile=1",
     "build --experimental_ui_max_stdouterr_bytes=-1",
+    "build --keep_going",
     "build --@build_bazel_rules_swift//swift:copt=-no-warnings-as-errors",
 ))
 

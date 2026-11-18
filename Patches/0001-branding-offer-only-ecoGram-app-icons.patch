@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ecoGram <build@ecogram.app>
 Date: Wed, 18 Nov 2026 07:31:50 +0200
-Subject: [PATCH 1/2] branding: offer only ecoGram app icons
+Subject: [PATCH] branding: offer only ecoGram app icons
 
 
 diff --git a/submodules/SettingsUI/Sources/Themes/ThemeSettingsAppIconItem.swift b/submodules/SettingsUI/Sources/Themes/ThemeSettingsAppIconItem.swift

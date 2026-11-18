@@ -1,0 +1,262 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ecoGram <build@ecogram.app>
+Date: Wed, 18 Nov 2026 14:58:43 +0200
+Subject: [PATCH] ui: add ecoGram settings, AyuGram badges and background
+ notifications
+
+
+diff --git a/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift b/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift
+index bdec8f4fdf24c51fc14cd8bbf499573c83012109..305b9839360e6ecd0f4681d47e18e0c763c3bdaf 100644
+--- a/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift
++++ b/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift
+@@ -2,6 +2,7 @@ import SGSimpleSettings
+ import SGStrings
+ import CountrySelectionUI
+ import Foundation
++import EcoSettingsUI
+ import UIKit
+ import AccountContext
+ import TelegramPresentationData
+@@ -170,5 +171,8 @@ func sgPeerInfoSettingsItems(context: AccountContext, paymentsEnabled: Bool, pre
+     items.append(PeerInfoScreenDisclosureItem(id: 1, label: swiftgramLabel, text: "Swiftgram", icon: PresentationResourcesSettings.swiftgram, action: {
+         interaction.openSettings(.swiftgram)
+     }))
++    items.append(PeerInfoScreenDisclosureItem(id: 2, label: .none, text: "ecoGram", icon: ecoSettingsIcon, action: {
++        interaction.openSettings(.ecogram)
++    }))
+     return items
+ }
+diff --git a/submodules/ChatListUI/BUILD b/submodules/ChatListUI/BUILD
+index c0fa1aaef0cfb60635e2e907a8469750f87d6565..43fd9e8caed8cdbf1e9f0a8dbbdd31fcbe3efe1c 100644
+--- a/submodules/ChatListUI/BUILD
++++ b/submodules/ChatListUI/BUILD
+@@ -5,7 +5,8 @@ load("@build_bazel_rules_apple//apple/testing/default_runner:ios_test_runner.bzl
+ sgdeps = [
+     "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
+     "//Swiftgram/SGAPIWebSettings:SGAPIWebSettings",
+-    "//Swiftgram/SGAPIToken:SGAPIToken"
++    "//Swiftgram/SGAPIToken:SGAPIToken",
++    "//EcoGram/Ayu/Badges:AyuBadges",
+ ]
+ sgsrcs = [
+     "//Swiftgram/SGChatListSimpleSettingsSignal:SGChatListSimpleSettingsSignal",
+diff --git a/submodules/ChatListUI/Sources/Node/ChatListItem.swift b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
+index 655bed73fbb335838b2279db8ac9d95e68444dd0..d57fd5179ed6a68fcd09fcc64d7351cc66f1e4e6 100644
+--- a/submodules/ChatListUI/Sources/Node/ChatListItem.swift
++++ b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
+@@ -1,5 +1,6 @@
+ import SGSimpleSettings // MARK: Swiftgram
+ import Foundation
++import AyuBadges
+ import UIKit
+ import AsyncDisplayKit
+ import Display
+@@ -3845,6 +3846,15 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+                     if let verificationIconFileId = peer.verificationIconFileId {
+                         currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
+                     }
++                    if let ayuBadge = AyuBadges.shared.badge(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel) {
++                        var replacesCurrent = currentCredibilityIconContent == nil
++                        if case .some(.premium) = currentCredibilityIconContent {
++                            replacesCurrent = true
++                        }
++                        if replacesCurrent {
++                            currentCredibilityIconContent = .image(image: AyuBadgeImages.image(ayuBadge), tintColor: item.presentationData.theme.list.itemAccentColor)
++                        }
++                    }
+                 }
+             }
+             if case let .peer(peerData) = item.content, peerData.isSideListAllThreadsItem {
+diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
+index 767fd2867d058071b438b11b0d64b9bb4e096ed2..561df5f7b9316060d27fdedfb8294b6886ac7e62 100644
+--- a/submodules/TelegramUI/BUILD
++++ b/submodules/TelegramUI/BUILD
+@@ -25,6 +25,7 @@ sgdeps = [
+     "//Swiftgram/SGProUI:SGProUI",
+     "//Swiftgram/SGKeychainBackupManager:SGKeychainBackupManager",
+     "//Swiftgram/SGGHSettings:SGGHSettings",
++    "//EcoGram/Ayu/Background:AyuBackground",
+     # "//Swiftgram/SGContentAnalysis:SGContentAnalysis"
+ ]
+ 
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
+index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..8e1854a275a857ef3a5d1705cd0c0913597bf807 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
+@@ -9,6 +9,8 @@ sgdeps = [
+     "//Swiftgram/SGRegDate:SGRegDate",
+     "//Swiftgram/SGRegDateScheme:SGRegDateScheme",
+     "//Swiftgram/SGDebugUI:SGDebugUI",
++    "//EcoGram/Settings:EcoSettingsUI",
++    "//EcoGram/Ayu/Badges:AyuBadges",
+ ]
+ #
+ # MARK: Swiftgram
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..eeb6c891a2f4e80f01d99adcd8630d0d322ddfb4 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
+@@ -1,5 +1,6 @@
+ import SGSimpleSettings // MARK: Swiftgram
+ import Foundation
++import AyuBadges
+ import UIKit
+ import AsyncDisplayKit
+ import Display
+@@ -581,6 +582,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+         case fake
+         case scam
+         case emojiStatus(PeerEmojiStatus)
++        case ayu(AyuBadgeKind)
+     }
+     
+     private var currentCredibilityIcon: CredibilityIcon?
+@@ -727,6 +729,14 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+             if peer.isVerified {
+                 credibilityIcon = .verified
+             }
++            if let ayuBadge = AyuBadges.shared.badge(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel) {
++                switch credibilityIcon {
++                case .none, .premium:
++                    credibilityIcon = .ayu(ayuBadge)
++                default:
++                    break
++                }
++            }
+             if let verificationIconFileId = peer.verificationIconFileId {
+                 verifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
+             }
+@@ -1023,6 +1033,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+             case .scam:
+                 emojiRegularStatusContent = .text(color: presentationData.theme.chat.message.incoming.scamColor, string: presentationData.strings.Message_ScamAccount.uppercased())
+                 emojiExpandedStatusContent = emojiRegularStatusContent
++            case let .ayu(kind):
++                emojiRegularStatusContent = .image(image: AyuBadgeImages.image(kind), tintColor: navigationContentsAccentColor)
++                emojiExpandedStatusContent = .image(image: AyuBadgeImages.image(kind), tintColor: navigationContentsAccentColor)
+             case let .emojiStatus(emojiStatus):
+                 currentEmojiStatus = emojiStatus
+                 emojiRegularStatusContent = .animation(content: .customEmoji(fileId: emojiStatus.fileId), size: CGSize(width: 80.0, height: 80.0), placeholderColor: presentationData.theme.list.mediaPlaceholderColor, themeColor: navigationContentsAccentColor, loopMode: .forever)
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..77a3cff3e53f478fdbe754f99fbc5e9c09ab2530 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+@@ -173,6 +173,7 @@ enum PeerInfoSettingsSection {
+     case swiftgram
+     case swiftgramPro
+     //
++    case ecogram
+     case avatar
+     case edit
+     case proxy
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+index 446979e1d4d5fb491531f9e23f8593836709fe2b..c6cba34c3a428831937d1c1945fdc174c51a4d51 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+@@ -1,6 +1,7 @@
+ import SGStrings
+ import SGSettingsUI
+ import Foundation
++import EcoSettingsUI
+ import UIKit
+ import Display
+ import AccountContext
+@@ -66,6 +67,8 @@ extension PeerInfoScreenNode {
+                     self.controller?.present(self.context.sharedContext.makeSGUpdateIOSController(), animated: true)
+                 }
+             }
++        case .ecogram:
++            self.controller?.push(ecoSettingsController(context: self.context))
+         case .avatar:
+             self.controller?.openAvatarForEditing()
+         case .edit:
+diff --git a/submodules/TelegramUI/Sources/SharedWakeupManager.swift b/submodules/TelegramUI/Sources/SharedWakeupManager.swift
+index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..aea06e36b3f7d217089bb2c3b5ed93873774d25b 100644
+--- a/submodules/TelegramUI/Sources/SharedWakeupManager.swift
++++ b/submodules/TelegramUI/Sources/SharedWakeupManager.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuBackground
+ import BackgroundTasks
+ import AVFAudio
+ import UIKit
+@@ -72,6 +73,10 @@ public final class SharedWakeupManager {
+     
+     private var inForeground: Bool = false
+     private var hasActiveAudioSession: Bool = false
++    private var ayuKeepAlive: AyuKeepAlive?
++    private var ayuKeepAliveActive: Bool = false
++    private var ayuNotifier: AyuLocalNotifier?
++    private var ayuNotifierDisposable: Disposable?
+     private var activeExplicitExtensionTimer: SwiftSignalKit.Timer?
+     private var activeExplicitExtensionTask: UIBackgroundTaskIdentifier?
+     private var allowBackgroundTimeExtensionDeadline: Double?
+@@ -120,6 +125,20 @@ public final class SharedWakeupManager {
+         self.acquireIdleExtension = acquireIdleExtension
+         self.presentationData = presentationData
+         
++        self.ayuKeepAlive = AyuKeepAlive(beginBackgroundTask: beginBackgroundTask, endBackgroundTask: endBackgroundTask, updated: { [weak self] value in
++            guard let self else {
++                return
++            }
++            self.ayuKeepAliveActive = value
++            self.checkTasks()
++        })
++        let ayuNotifier = AyuLocalNotifier(presentationData: presentationData)
++        self.ayuNotifier = ayuNotifier
++        self.ayuNotifierDisposable = (activeAccounts
++        |> deliverOnMainQueue).startStrict(next: { [weak ayuNotifier] activeAccounts in
++            ayuNotifier?.update(accounts: activeAccounts.accounts)
++        })
++        
+         self.accountSettingsDisposable = (activeAccounts
+         |> mapToSignal { activeAccounts -> Signal<Bool, NoError> in
+             guard let account = activeAccounts.primary else {
+@@ -149,6 +168,7 @@ public final class SharedWakeupManager {
+                 return
+             }
+             strongSelf.inForeground = value
++            strongSelf.ayuKeepAlive?.update(inForeground: value)
+             if value {
+                 strongSelf.activeExplicitExtensionTimer?.invalidate()
+                 strongSelf.activeExplicitExtensionTimer = nil
+@@ -174,6 +194,7 @@ public final class SharedWakeupManager {
+                 return
+             }
+             strongSelf.hasActiveAudioSession = value
++            strongSelf.ayuKeepAlive?.update(telegramAudioActive: value)
+             strongSelf.checkTasks()
+         })
+         
+@@ -358,6 +379,7 @@ public final class SharedWakeupManager {
+         self.accountSettingsDisposable?.dispose()
+         self.inForegroundDisposable?.dispose()
+         self.hasActiveAudioSessionDisposable?.dispose()
++        self.ayuNotifierDisposable?.dispose()
+         self.tasksDisposable?.dispose()
+         self.pendingMediaUploadsDisposable?.dispose()
+         self.pendingStoryUploadsDisposable?.dispose()
+@@ -993,7 +1015,7 @@ public final class SharedWakeupManager {
+         
+         var endTaskAfterTransactionsComplete: UIBackgroundTaskIdentifier?
+         
+-        if self.inForeground || self.hasActiveAudioSession || hasActiveCalls {
++        if self.inForeground || self.hasActiveAudioSession || hasActiveCalls || self.ayuKeepAliveActive {
+             if let (completion, timer) = self.currentExternalCompletion {
+                 self.currentExternalCompletion = nil
+                 completion()
+@@ -1135,13 +1157,13 @@ public final class SharedWakeupManager {
+     private func updateAccounts(hasTasks: Bool, endTaskAfterTransactionsComplete: UIBackgroundTaskIdentifier?) {
+         let hasBackgroundLocationTask = self.accountsAndTasks.contains(where: { $0.2.backgroundLocation })
+         
+-        if self.inForeground || self.hasActiveAudioSession || self.isInBackgroundExtension || self.backgroundProcessingTaskId != nil || self.backgroundStoryProcessingTaskId != nil || hasBackgroundLocationTask || (hasTasks && self.currentExternalCompletion != nil) || self.activeExplicitExtensionTimer != nil || self.silenceAudioRenderer != nil {
++        if self.inForeground || self.hasActiveAudioSession || self.isInBackgroundExtension || self.backgroundProcessingTaskId != nil || self.backgroundStoryProcessingTaskId != nil || hasBackgroundLocationTask || (hasTasks && self.currentExternalCompletion != nil) || self.activeExplicitExtensionTimer != nil || self.silenceAudioRenderer != nil || self.ayuKeepAliveActive {
+             Logger.shared.log("Wakeup", "enableBeginTransactions: true (active)")
+             
+             for (account, primary, tasks) in self.accountsAndTasks {
+                 account.postbox.setCanBeginTransactions(true)
+                 
+-                if (self.inForeground && primary) || !tasks.isEmpty || (self.activeExplicitExtensionTimer != nil && primary) {
++                if (self.inForeground && primary) || !tasks.isEmpty || (self.activeExplicitExtensionTimer != nil && primary) || self.ayuKeepAliveActive {
+                     account.shouldBeServiceTaskMaster.set(.single(.always))
+                 } else {
+                     account.shouldBeServiceTaskMaster.set(.single(.never))

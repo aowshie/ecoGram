@@ -1,0 +1,331 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ecoGram <build@ecogram.app>
+Date: Wed, 18 Nov 2026 14:50:20 +0200
+Subject: [PATCH] ayu: hook ghost mode and message history into TelegramCore
+
+
+diff --git a/submodules/TelegramCore/BUILD b/submodules/TelegramCore/BUILD
+index 9ed712747025dea831f4112ad0c1ffd5c1c503cf..7f2edd3b3d0f89145bab430a0c7df97ed5d7f36a 100644
+--- a/submodules/TelegramCore/BUILD
++++ b/submodules/TelegramCore/BUILD
+@@ -9,6 +9,8 @@ sgdeps = [
+     "//Swiftgram/SGGHSettingsScheme:SGGHSettingsScheme",
+     "//Swiftgram/SGConfig:SGConfig",
+     "//Swiftgram/SGLogging:SGLogging",
++    "//EcoGram/Ayu/Settings:AyuSettings",
++    "//EcoGram/Ayu/History:AyuHistory",
+ ]
+ 
+ sgsrc = [
+@@ -17,6 +19,7 @@ sgsrc = [
+     "//Swiftgram/SGServerSuggestions:SGServerSuggestions",
+     "//Swiftgram/SGTranslate:SGTranslate",
+     "//Swiftgram/SGLocalizationInfoExtension:SGLocalizationInfoExtension",
++    "//EcoGram/Ayu/Core:AyuCore",
+     #
+ ]
+ 
+diff --git a/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift b/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
+index 7256668bf953823b2c324642f04290174fbf3825..639b6c97f1ce6426b5ff1da4436d19a6067f036c 100644
+--- a/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
++++ b/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ internal import TelegramApi
+ import Postbox
+ import SwiftSignalKit
+@@ -17,32 +18,50 @@ private final class AccountPresenceManagerImpl {
+     private var onlineTimer: SignalKitTimer?
+     
+     private var wasOnline: Bool = false
++    private var requestedOnline: Bool = false
++    private var ayuSettingsObserver: NSObjectProtocol?
+     
+     init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
+         self.queue = queue
+         self.network = network
+         
++        self.ayuSettingsObserver = NotificationCenter.default.addObserver(forName: AyuSettings.didChange, object: nil, queue: nil, using: { [weak self] _ in
++            self?.queue.async { [weak self] in
++                self?.applyRequestedPresence()
++            }
++        })
++        
+         self.shouldKeepOnlinePresenceDisposable = (shouldKeepOnlinePresence
+         |> distinctUntilChanged
+         |> deliverOn(self.queue)).start(next: { [weak self] value in
+             guard let `self` = self else {
+                 return
+             }
+-            if self.wasOnline != value {
+-                self.wasOnline = value
+-                self.updatePresence(value)
+-            }
++            self.requestedOnline = value
++            self.applyRequestedPresence()
+         })
+     }
+     
+     deinit {
+         assert(self.queue.isCurrent())
++        if let ayuSettingsObserver = self.ayuSettingsObserver {
++            NotificationCenter.default.removeObserver(ayuSettingsObserver)
++        }
+         self.shouldKeepOnlinePresenceDisposable?.dispose()
+         self.currentRequestDisposable.dispose()
+         self.onlineTimer?.invalidate()
+     }
+     
+-    private func updatePresence(_ isOnline: Bool) {
++    private func applyRequestedPresence() {
++        let value = self.requestedOnline && !AyuSettings.shared.suppressOnline
++        if self.wasOnline != value {
++            self.wasOnline = value
++            self.updatePresence(value)
++        }
++    }
++    
++    private func updatePresence(_ requestedOnline: Bool) {
++        let isOnline = requestedOnline && !AyuSettings.shared.suppressOnline
+         let request: Signal<Api.Bool, MTRpcError>
+         if isOnline {
+             let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
+diff --git a/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift b/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
+index e8e08874bb16f409fa0ab474b127f76726745a98..2c15da2cf3dbaa0a0de242d18bf8efbbe152b6a2 100644
+--- a/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
++++ b/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import Postbox
+ import SwiftSignalKit
+ internal import TelegramApi
+@@ -142,6 +143,12 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
+ }
+ 
+ private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
++    if let activity = activity, AyuSettings.shared.suppressTyping {
++        if case .speakingInGroupCall = activity {
++        } else {
++            return .complete()
++        }
++    }
+     return postbox.transaction { transaction -> Signal<Void, NoError> in
+         if let peer = transaction.getPeer(peerId) {
+             if peerId == accountPeerId {
+diff --git a/submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift b/submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift
+index b5ede6a809bb60cdf51183ad6019e0d4f9bbf31a..25b48262008adcec1fab95982d0c2169351a3b94 100644
+--- a/submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift
++++ b/submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import Postbox
+ import SwiftSignalKit
+ internal import TelegramApi
+@@ -110,6 +111,9 @@ func managedSynchronizeConsumeMessageContentOperations(postbox: Postbox, network
+ }
+ 
+ private func synchronizeConsumeMessageContents(transaction: Transaction, network: Network, stateManager: AccountStateManager, peerId: PeerId, operation: SynchronizeConsumeMessageContentsOperation) -> Signal<Void, NoError> {
++    if AyuSettings.shared.suppressReadReceipts {
++        return .complete()
++    }
+     if peerId.namespace == Namespaces.Peer.CloudUser || peerId.namespace == Namespaces.Peer.CloudGroup {
+         return network.request(Api.functions.messages.readMessageContents(id: operation.messageIds.map { $0.id }))
+         |> map(Optional.init)
+diff --git a/submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift b/submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift
+index e38c0f96c77041c97293f8cc2c0386ebf62274ed..30ace2c1e2ff87103d4fd08a88f302223cf1ccb5 100644
+--- a/submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift
++++ b/submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import Postbox
+ import SwiftSignalKit
+ internal import TelegramApi
+@@ -119,6 +120,9 @@ func managedSynchronizeViewStoriesOperations(postbox: Postbox, network: Network,
+ }
+ 
+ private func pushStoriesAreSeen(postbox: Postbox, network: Network, stateManager: AccountStateManager, peer: Peer, operation: SynchronizeViewStoriesOperation) -> Signal<Void, NoError> {
++    if AyuSettings.shared.suppressStoryViews {
++        return .complete()
++    }
+     guard let inputPeer = apiInputPeer(peer) else {
+         return .complete()
+     }
+diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
+index cf1ab15d9cfae956abcb53bf5060db525b32448d..e4d914804dad86e3dc17f11b806bf47a9edc4cd7 100644
+--- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
++++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
+@@ -274,6 +274,7 @@ extension ReplayContext {
+     }
+     
+     func applyDeleteMessagesWithGlobalIds(_ ids: [Int32]) {
++        AyuHistoryCapture.captureDeleted(transaction: transaction, mediaBox: mediaBox, globalIds: ids)
+         var resourceIds: [MediaResourceId] = []
+         transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
+             addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
+@@ -285,6 +286,7 @@ extension ReplayContext {
+     }
+     
+     func applyDeleteMessages(_ ids: [MessageId]) {
++        AyuHistoryCapture.captureDeleted(transaction: transaction, mediaBox: mediaBox, ids: ids)
+         _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
+             self.addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
+         })
+@@ -305,6 +307,7 @@ extension ReplayContext {
+     }
+     
+     func applyEditMessage(_ id: MessageId, _ message: StoreMessage) {
++        AyuHistoryCapture.captureEdit(transaction: transaction, mediaBox: mediaBox, id: id, updated: message)
+         var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
+         transaction.updateMessage(id, update: { previousMessage in
+             let peers: [PeerId:Peer] = previousMessage.peers.reduce([:], { current, value in
+diff --git a/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift b/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
+index b2e65895ccd2f29f003474b051fee81c6f3819ed..9f38938638f6b846d32ff0994abcba1b52c05503 100644
+--- a/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
++++ b/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import Postbox
+ internal import TelegramApi
+ import SwiftSignalKit
+@@ -212,6 +213,10 @@ private func validatePeerReadState(network: Network, postbox: Postbox, stateMana
+                         case let .idBased(localMaxIncomingReadId, _, _, _, _):
+                             if case let .idBased(updatedMaxIncomingReadId, _, _, updatedCount, updatedMarkedUnread) = readState {
+                                 if localReadMarkIsAheadOfServer(localMaxIncomingReadId: localMaxIncomingReadId, serverMaxIncomingReadId: updatedMaxIncomingReadId, serverCount: updatedCount, serverMarkedUnread: updatedMarkedUnread) {
++                                    if AyuSettings.shared.suppressReadReceipts {
++                                        transaction.confirmSynchronizedIncomingReadState(peerId)
++                                        return nil
++                                    }
+                                     return .retry
+                                 }
+                             }
+@@ -252,6 +257,9 @@ private func validatePeerReadState(network: Network, postbox: Postbox, stateMana
+ }
+ 
+ private func pushPeerReadState(network: Network, postbox: Postbox, stateManager: AccountStateManager, peerId: PeerId, readState: PeerReadState) -> Signal<PeerReadState, PeerReadStateValidationError> {
++    if AyuSettings.shared.suppressReadReceipts {
++        return .single(readState)
++    }
+     if peerId.namespace == Namespaces.Peer.SecretChat {
+         // Decide whether a request is needed before looking the peer up: inputSecretChat goes
+         // through loadedPeerWithId, which never emits when the peer row is missing and fails
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
+index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..1e20787584e2d9020c7a2f2e63eb87b56c35c9ab 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import Postbox
+ internal import TelegramApi
+ import SwiftSignalKit
+@@ -219,11 +220,15 @@ func _internal_toggleForumThreadUnreadMarkInteractively(transaction: Transaction
+             
+             if peer.isForum {
+                 if let inputPeer = apiInputPeer(peer) {
+-                    let _ = network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: threadId), readMaxId: messageIndex.id.id)).start()
++                    if !AyuSettings.shared.suppressReadReceipts {
++                        let _ = network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: threadId), readMaxId: messageIndex.id.id)).start()
++                    }
+                 }
+             } else if peer.isMonoForum {
+                 if let inputPeer = apiInputPeer(peer), let subPeer = transaction.getPeer(PeerId(threadId)).flatMap(apiInputPeer) {
+-                    let _ = network.request(Api.functions.messages.readSavedHistory(parentPeer: inputPeer, peer: subPeer, maxId: messageIndex.id.id)).start()
++                    if !AyuSettings.shared.suppressReadReceipts {
++                        let _ = network.request(Api.functions.messages.readSavedHistory(parentPeer: inputPeer, peer: subPeer, maxId: messageIndex.id.id)).start()
++                    }
+                 }
+             }
+         }
+@@ -255,11 +260,15 @@ func _internal_markForumThreadAsReadInteractively(transaction: Transaction, netw
+         
+         if peer.isForum {
+             if let inputPeer = apiInputPeer(peer) {
+-                let _ = network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: threadId), readMaxId: messageIndex.id.id)).start()
++                if !AyuSettings.shared.suppressReadReceipts {
++                    let _ = network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: threadId), readMaxId: messageIndex.id.id)).start()
++                }
+             }
+         } else if peer.isMonoForum {
+             if let inputPeer = apiInputPeer(peer), let subPeer = transaction.getPeer(PeerId(threadId)).flatMap(apiInputPeer) {
+-                let _ = network.request(Api.functions.messages.readSavedHistory(parentPeer: inputPeer, peer: subPeer, maxId: messageIndex.id.id)).start()
++                if !AyuSettings.shared.suppressReadReceipts {
++                    let _ = network.request(Api.functions.messages.readSavedHistory(parentPeer: inputPeer, peer: subPeer, maxId: messageIndex.id.id)).start()
++                }
+             }
+         }
+     }
+@@ -297,11 +306,15 @@ func _internal_togglePeerUnreadMarkInteractively(transaction: Transaction, netwo
+                 
+                 if peer.isForum {
+                     if let inputPeer = apiInputPeer(peer) {
+-                        let _ = network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: item.threadId), readMaxId: messageIndex.id.id)).start()
++                        if !AyuSettings.shared.suppressReadReceipts {
++                            let _ = network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: item.threadId), readMaxId: messageIndex.id.id)).start()
++                        }
+                     }
+                 } else if peer.isMonoForum {
+                     if let inputPeer = apiInputPeer(peer), let subPeer = transaction.getPeer(PeerId(item.threadId)).flatMap(apiInputPeer) {
+-                        let _ = network.request(Api.functions.messages.readSavedHistory(parentPeer: inputPeer, peer: subPeer, maxId: messageIndex.id.id)).start()
++                        if !AyuSettings.shared.suppressReadReceipts {
++                            let _ = network.request(Api.functions.messages.readSavedHistory(parentPeer: inputPeer, peer: subPeer, maxId: messageIndex.id.id)).start()
++                        }
+                     }
+                 }
+             }
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
+index 04945389638f5bf66324fd44010a8b69d8ab0d5e..654f295d40179b16c68c8ed9f38ca0482e2c82b4 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import Postbox
+ import SwiftSignalKit
+ internal import TelegramApi
+@@ -396,7 +397,9 @@ private class ReplyThreadHistoryContextImpl {
+                 |> ignoreValues
+                 if revalidate {
+                 }
+-                strongSelf.readDisposable.set(signal.start())
++                if !AyuSettings.shared.suppressReadReceipts {
++                    strongSelf.readDisposable.set(signal.start())
++                }
+             } else {
+                 var signal = strongSelf.account.network.request(Api.functions.messages.readDiscussion(peer: inputPeer, msgId: Int32(clamping: threadId), readMaxId: messageIndex.id.id))
+                 |> `catch` { _ -> Signal<Api.Bool, NoError> in
+@@ -431,7 +434,9 @@ private class ReplyThreadHistoryContextImpl {
+                     signal = signal
+                     |> then(validateSignal)
+                 }
+-                strongSelf.readDisposable.set(signal.start())
++                if !AyuSettings.shared.suppressReadReceipts {
++                    strongSelf.readDisposable.set(signal.start())
++                }
+             }
+         })
+     }
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
+index e74f20743396547ad82771f9c53b97651b29e17f..3687d029d96cce6b26e87081b8fa277d82b436e4 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import AyuSettings
+ import SwiftSignalKit
+ import Postbox
+ internal import TelegramApi
+@@ -2123,6 +2124,9 @@ func _internal_markStoryAsSeen(account: Account, peerId: PeerId, id: Int32, asPi
+             }
+             #endif
+             
++            if AyuSettings.shared.suppressStoryViews {
++                return .complete()
++            }
+             return account.network.request(Api.functions.stories.incrementStoryViews(peer: inputPeer, id: [id]))
+             |> `catch` { _ -> Signal<Api.Bool, NoError> in
+                 return .single(.boolFalse)
