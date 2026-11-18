@@ -5,47 +5,47 @@
 <h1 align="center">ecoGram</h1>
 
 <p align="center">
-  Telegram для iOS на основе <a href="https://github.com/Swiftgram/Telegram-iOS">Swiftgram</a> с возможностями <a href="https://github.com/AyuGram">AyuGram</a>
+  Telegram for iOS based on <a href="https://github.com/Swiftgram/Telegram-iOS">Swiftgram</a> with <a href="https://github.com/AyuGram">AyuGram</a> features
 </p>
 
 <p align="center">
-  <a href="../../releases">Скачать</a> · <a href="#установка">Установка</a> · <a href="#сборка">Сборка</a>
+  <a href="../../releases">Download</a> · <a href="#install">Install</a> · <a href="#build">Build</a>
 </p>
 
 ---
 
-## Возможности
+## Features
 
 ### AyuGram
 
-- Режим призрака
-- Сохранение удалённых сообщений
-- Одноразовые фото и видео
-- История изменений
-- Значки AyuGram
+- Ghost mode
+- Deleted message history
+- One-time photos and videos
+- Edit history
+- AyuGram badges
 - Shot
 
 ### ecoGram
 
-- Локальные уведомления
-- Настройка панели выделения
-- Настройка меню сообщения
-- Аватарка во вкладке настроек
-- Скрытие кнопок профиля
+- Local notifications
+- Custom selection bar
+- Custom message menu
+- Avatar in the Settings tab
+- Hidden profile shortcuts
 
-## Приватность
+## Privacy
 
-Без своих серверов и статистики. История хранится только на устройстве.
+No own servers, no analytics. History stays on the device.
 
-## Установка
+## Install
 
-IPA из [релизов](../../releases), подпись через SideStore, AltStore, Sideloadly, Feather или ESign.
+IPA from [releases](../../releases), signed with SideStore, AltStore, Sideloadly, Feather or ESign.
 
-## Сборка
+## Build
 
-GitHub Actions: workflow `Build`, секреты `TELEGRAM_API_ID` и `TELEGRAM_API_HASH`.
+GitHub Actions: `Build` workflow, `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` secrets.
 
-Локально, на Mac:
+Locally, on a Mac:
 
 ```bash
 python -m Tools.ecogram prepare
@@ -55,23 +55,23 @@ python -m Tools.ecogram prepare
 TELEGRAM_API_ID=… TELEGRAM_API_HASH=… python -m Tools.ecogram build
 ```
 
-Swiftgram подтягивается автоматически workflow `Upstream`.
+Swiftgram updates are pulled automatically by the `Upstream` workflow.
 
-## Структура
+## Structure
 
-| Путь | |
+| Path | |
 | --- | --- |
 | `EcoGram/Ayu/` | AyuGram |
-| `EcoGram/Settings/` | Раздел ecoGram |
-| `EcoGram/Preferences/` | Настройки |
-| `EcoGram/ContextMenu/` | Меню сообщения |
-| `EcoGram/Notifications/` | Уведомления |
-| `EcoGram/Strings/` | Тексты ru, en, ja |
-| `Patches/` | Патчи Swiftgram |
-| `Branding/` | Брендинг |
-| `Tools/ecogram/` | Инструменты |
+| `EcoGram/Settings/` | ecoGram section |
+| `EcoGram/Preferences/` | Preferences |
+| `EcoGram/ContextMenu/` | Message menu |
+| `EcoGram/Notifications/` | Notifications |
+| `EcoGram/Strings/` | Strings ru, en, ja |
+| `Patches/` | Swiftgram patches |
+| `Branding/` | Branding |
+| `Tools/ecogram/` | Tools |
 
-Патчи:
+Patches:
 
 ```bash
 python -m Tools.ecogram sync
@@ -85,6 +85,6 @@ python -m Tools.ecogram export
 
 [Telegram](https://github.com/TelegramMessenger/Telegram-iOS), [Swiftgram](https://github.com/Swiftgram/Telegram-iOS), [AyuGram](https://github.com/AyuGram/AyuGramDesktop).
 
-## Лицензия
+## License
 
-GPL-2.0. Значки и логотип AyuGram — из AyuGram Desktop (GPL-3.0).
+GPL-2.0. AyuGram badges and logo are from AyuGram Desktop (GPL-3.0).
