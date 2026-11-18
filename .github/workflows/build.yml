@@ -21,7 +21,7 @@ concurrency:
 jobs:
   ipa:
     runs-on: ${{ vars.ECOGRAM_RUNNER || 'xcode-27' }}
-    timeout-minutes: 360
+    timeout-minutes: 150
     env:
       TREE: ${{ github.workspace }}/.work/swiftgram
       ECOGRAM_BAZEL_CACHE: ${{ github.workspace }}/../bazel-cache
