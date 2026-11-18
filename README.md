@@ -6,7 +6,12 @@ Telegram-клиент для iOS на базе [Swiftgram](https://github.com/Sw
 
 | Путь | Назначение |
 | --- | --- |
-| `EcoGram/` | Собственный код клиента: Bazel-модули |
+| `EcoGram/Ayu/` | Возможности AyuGram: режим призрака, история сообщений, значки, Shot |
+| `EcoGram/Settings/` | Раздел ecoGram в настройках |
+| `EcoGram/Preferences/` | Настройки ecoGram: уведомления, панель выделения, меню, оформление |
+| `EcoGram/ContextMenu/` | Порядок пунктов меню сообщения |
+| `EcoGram/Notifications/` | Локальные уведомления в фоне |
+| `EcoGram/Strings/` | Тексты на русском, английском и японском |
 | `Patches/` | Точечные правки исходников Swiftgram, по одному коммиту на патч |
 | `Branding/` | Имя, bundle ID и иконки |
 | `Tools/ecogram/` | Утилита для синхронизации, патчей и сборки |
@@ -48,4 +53,4 @@ IPA перед установкой подписывается через SideSt
 
 ## Лицензия
 
-GPL-2.0, как у Telegram для iOS и Swiftgram.
+GPL-2.0, как у Telegram для iOS и Swiftgram. Иконки значков и логотип AyuGram взяты из AyuGram Desktop (GPL-3.0).

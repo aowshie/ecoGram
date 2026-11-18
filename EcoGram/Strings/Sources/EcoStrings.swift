@@ -3,6 +3,7 @@ import Foundation
 public struct EcoStrings {
     public enum Key: CaseIterable {
         case settingsTitle
+        case ayuTitle
         case ghostHeader
         case ghostMode
         case ghostHideRead
@@ -12,44 +13,45 @@ public struct EcoStrings {
         case ghostFooter
         case historyHeader
         case historySaveDeleted
+        case historySaveSelfDestructing
         case historySaveEdited
         case historySaveBots
         case historyMediaLimit
         case historyMediaOff
         case historyCleanup
         case historyCleanupNever
-        case historyOpen
+        case historyClearDeleted
+        case historyClearDeletedConfirm
         case historyFooter
         case badgesHeader
         case badgesShow
         case badgesFooter
+        case editHistory
+        case editOriginal
+        case editEdited
+        case editCurrent
         case notificationsHeader
         case notificationsBackground
+        case notificationSettings
         case notificationsFooter
-        case savedTitle
-        case savedEmpty
-        case savedUsage
-        case savedClearAll
-        case savedClearAllConfirm
-        case savedClearChat
-        case savedClearChatConfirm
-        case savedDeleted
-        case savedEdited
-        case savedWas
-        case savedNow
-        case savedCopy
-        case savedOpenMedia
-        case savedDelete
-        case savedMediaNotSaved
-        case mediaPhoto
-        case mediaVideo
-        case mediaRoundVideo
-        case mediaVoice
-        case mediaAudio
-        case mediaSticker
-        case mediaAnimation
-        case mediaFile
-        case mediaOther
+        case chatHeader
+        case selectionPanel
+        case contextMenu
+        case chatFooter
+        case selectionFooter
+        case selectionLimit
+        case contextFooter
+        case appearanceHeader
+        case avatarInTabBar
+        case appearanceFooter
+        case actionShot
+        case actionTag
+        case actionSaveToCloud
+        case shotSave
+        case shotShare
+        case shotSaved
+        case shotFailed
+        case shotClose
         case unitMegabytes
         case unitDays
         case unitMonth
@@ -59,6 +61,7 @@ public struct EcoStrings {
 
     private static let table: [Key: (en: String, ru: String, ja: String)] = [
         .settingsTitle: ("ecoGram", "ecoGram", "ecoGram"),
+        .ayuTitle: ("AyuGram", "AyuGram", "AyuGram"),
         .ghostHeader: ("GHOST MODE", "РЕЖИМ ПРИЗРАКА", "ゴーストモード"),
         .ghostMode: ("Ghost Mode", "Режим призрака", "ゴーストモード"),
         .ghostHideRead: ("Don't Send Read Receipts", "Не отправлять прочтение", "既読を送信しない"),
@@ -68,44 +71,45 @@ public struct EcoStrings {
         .ghostFooter: ("Others won't see that you are online, typing or reading their messages.", "Собеседники не увидят, что вы в сети, печатаете или прочитали их сообщения.", "相手にオンライン、入力中、既読であることが表示されません。"),
         .historyHeader: ("MESSAGE HISTORY", "ИСТОРИЯ СООБЩЕНИЙ", "メッセージ履歴"),
         .historySaveDeleted: ("Save Deleted Messages", "Сохранять удалённые", "削除されたメッセージを保存"),
+        .historySaveSelfDestructing: ("Save Self-Destructing Messages", "Сохранять самоудаляющиеся", "自動削除メッセージを保存"),
         .historySaveEdited: ("Save Edit History", "Сохранять историю изменений", "編集履歴を保存"),
         .historySaveBots: ("Include Chats with Bots", "Включая чаты с ботами", "ボットとのチャットも含める"),
-        .historyMediaLimit: ("Save Media up To", "Сохранять медиа до", "メディアの保存上限"),
-        .historyMediaOff: ("Don't Save", "Не сохранять", "保存しない"),
+        .historyMediaLimit: ("Keep Media up To", "Сохранять медиа до", "メディアの保存上限"),
+        .historyMediaOff: ("Don't Keep", "Не сохранять", "保存しない"),
         .historyCleanup: ("Delete Older Than", "Удалять старше", "古い履歴を削除"),
         .historyCleanupNever: ("Never", "Никогда", "削除しない"),
-        .historyOpen: ("Saved Messages History", "Сохранённая история", "保存された履歴"),
-        .historyFooter: ("Deleted and edited messages are kept only on this device and never leave it.", "Удалённые и изменённые сообщения хранятся только на этом устройстве и никуда не отправляются.", "削除・編集されたメッセージはこの端末にのみ保存され、外部に送信されません。"),
+        .historyClearDeleted: ("Clear Deleted Messages", "Очистить удалённые сообщения", "削除されたメッセージを消去"),
+        .historyClearDeletedConfirm: ("Remove all saved deleted messages from your chats?", "Убрать все сохранённые удалённые сообщения из чатов?", "保存された削除済みメッセージをすべてチャットから消去しますか？"),
+        .historyFooter: ("Deleted and self-destructing messages stay in the chat, slightly faded and marked with a trash icon. Hold an edited message to see its previous versions. Everything is kept only on this device.", "Удалённые и самоудаляющиеся сообщения остаются в чате: они полупрозрачные и отмечены значком корзины. Прошлые версии изменённого сообщения видны в его меню. Всё хранится только на этом устройстве.", "削除・自動削除されたメッセージは半透明のままゴミ箱アイコン付きでチャットに残ります。編集されたメッセージを長押しすると以前の版を確認できます。すべてこの端末にのみ保存されます。"),
         .badgesHeader: ("BADGES", "ЗНАЧКИ", "バッジ"),
         .badgesShow: ("AyuGram Badges", "Значки AyuGram", "AyuGramバッジ"),
         .badgesFooter: ("Shows the badges of AyuGram developers and supporters next to their names. The public list is downloaded from the AyuGram server, nothing is sent.", "Показывает значки разработчиков и поддержавших AyuGram рядом с именем. Публичный список загружается с сервера AyuGram, от вас ничего не отправляется.", "AyuGramの開発者と支援者のバッジを名前の横に表示します。公開リストをAyuGramのサーバーから取得し、こちらからは何も送信しません。"),
+        .editHistory: ("Edit History", "История изменений", "編集履歴"),
+        .editOriginal: ("Original", "Исходное", "元の内容"),
+        .editEdited: ("Edited", "Изменено", "編集"),
+        .editCurrent: ("Current", "Сейчас", "現在"),
         .notificationsHeader: ("NOTIFICATIONS", "УВЕДОМЛЕНИЯ", "通知"),
-        .notificationsBackground: ("Background Notifications", "Уведомления в фоне", "バックグラウンド通知"),
+        .notificationsBackground: ("Local Notifications", "Локальные уведомления", "ローカル通知"),
+        .notificationSettings: ("Notification Settings", "Настройки уведомлений", "通知設定"),
         .notificationsFooter: ("Keeps ecoGram running in the background with silent audio so new messages arrive as local notifications without any servers. Uses more battery.", "ecoGram работает в фоне благодаря беззвучному звуку и показывает новые сообщения локальными уведомлениями, без серверов. Расходует больше заряда.", "無音のオーディオでecoGramをバックグラウンドで動作させ、サーバーを使わずに新着メッセージをローカル通知で表示します。バッテリー消費が増えます。"),
-        .savedTitle: ("Saved History", "Сохранённая история", "保存された履歴"),
-        .savedEmpty: ("Nothing has been saved yet.", "Пока ничего не сохранено.", "まだ何も保存されていません。"),
-        .savedUsage: ("Storage Used", "Занято", "使用容量"),
-        .savedClearAll: ("Clear All History", "Очистить всю историю", "すべての履歴を削除"),
-        .savedClearAllConfirm: ("Delete all saved messages and media?", "Удалить все сохранённые сообщения и медиа?", "保存されたすべてのメッセージとメディアを削除しますか？"),
-        .savedClearChat: ("Clear This Chat", "Очистить этот чат", "このチャットを削除"),
-        .savedClearChatConfirm: ("Delete saved messages of this chat?", "Удалить сохранённые сообщения этого чата?", "このチャットの保存されたメッセージを削除しますか？"),
-        .savedDeleted: ("Deleted", "Удалено", "削除済み"),
-        .savedEdited: ("Edited", "Изменено", "編集済み"),
-        .savedWas: ("Before", "Было", "変更前"),
-        .savedNow: ("After", "Стало", "変更後"),
-        .savedCopy: ("Copy Text", "Скопировать текст", "テキストをコピー"),
-        .savedOpenMedia: ("Open Media", "Открыть медиа", "メディアを開く"),
-        .savedDelete: ("Delete", "Удалить", "削除"),
-        .savedMediaNotSaved: ("not saved", "не сохранено", "未保存"),
-        .mediaPhoto: ("Photo", "Фото", "写真"),
-        .mediaVideo: ("Video", "Видео", "動画"),
-        .mediaRoundVideo: ("Video Message", "Видеосообщение", "ビデオメッセージ"),
-        .mediaVoice: ("Voice Message", "Голосовое сообщение", "ボイスメッセージ"),
-        .mediaAudio: ("Audio", "Аудио", "オーディオ"),
-        .mediaSticker: ("Sticker", "Стикер", "ステッカー"),
-        .mediaAnimation: ("GIF", "GIF", "GIF"),
-        .mediaFile: ("File", "Файл", "ファイル"),
-        .mediaOther: ("Attachment", "Вложение", "添付ファイル"),
+        .chatHeader: ("CHAT", "ЧАТ", "チャット"),
+        .selectionPanel: ("Selection Bar", "Панель выделения", "選択バー"),
+        .contextMenu: ("Message Menu", "Меню сообщения", "メッセージメニュー"),
+        .chatFooter: ("Choose which buttons are shown and in what order.", "Выберите, какие кнопки показывать и в каком порядке.", "表示するボタンと順番を選べます。"),
+        .selectionFooter: ("Buttons shown at the bottom while messages are selected. Check up to 6 and drag to reorder.", "Кнопки внизу экрана при выделении сообщений. Отметьте до 6 кнопок и перетащите, чтобы изменить порядок.", "メッセージ選択中に下部に表示されるボタンです。最大6つまでチェックでき、ドラッグで並べ替えます。"),
+        .selectionLimit: ("You can enable up to 6 buttons", "Можно включить не больше 6 кнопок", "有効にできるボタンは6つまでです"),
+        .contextFooter: ("Items shown when you hold a message. Check the ones you need and drag to reorder. Hidden items stay in the Swiftgram submenu, and the switches match the Swiftgram section.", "Пункты, которые появляются при удержании сообщения. Отметьте нужные и перетащите, чтобы изменить порядок. Скрытые пункты остаются в подменю Swiftgram, переключатели совпадают с разделом Swiftgram.", "メッセージを長押ししたときに表示される項目です。必要なものにチェックを入れ、ドラッグで並べ替えます。非表示の項目はSwiftgramのサブメニューに残り、Swiftgramの設定と連動します。"),
+        .appearanceHeader: ("APPEARANCE", "ОФОРМЛЕНИЕ", "外観"),
+        .avatarInTabBar: ("Avatar Instead of Settings Icon", "Аватарка вместо шестерёнки", "設定アイコンの代わりにアバター"),
+        .appearanceFooter: ("Shows your profile photo on the Settings tab at the bottom of the screen.", "Во вкладке «Настройки» внизу экрана показывается ваша аватарка.", "画面下部の設定タブにプロフィール写真を表示します。"),
+        .actionShot: ("Shot", "Shot", "Shot"),
+        .actionTag: ("Tag", "Тег", "タグ"),
+        .actionSaveToCloud: ("Save to Saved Messages", "В Избранное", "保存済みメッセージに保存"),
+        .shotSave: ("Save", "Сохранить", "保存"),
+        .shotShare: ("Share", "Поделиться", "共有"),
+        .shotSaved: ("Saved to Photos", "Сохранено в Фото", "写真に保存しました"),
+        .shotFailed: ("Couldn't create the shot", "Не удалось сделать снимок", "スクリーンショットを作成できませんでした"),
+        .shotClose: ("Close", "Закрыть", "閉じる"),
         .unitMegabytes: ("MB", "МБ", "MB"),
         .unitDays: ("days", "дней", "日"),
         .unitMonth: ("1 month", "1 месяц", "1か月"),

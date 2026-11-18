@@ -4,6 +4,7 @@ import AyuSettings
 public final class AyuHistoryStore {
     private static let registryLock = NSLock()
     private static var registry: [String: AyuHistoryStore] = [:]
+    private static let expirationInterval: TimeInterval = 6 * 60 * 60
 
     public static func store(mediaBoxBasePath: String) -> AyuHistoryStore {
         let accountUrl = URL(fileURLWithPath: mediaBoxBasePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -21,46 +22,15 @@ public final class AyuHistoryStore {
     }
 
     private let rootUrl: URL
-    private let chatsUrl: URL
-    private let mediaUrl: URL
     private let queue = DispatchQueue(label: "ecogram.ayu.history", qos: .utility)
     private let fileManager = FileManager()
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var lastExpiration: TimeInterval = 0.0
 
     private init(rootUrl: URL) {
         self.rootUrl = rootUrl
-        self.chatsUrl = rootUrl.appendingPathComponent("chats", isDirectory: true)
-        self.mediaUrl = rootUrl.appendingPathComponent("media", isDirectory: true)
-        try? self.fileManager.createDirectory(at: self.chatsUrl, withIntermediateDirectories: true)
-        try? self.fileManager.createDirectory(at: self.mediaUrl, withIntermediateDirectories: true)
-        self.queue.async {
-            self.performCleanup()
-        }
-    }
-
-    public func url(storedName: String) -> URL {
-        return self.mediaUrl.appendingPathComponent(storedName)
-    }
-
-    public func importMedia(path: String, size: Int64, pathExtension: String) -> String? {
-        let limit = AyuSettings.shared.historyMediaLimitBytes
-        guard limit > 0, size > 0, size <= limit else {
-            return nil
-        }
-        let name = UUID().uuidString + (pathExtension.isEmpty ? "" : "." + pathExtension)
-        let target = self.url(storedName: name)
-        do {
-            try self.fileManager.linkItem(atPath: path, toPath: target.path)
-            return name
-        } catch {
-            do {
-                try self.fileManager.copyItem(atPath: path, toPath: target.path)
-                return name
-            } catch {
-                return nil
-            }
-        }
+        try? self.fileManager.createDirectory(at: rootUrl, withIntermediateDirectories: true)
     }
 
     public func append(_ records: [AyuHistoryRecord]) {
@@ -75,115 +45,75 @@ public final class AyuHistoryStore {
         }
     }
 
-    public func summaries(completion: @escaping ([AyuHistoryChatSummary]) -> Void) {
+    public func editRecords(peerId: Int64, messageId: Int32) -> [AyuHistoryRecord] {
+        return self.queue.sync { () -> [AyuHistoryRecord] in
+            return self.readRecords(peerId: peerId).filter { $0.kind == .edited && $0.messageId == messageId }.sorted(by: { $0.savedAt < $1.savedAt })
+        }
+    }
+
+    public func remove(kind: AyuHistoryRecord.Kind, completion: @escaping ([AyuHistoryRecord]) -> Void) {
         self.queue.async {
-            var result: [AyuHistoryChatSummary] = []
+            var removed: [AyuHistoryRecord] = []
             for peerId in self.storedPeerIds() {
                 let records = self.readRecords(peerId: peerId)
-                guard let last = records.max(by: { $0.savedAt < $1.savedAt }) else {
+                let matching = records.filter { $0.kind == kind }
+                guard !matching.isEmpty else {
                     continue
                 }
-                let deleted = records.filter { $0.kind == .deleted }.count
-                result.append(AyuHistoryChatSummary(peerId: peerId, chatTitle: last.chatTitle, deletedCount: deleted, editedCount: records.count - deleted, lastSavedAt: last.savedAt))
-            }
-            result.sort(by: { $0.lastSavedAt > $1.lastSavedAt })
-            DispatchQueue.main.async {
-                completion(result)
-            }
-        }
-    }
-
-    public func records(peerId: Int64, completion: @escaping ([AyuHistoryRecord]) -> Void) {
-        self.queue.async {
-            let records = self.readRecords(peerId: peerId).sorted(by: { $0.savedAt > $1.savedAt })
-            DispatchQueue.main.async {
-                completion(records)
-            }
-        }
-    }
-
-    public func remove(recordIds: Set<String>, peerId: Int64, completion: (() -> Void)? = nil) {
-        self.queue.async {
-            let records = self.readRecords(peerId: peerId)
-            let removed = records.filter { recordIds.contains($0.id) }
-            self.deleteMedia(of: removed)
-            self.writeRecords(records.filter { !recordIds.contains($0.id) }, peerId: peerId)
-            self.finish(completion)
-        }
-    }
-
-    public func clear(peerId: Int64, completion: (() -> Void)? = nil) {
-        self.queue.async {
-            self.deleteMedia(of: self.readRecords(peerId: peerId))
-            try? self.fileManager.removeItem(at: self.chatUrl(peerId: peerId))
-            self.finish(completion)
-        }
-    }
-
-    public func clearAll(completion: (() -> Void)? = nil) {
-        self.queue.async {
-            try? self.fileManager.removeItem(at: self.chatsUrl)
-            try? self.fileManager.removeItem(at: self.mediaUrl)
-            try? self.fileManager.createDirectory(at: self.chatsUrl, withIntermediateDirectories: true)
-            try? self.fileManager.createDirectory(at: self.mediaUrl, withIntermediateDirectories: true)
-            self.finish(completion)
-        }
-    }
-
-    public func usage(completion: @escaping (Int64) -> Void) {
-        self.queue.async {
-            var total: Int64 = 0
-            for directory in [self.chatsUrl, self.mediaUrl] {
-                let names = (try? self.fileManager.contentsOfDirectory(atPath: directory.path)) ?? []
-                for name in names {
-                    let attributes = try? self.fileManager.attributesOfItem(atPath: directory.appendingPathComponent(name).path)
-                    total += (attributes?[.size] as? NSNumber)?.int64Value ?? 0
-                }
+                self.writeRecords(records.filter { $0.kind != kind }, peerId: peerId)
+                removed.append(contentsOf: matching)
             }
             DispatchQueue.main.async {
-                completion(total)
+                completion(removed)
             }
         }
     }
 
-    public func cleanup() {
+    public func expire(completion: @escaping ([AyuHistoryRecord]) -> Void) {
         self.queue.async {
-            self.performCleanup()
+            let expired = self.removeExpired()
+            DispatchQueue.main.async {
+                completion(expired)
+            }
         }
     }
 
-    private func performCleanup() {
+    public func takeExpiredRecords() -> [AyuHistoryRecord] {
+        let now = Date().timeIntervalSince1970
+        return self.queue.sync { () -> [AyuHistoryRecord] in
+            guard now - self.lastExpiration > AyuHistoryStore.expirationInterval else {
+                return []
+            }
+            self.lastExpiration = now
+            return self.removeExpired()
+        }
+    }
+
+    private func removeExpired() -> [AyuHistoryRecord] {
         let days = AyuSettings.shared.historyCleanupDays
         guard days > 0 else {
-            return
+            return []
         }
         let threshold = Int32(Date().timeIntervalSince1970) - Int32(days * 24 * 60 * 60)
+        var removed: [AyuHistoryRecord] = []
         for peerId in self.storedPeerIds() {
             let records = self.readRecords(peerId: peerId)
             let expired = records.filter { $0.savedAt < threshold }
             guard !expired.isEmpty else {
                 continue
             }
-            self.deleteMedia(of: expired)
             self.writeRecords(records.filter { $0.savedAt >= threshold }, peerId: peerId)
+            removed.append(contentsOf: expired)
         }
-    }
-
-    private func finish(_ completion: (() -> Void)?) {
-        guard let completion else {
-            return
-        }
-        DispatchQueue.main.async {
-            completion()
-        }
+        return removed
     }
 
     private func chatUrl(peerId: Int64) -> URL {
-        return self.chatsUrl.appendingPathComponent("\(peerId).jsonl")
+        return self.rootUrl.appendingPathComponent("\(peerId).jsonl")
     }
 
     private func storedPeerIds() -> [Int64] {
-        let names = (try? self.fileManager.contentsOfDirectory(atPath: self.chatsUrl.path)) ?? []
+        let names = (try? self.fileManager.contentsOfDirectory(atPath: self.rootUrl.path)) ?? []
         return names.compactMap { name -> Int64? in
             guard name.hasSuffix(".jsonl") else {
                 return nil
@@ -237,16 +167,6 @@ public final class AyuHistoryStore {
             try? self.fileManager.removeItem(at: url)
         } else {
             try? self.encodedLines(records).write(to: url, options: .atomic)
-        }
-    }
-
-    private func deleteMedia(of records: [AyuHistoryRecord]) {
-        for record in records {
-            for attachment in record.attachments {
-                if let storedName = attachment.storedName {
-                    try? self.fileManager.removeItem(at: self.url(storedName: storedName))
-                }
-            }
         }
     }
 }

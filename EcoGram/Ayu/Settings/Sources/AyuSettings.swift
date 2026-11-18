@@ -16,10 +16,10 @@ public final class AyuSettings {
         case saveDeletedMessages
         case saveEditedMessages
         case saveInBots
+        case saveSelfDestructing
         case historyMediaLimitMegabytes
         case historyCleanupDays
         case showAyuBadges
-        case backgroundNotifications
 
         var name: String {
             return "ecogram.ayu." + self.rawValue
@@ -39,10 +39,10 @@ public final class AyuSettings {
             Key.saveDeletedMessages.name: true,
             Key.saveEditedMessages.name: true,
             Key.saveInBots.name: false,
+            Key.saveSelfDestructing.name: true,
             Key.historyMediaLimitMegabytes.name: 20,
             Key.historyCleanupDays.name: 0,
-            Key.showAyuBadges.name: true,
-            Key.backgroundNotifications.name: true
+            Key.showAyuBadges.name: true
         ])
     }
 
@@ -86,6 +86,11 @@ public final class AyuSettings {
         set { self.set(newValue, .saveInBots) }
     }
 
+    public var saveSelfDestructing: Bool {
+        get { return self.bool(.saveSelfDestructing) }
+        set { self.set(newValue, .saveSelfDestructing) }
+    }
+
     public var historyMediaLimitMegabytes: Int {
         get { return self.defaults.integer(forKey: Key.historyMediaLimitMegabytes.name) }
         set { self.set(newValue, .historyMediaLimitMegabytes) }
@@ -99,11 +104,6 @@ public final class AyuSettings {
     public var showAyuBadges: Bool {
         get { return self.bool(.showAyuBadges) }
         set { self.set(newValue, .showAyuBadges) }
-    }
-
-    public var backgroundNotifications: Bool {
-        get { return self.bool(.backgroundNotifications) }
-        set { self.set(newValue, .backgroundNotifications) }
     }
 
     public var suppressReadReceipts: Bool {

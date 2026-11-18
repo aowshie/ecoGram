@@ -1,0 +1,592 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ecoGram <build@ecogram.app>
+Date: Wed, 18 Nov 2026 15:55:50 +0200
+Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
+ kept messages
+
+
+diff --git a/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift b/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift
+index bdec8f4fdf24c51fc14cd8bbf499573c83012109..0633af825b1e58f0f13b998f800fda583ffa91a6 100644
+--- a/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift
++++ b/Swiftgram/SGPeerInfoRows/Sources/SGPeerInfoRows.swift
+@@ -2,6 +2,8 @@ import SGSimpleSettings
+ import SGStrings
+ import CountrySelectionUI
+ import Foundation
++import EcoSettingsUI
++import AyuSettingsUI
+ import UIKit
+ import AccountContext
+ import TelegramPresentationData
+@@ -170,5 +172,11 @@ func sgPeerInfoSettingsItems(context: AccountContext, paymentsEnabled: Bool, pre
+     items.append(PeerInfoScreenDisclosureItem(id: 1, label: swiftgramLabel, text: "Swiftgram", icon: PresentationResourcesSettings.swiftgram, action: {
+         interaction.openSettings(.swiftgram)
+     }))
++    items.append(PeerInfoScreenDisclosureItem(id: 2, label: .none, text: "AyuGram", icon: ayuSettingsIcon, action: {
++        interaction.openSettings(.ayugram)
++    }))
++    items.append(PeerInfoScreenDisclosureItem(id: 3, label: .none, text: "ecoGram", icon: ecoSettingsIcon, action: {
++        interaction.openSettings(.ecogram)
++    }))
+     return items
+ }
+diff --git a/submodules/ChatListUI/BUILD b/submodules/ChatListUI/BUILD
+index c0fa1aaef0cfb60635e2e907a8469750f87d6565..43fd9e8caed8cdbf1e9f0a8dbbdd31fcbe3efe1c 100644
+--- a/submodules/ChatListUI/BUILD
++++ b/submodules/ChatListUI/BUILD
+@@ -5,7 +5,8 @@ load("@build_bazel_rules_apple//apple/testing/default_runner:ios_test_runner.bzl
+ sgdeps = [
+     "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
+     "//Swiftgram/SGAPIWebSettings:SGAPIWebSettings",
+-    "//Swiftgram/SGAPIToken:SGAPIToken"
++    "//Swiftgram/SGAPIToken:SGAPIToken",
++    "//EcoGram/Ayu/Badges:AyuBadges",
+ ]
+ sgsrcs = [
+     "//Swiftgram/SGChatListSimpleSettingsSignal:SGChatListSimpleSettingsSignal",
+diff --git a/submodules/ChatListUI/Sources/Node/ChatListItem.swift b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
+index 655bed73fbb335838b2279db8ac9d95e68444dd0..f90ae7abef5cbf0b416feb0222f55b903853a340 100644
+--- a/submodules/ChatListUI/Sources/Node/ChatListItem.swift
++++ b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
+@@ -1,5 +1,6 @@
+ import SGSimpleSettings // MARK: Swiftgram
+ import Foundation
++import AyuBadges
+ import UIKit
+ import AsyncDisplayKit
+ import Display
+@@ -1519,6 +1520,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+     var credibilityIconView: ComponentHostView<Empty>?
+     var credibilityIconComponent: EmojiStatusComponent?
+     var statusIconView: ComponentHostView<Empty>?
++    var ayuBadgeIconView: UIImageView?
+     var statusIconComponent: EmojiStatusComponent?
+     let hiddenPeerIconNode: ASImageNode
+     let mutedIconNode: ASImageNode
+@@ -2680,6 +2682,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+             var currentHiddenIconImage: UIImage?
+             var currentMutedIconImage: UIImage?
+             var currentCredibilityIconContent: EmojiStatusComponent.Content?
++            var currentAyuBadge: AyuBadgeKind?
+             var currentVerifiedIconContent: EmojiStatusComponent.Content?
+             var currentStatusIconContent: EmojiStatusComponent.Content?
+             var currentStatusIconParticleColor: UIColor?
+@@ -3845,12 +3848,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+                     if let verificationIconFileId = peer.verificationIconFileId {
+                         currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
+                     }
++                    currentAyuBadge = AyuBadges.shared.badge(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
+                 }
+             }
+             if case let .peer(peerData) = item.content, peerData.isSideListAllThreadsItem {
+                 // "All Messages" is not the peer's own title: no status or verification marks.
+                 currentCredibilityIconContent = nil
+                 currentVerifiedIconContent = nil
++                currentAyuBadge = nil
+                 currentStatusIconContent = nil
+             }
+             if let currentSecretIconImage = currentSecretIconImage {
+@@ -3910,6 +3915,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+                 }
+             }
+             
++            if currentAyuBadge != nil {
++                titleIconsWidth += titleIconsWidth.isZero ? 4.0 : 2.0
++                titleIconsWidth += 18.0
++            }
++            
+             let layoutOffset: CGFloat = 0.0
+             
+             let rawContentWidth = params.width - leftInset - params.rightInset - 18.0 - editingOffset - (item.interaction.isSideListMode ? ChatListItem.sideListContentInset - 12.0 : 0.0)
+@@ -5578,6 +5588,25 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+                         credibilityIconView.removeFromSuperview()
+                     }
+                     
++                    if let currentAyuBadge, let ayuBadgeImage = AyuBadgeImages.image(currentAyuBadge) {
++                        let ayuBadgeIconView: UIImageView
++                        if let current = strongSelf.ayuBadgeIconView {
++                            ayuBadgeIconView = current
++                        } else {
++                            ayuBadgeIconView = UIImageView()
++                            strongSelf.ayuBadgeIconView = ayuBadgeIconView
++                            strongSelf.mainContentContainerNode.view.addSubview(ayuBadgeIconView)
++                        }
++                        ayuBadgeIconView.image = ayuBadgeImage.withRenderingMode(.alwaysTemplate)
++                        ayuBadgeIconView.tintColor = item.presentationData.theme.list.itemAccentColor
++                        let ayuBadgeSize = CGSize(width: 18.0, height: 18.0)
++                        transition.updateFrame(view: ayuBadgeIconView, frame: CGRect(origin: CGPoint(x: nextTitleIconOrigin, y: floorToScreenPixels(titleFrame.maxY - lastLineRect.height * 0.5 - ayuBadgeSize.height / 2.0) - UIScreenPixel), size: ayuBadgeSize))
++                        nextTitleIconOrigin += ayuBadgeSize.width + 4.0
++                    } else if let ayuBadgeIconView = strongSelf.ayuBadgeIconView {
++                        strongSelf.ayuBadgeIconView = nil
++                        ayuBadgeIconView.removeFromSuperview()
++                    }
++                    
+                     if let currentVerifiedIconContent {
+                         let verifiedIconView: ComponentHostView<Empty>
+                         if let current = strongSelf.verifiedIconView {
+diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
+index 767fd2867d058071b438b11b0d64b9bb4e096ed2..f2758c7ddc717732ee6e8d077847378be78ac50f 100644
+--- a/submodules/TelegramUI/BUILD
++++ b/submodules/TelegramUI/BUILD
+@@ -25,6 +25,10 @@ sgdeps = [
+     "//Swiftgram/SGProUI:SGProUI",
+     "//Swiftgram/SGKeychainBackupManager:SGKeychainBackupManager",
+     "//Swiftgram/SGGHSettings:SGGHSettings",
++    "//EcoGram/Notifications:EcoNotifications",
++    "//EcoGram/ContextMenu:EcoContextMenu",
++    "//EcoGram/Ayu/SettingsUI:AyuSettingsUI",
++    "//EcoGram/Strings:EcoStrings",
+     # "//Swiftgram/SGContentAnalysis:SGContentAnalysis"
+ ]
+ 
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
+index bf71cb207328261b644bc13dda3f3563bdb761f8..dd99e9143b7be34c4a578d794a893129d60eafc5 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
+@@ -258,5 +258,8 @@ public func stringForMessageTimestampStatus(
+         }
+     }
+     
++    if message._asMessage().ayuIsDeleted {
++        dateText = "\u{1F5D1}\u{FE0E} " + dateText
++    }
+     return dateText
+ }
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift b/submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift
+index c8cf0659bd1bc1458410400af71e54af1ecda94d..932abd006bc897a73485deb11ca96a0c6f61b598 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift
+@@ -683,6 +683,7 @@ open class ChatMessageItemView: ListViewItemNode, ChatMessageItemNodeProtocol {
+     
+     private var wasFilteredKeywordTested: Bool = false
+     private var matchedFilterKeyword: String? = nil
++    private var isAyuDimmed: Bool = false
+     
+     public required init(rotated: Bool) {
+         super.init(layerBacked: false, rotated: rotated)
+@@ -722,6 +723,15 @@ open class ChatMessageItemView: ListViewItemNode, ChatMessageItemNodeProtocol {
+             }
+         }
+         self.wasFilteredKeywordTested = true
++        if self.matchedFilterKeyword == nil {
++            let isDeleted = item.message.ayuIsDeleted
++            if isDeleted {
++                self.alpha = 0.65
++            } else if self.isAyuDimmed {
++                self.alpha = 1.0
++            }
++            self.isAyuDimmed = isDeleted
++        }
+     }
+     
+     open func updateAccessibilityData(_ accessibilityData: ChatMessageAccessibilityData) {
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
+index f05b8b8b4e8a411133d8fa1fb4470def9c369b82..1e963af9840a00e0a10845c243128d8eca500e4d 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
+@@ -11,6 +11,8 @@ swift_library(
+     ],
+     deps = [
+         "//submodules/AsyncDisplayKit",
++        "//EcoGram/Ayu/Shot:AyuShot",
++        "//EcoGram/Preferences:EcoPreferences",
+         "//submodules/Display",
+         "//submodules/TelegramCore",
+         "//submodules/SSignalKit/SwiftSignalKit",
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift
+index a5412dc0d1d590c6c196d74c057382a76028f5ea..d05772fe23f4b6a8f42767edae33f1bbf78aa66e 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift
+@@ -1,4 +1,6 @@
+ import Foundation
++import EcoPreferences
++import AyuShot
+ import UIKit
+ import AsyncDisplayKit
+ import Display
+@@ -201,6 +203,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+     // MARK: Swiftgram
+     private let cloudButton: GlassButtonView
+     private let forwardHideNamesButton: GlassButtonView
++    private let shotButton: GlassButtonView
+     //
+     private let shareButton: GlassButtonView
+     private let tagButton: GlassButtonView
+@@ -256,6 +259,11 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         self.forwardHideNamesButton.image = generateTintedImage(image: UIImage(bundleImageName: "Avatar/AnonymousSenderIcon"), color: theme.chat.inputPanel.panelControlAccentColor, customSize: CGSize(width: 28.0, height: 28.0))
+         self.forwardHideNamesButton.isAccessibilityElement = true
+         self.forwardHideNamesButton.accessibilityLabel = "Hide Sender Name"
++        
++        self.shotButton = GlassButtonView()
++        self.shotButton.image = generateTintedImage(image: UIImage(systemName: "camera.viewfinder", withConfiguration: UIImage.SymbolConfiguration(pointSize: 21.0, weight: .medium)), color: theme.chat.inputPanel.panelControlAccentColor)
++        self.shotButton.isAccessibilityElement = true
++        self.shotButton.accessibilityLabel = "Shot"
+         //
+         
+         self.shareButton = GlassButtonView()
+@@ -282,6 +290,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         self.view.addSubview(self.forwardButton)
+         self.view.addSubview(self.cloudButton) // MARK: Swiftgram
+         self.view.addSubview(self.forwardHideNamesButton) // MARK: Swiftgram
++        self.view.addSubview(self.shotButton)
+         self.view.addSubview(self.shareButton)
+         self.view.addSubview(self.tagButton)
+         self.view.addSubview(self.tagEditButton)
+@@ -301,6 +310,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         // MARK: Swiftgram
+         self.cloudButton.button.addTarget(self, action: #selector(self.cloudButtonPressed), for: .touchUpInside)
+         self.forwardHideNamesButton.button.addTarget(self, action: #selector(self.forwardHideNamesButtonPressed), for: .touchUpInside)
++        self.shotButton.button.addTarget(self, action: #selector(self.shotButtonPressed), for: .touchUpInside)
+         //
+         self.shareButton.button.addTarget(self, action: #selector(self.shareButtonPressed), for: .touchUpInside)
+         self.tagButton.button.addTarget(self, action: #selector(self.tagButtonPressed), for: .touchUpInside)
+@@ -316,6 +326,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         // MARK: Swiftgram
+         self.cloudButton.isEnabled = self.forwardButton.isEnabled
+         self.forwardHideNamesButton.isEnabled = self.forwardButton.isEnabled
++        self.shotButton.isEnabled = self.selectedMessages.count != 0
+         //
+         
+         if self.selectedMessages.isEmpty {
+@@ -396,6 +407,38 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         }
+     }
+     
++    @objc private func shotButtonPressed() {
++        guard let context = self.context, !self.selectedMessages.isEmpty else {
++            return
++        }
++        ayuPresentShot(context: context, messageIds: Array(self.selectedMessages), sourceView: self.view)
++        self.interfaceInteraction?.cancelMessageSelection(.animated(duration: 0.4, curve: .spring))
++    }
++    
++    private func ecoArrangedButtons(tagButton: GlassButtonView?) -> [GlassButtonView] {
++        var available: [EcoSelectionAction: GlassButtonView] = [
++            .shot: self.shotButton,
++            .forward: self.forwardButton,
++            .share: self.shareButton,
++            .saveToCloud: self.cloudButton,
++            .hideSenderNames: self.forwardHideNamesButton
++        ]
++        if !self.deleteButton.isHidden {
++            available[.delete] = self.deleteButton
++        }
++        if !self.reportButton.isHidden {
++            available[.report] = self.reportButton
++        }
++        if let tagButton {
++            available[.tag] = tagButton
++        }
++        let result = EcoPreferences.shared.enabledSelectionActions.compactMap { available[$0] }
++        for button in [self.deleteButton, self.reportButton, self.forwardButton, self.cloudButton, self.forwardHideNamesButton, self.shareButton, self.tagButton, self.tagEditButton, self.shotButton] {
++            button.isHidden = !result.contains(where: { $0 === button })
++        }
++        return result
++    }
++    
+     @objc private func tagButtonPressed() {
+         guard let context = self.context else {
+             return
+@@ -656,18 +699,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         
+         let buttonSize = CGSize(width: 40.0, height: 40.0)
+ 
+-        // MARK: Swiftgram
+-        reportButton.isHidden = true
+-        buttons = [
+-            self.deleteButton,
+-            self.reportButton,
+-            tagButton ?? self.tagButton,
+-            self.shareButton,
+-            self.cloudButton,
+-            self.forwardHideNamesButton,
+-            self.forwardButton
+-        ].filter { !$0.isHidden }
+-        //
++        buttons = self.ecoArrangedButtons(tagButton: tagButton)
+         
+         let availableWidth = width - leftInset - rightInset
+         let spacing: CGFloat = floor((availableWidth - buttonSize.width * CGFloat(buttons.count)) / CGFloat(buttons.count - 1))
+@@ -675,7 +707,9 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         for i in 0 ..< buttons.count {
+             let button = buttons[i]
+             let buttonFrame: CGRect
+-            if i == buttons.count - 1 {
++            if buttons.count == 1 {
++                buttonFrame = CGRect(origin: CGPoint(x: floor((width - buttonSize.width) / 2.0), y: 0.0), size: buttonSize)
++            } else if i == buttons.count - 1 {
+                 buttonFrame = CGRect(origin: CGPoint(x: width - rightInset - buttonSize.width, y: 0.0), size: buttonSize)
+             } else {
+                 buttonFrame = CGRect(origin: CGPoint(x: offset, y: 0.0), size: buttonSize)
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
+index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..8d74b6398babd304f60579a348d673bd3d18fab4 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
+@@ -9,6 +9,10 @@ sgdeps = [
+     "//Swiftgram/SGRegDate:SGRegDate",
+     "//Swiftgram/SGRegDateScheme:SGRegDateScheme",
+     "//Swiftgram/SGDebugUI:SGDebugUI",
++    "//EcoGram/Settings:EcoSettingsUI",
++    "//EcoGram/Ayu/SettingsUI:AyuSettingsUI",
++    "//EcoGram/Ayu/Badges:AyuBadges",
++    "//EcoGram/Preferences:EcoPreferences",
+ ]
+ #
+ # MARK: Swiftgram
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..beb7ef910e90550d49ae0f3625ddbcb542223237 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
+@@ -1,5 +1,6 @@
+ import SGSimpleSettings // MARK: Swiftgram
+ import Foundation
++import AyuBadges
+ import UIKit
+ import AsyncDisplayKit
+ import Display
+@@ -149,6 +150,10 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+     let titleExpandedStatusIconView: ComponentHostView<Empty>
+     var titleExpandedStatusIconSize: CGSize?
+     
++    let titleAyuBadgeView: UIImageView
++    let titleExpandedAyuBadgeView: UIImageView
++    private var ayuBadge: AyuBadgeKind?
++    
+     var subtitleRating: ComponentView<Empty>?
+     
+     let subtitleNodeContainer: ASDisplayNode
+@@ -328,6 +333,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+         self.titleStatusIconView = ComponentHostView<Empty>()
+         self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleStatusIconView)
+         
++        self.titleAyuBadgeView = UIImageView()
++        self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleAyuBadgeView)
++        
++        self.titleExpandedAyuBadgeView = UIImageView()
++        self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedAyuBadgeView)
++        
+         self.titleExpandedStatusIconView = ComponentHostView<Empty>()
+         self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedStatusIconView)
+         
+@@ -710,6 +721,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+         var credibilityIcon: CredibilityIcon = .none
+         var verifiedIcon: CredibilityIcon = .none
+         var statusIcon: CredibilityIcon = .none
++        self.ayuBadge = peer.flatMap { peer in
++            return AyuBadges.shared.badge(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
++        }
+         if let peer {
+             if peer.id == self.context.account.peerId && !self.isSettings && !self.isMyProfile {
+                 credibilityIcon = .none
+@@ -1001,6 +1015,11 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+         
+         do {
+             self.currentCredibilityIcon = credibilityIcon
++            let ayuBadgeImage = self.ayuBadge.flatMap { AyuBadgeImages.image($0)?.withRenderingMode(.alwaysTemplate) }
++            self.titleAyuBadgeView.image = ayuBadgeImage
++            self.titleAyuBadgeView.tintColor = navigationContentsAccentColor
++            self.titleExpandedAyuBadgeView.image = ayuBadgeImage
++            self.titleExpandedAyuBadgeView.tintColor = navigationContentsAccentColor
+             
+             var emojiStatusSize: CGSize?
+             var currentEmojiStatus: PeerEmojiStatus?
+@@ -1742,6 +1761,21 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+             nextExpandedIconX += 4.0 + titleExpandedCredibilityIconSize.width
+         }
+                 
++        if self.titleAyuBadgeView.image != nil {
++            let badgeSize = CGSize(width: 22.0, height: 22.0)
++            let expandedBadgeSize = CGSize(width: 20.0, height: 20.0)
++            titleHorizontalOffset -= (badgeSize.width + 4.0) / 2.0
++            self.titleAyuBadgeView.isHidden = false
++            self.titleExpandedAyuBadgeView.isHidden = false
++            transition.updateFrame(view: self.titleAyuBadgeView, frame: CGRect(origin: CGPoint(x: nextIconX + 4.0, y: floor((titleSize.height - badgeSize.height) / 2.0)), size: badgeSize))
++            transition.updateFrame(view: self.titleExpandedAyuBadgeView, frame: CGRect(origin: CGPoint(x: nextExpandedIconX + 4.0, y: floor((titleExpandedSize.height - expandedBadgeSize.height) / 2.0) + 1.0), size: expandedBadgeSize))
++            nextIconX += 4.0 + badgeSize.width
++            nextExpandedIconX += 4.0 + expandedBadgeSize.width
++        } else {
++            self.titleAyuBadgeView.isHidden = true
++            self.titleExpandedAyuBadgeView.isHidden = true
++        }
++        
+         if let verifiedIconSize = self.verifiedIconSize, let titleExpandedVerifiedIconSize = self.titleExpandedVerifiedIconSize, verifiedIconSize.width > 0.0 {
+             let leftOffset: CGFloat
+             let leftExpandedOffset: CGFloat
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..cbee263962b2a00fddfc7374b13fa3315fce44c5 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+@@ -6,6 +6,7 @@ import SGStrings
+ import CountrySelectionUI
+ //
+ import Foundation
++import EcoPreferences
+ import UIKit
+ import Display
+ import AsyncDisplayKit
+@@ -173,6 +174,8 @@ enum PeerInfoSettingsSection {
+     case swiftgram
+     case swiftgramPro
+     //
++    case ayugram
++    case ecogram
+     case avatar
+     case edit
+     case proxy
+@@ -6860,9 +6863,9 @@ public final class PeerInfoScreenImpl: ViewController, PeerInfoScreen, KeyShortc
+             }
+             |> distinctUntilChanged
+             
+-            let accountTabBarAvatar: Signal<(UIImage, UIImage)?, NoError> = combineLatest(self.accountsAndPeers.get(), context.sharedContext.presentationData)
+-            |> map { primaryAndOther, presentationData -> (Account, EnginePeer, PresentationTheme)? in
+-                if let primary = primaryAndOther.0, !primaryAndOther.1.isEmpty {
++            let accountTabBarAvatar: Signal<(UIImage, UIImage)?, NoError> = combineLatest(self.accountsAndPeers.get(), context.sharedContext.presentationData, EcoPreferences.shared.avatarInTabBarSignal)
++            |> map { primaryAndOther, presentationData, avatarInTabBar -> (Account, EnginePeer, PresentationTheme)? in
++                if let primary = primaryAndOther.0, !primaryAndOther.1.isEmpty || avatarInTabBar {
+                     return (primary.0.account, primary.1, presentationData.theme)
+                 } else {
+                     return nil
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+index 446979e1d4d5fb491531f9e23f8593836709fe2b..089b85b6731bf5d8d0380fdf4fdeaaf88fd90f08 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+@@ -1,6 +1,8 @@
+ import SGStrings
+ import SGSettingsUI
+ import Foundation
++import EcoSettingsUI
++import AyuSettingsUI
+ import UIKit
+ import Display
+ import AccountContext
+@@ -66,6 +68,10 @@ extension PeerInfoScreenNode {
+                     self.controller?.present(self.context.sharedContext.makeSGUpdateIOSController(), animated: true)
+                 }
+             }
++        case .ayugram:
++            self.controller?.push(ayuSettingsController(context: self.context))
++        case .ecogram:
++            self.controller?.push(ecoSettingsController(context: self.context))
+         case .avatar:
+             self.controller?.openAvatarForEditing()
+         case .edit:
+diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..104f4efeaf1343fa5f4a925cdd9a4823cad1eb50 100644
+--- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
++++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
+@@ -1,6 +1,9 @@
+ import SGSimpleSettings // MARK: Swiftgram
+ import PeerInfoUI
+ import Foundation
++import EcoStrings
++import AyuSettingsUI
++import EcoContextMenu
+ import UIKit
+ import TelegramCore
+ import AsyncDisplayKit
+@@ -2297,6 +2300,14 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+             canViewStats = canViewReadStats(message: message, participantCount: infoSummaryData.participantCount, isMessageRead: isMessageRead, isPremium: isPremium, appConfig: appConfig)
+         }
+ 
++        if let editHistoryItem = ayuEditHistoryContextItem(context: context, messageId: message.id, currentText: message.text, title: EcoStrings(languageCode: chatPresentationInterfaceState.strings.baseLanguageCode).get(.editHistory), push: { controller in
++            controllerInteraction.navigationController()?.pushViewController(controller)
++        }) {
++            actions.append(editHistoryItem)
++        }
++        if ecoArrangeContextMenu(actions: &actions, sgActions: &sgActions, strings: chatPresentationInterfaceState.strings) {
++            sgActionsIndex = nil
++        }
+         sgInsertContextMenu(actions: &actions, sgActions: &sgActions, index: sgActionsIndex, chatPresentationInterfaceState: chatPresentationInterfaceState) // MARK: Swiftgram
+         
+         var reactionCount = 0
+diff --git a/submodules/TelegramUI/Sources/SharedWakeupManager.swift b/submodules/TelegramUI/Sources/SharedWakeupManager.swift
+index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..8594f6e6ce3daa55cbc5b26d4dbeedbc91bca0ea 100644
+--- a/submodules/TelegramUI/Sources/SharedWakeupManager.swift
++++ b/submodules/TelegramUI/Sources/SharedWakeupManager.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import EcoNotifications
+ import BackgroundTasks
+ import AVFAudio
+ import UIKit
+@@ -72,6 +73,10 @@ public final class SharedWakeupManager {
+     
+     private var inForeground: Bool = false
+     private var hasActiveAudioSession: Bool = false
++    private var ecoKeepAlive: EcoKeepAlive?
++    private var ecoKeepAliveActive: Bool = false
++    private var ecoNotifier: EcoLocalNotifier?
++    private var ecoNotifierDisposable: Disposable?
+     private var activeExplicitExtensionTimer: SwiftSignalKit.Timer?
+     private var activeExplicitExtensionTask: UIBackgroundTaskIdentifier?
+     private var allowBackgroundTimeExtensionDeadline: Double?
+@@ -120,6 +125,20 @@ public final class SharedWakeupManager {
+         self.acquireIdleExtension = acquireIdleExtension
+         self.presentationData = presentationData
+         
++        self.ecoKeepAlive = EcoKeepAlive(beginBackgroundTask: beginBackgroundTask, endBackgroundTask: endBackgroundTask, updated: { [weak self] value in
++            guard let self else {
++                return
++            }
++            self.ecoKeepAliveActive = value
++            self.checkTasks()
++        })
++        let ecoNotifier = EcoLocalNotifier(presentationData: presentationData)
++        self.ecoNotifier = ecoNotifier
++        self.ecoNotifierDisposable = (activeAccounts
++        |> deliverOnMainQueue).startStrict(next: { [weak ecoNotifier] activeAccounts in
++            ecoNotifier?.update(accounts: activeAccounts.accounts)
++        })
++        
+         self.accountSettingsDisposable = (activeAccounts
+         |> mapToSignal { activeAccounts -> Signal<Bool, NoError> in
+             guard let account = activeAccounts.primary else {
+@@ -149,6 +168,7 @@ public final class SharedWakeupManager {
+                 return
+             }
+             strongSelf.inForeground = value
++            strongSelf.ecoKeepAlive?.update(inForeground: value)
+             if value {
+                 strongSelf.activeExplicitExtensionTimer?.invalidate()
+                 strongSelf.activeExplicitExtensionTimer = nil
+@@ -174,6 +194,7 @@ public final class SharedWakeupManager {
+                 return
+             }
+             strongSelf.hasActiveAudioSession = value
++            strongSelf.ecoKeepAlive?.update(telegramAudioActive: value)
+             strongSelf.checkTasks()
+         })
+         
+@@ -358,6 +379,7 @@ public final class SharedWakeupManager {
+         self.accountSettingsDisposable?.dispose()
+         self.inForegroundDisposable?.dispose()
+         self.hasActiveAudioSessionDisposable?.dispose()
++        self.ecoNotifierDisposable?.dispose()
+         self.tasksDisposable?.dispose()
+         self.pendingMediaUploadsDisposable?.dispose()
+         self.pendingStoryUploadsDisposable?.dispose()
+@@ -993,7 +1015,7 @@ public final class SharedWakeupManager {
+         
+         var endTaskAfterTransactionsComplete: UIBackgroundTaskIdentifier?
+         
+-        if self.inForeground || self.hasActiveAudioSession || hasActiveCalls {
++        if self.inForeground || self.hasActiveAudioSession || hasActiveCalls || self.ecoKeepAliveActive {
+             if let (completion, timer) = self.currentExternalCompletion {
+                 self.currentExternalCompletion = nil
+                 completion()
+@@ -1135,13 +1157,13 @@ public final class SharedWakeupManager {
+     private func updateAccounts(hasTasks: Bool, endTaskAfterTransactionsComplete: UIBackgroundTaskIdentifier?) {
+         let hasBackgroundLocationTask = self.accountsAndTasks.contains(where: { $0.2.backgroundLocation })
+         
+-        if self.inForeground || self.hasActiveAudioSession || self.isInBackgroundExtension || self.backgroundProcessingTaskId != nil || self.backgroundStoryProcessingTaskId != nil || hasBackgroundLocationTask || (hasTasks && self.currentExternalCompletion != nil) || self.activeExplicitExtensionTimer != nil || self.silenceAudioRenderer != nil {
++        if self.inForeground || self.hasActiveAudioSession || self.isInBackgroundExtension || self.backgroundProcessingTaskId != nil || self.backgroundStoryProcessingTaskId != nil || hasBackgroundLocationTask || (hasTasks && self.currentExternalCompletion != nil) || self.activeExplicitExtensionTimer != nil || self.silenceAudioRenderer != nil || self.ecoKeepAliveActive {
+             Logger.shared.log("Wakeup", "enableBeginTransactions: true (active)")
+             
+             for (account, primary, tasks) in self.accountsAndTasks {
+                 account.postbox.setCanBeginTransactions(true)
+                 
+-                if (self.inForeground && primary) || !tasks.isEmpty || (self.activeExplicitExtensionTimer != nil && primary) {
++                if (self.inForeground && primary) || !tasks.isEmpty || (self.activeExplicitExtensionTimer != nil && primary) || self.ecoKeepAliveActive {
+                     account.shouldBeServiceTaskMaster.set(.single(.always))
+                 } else {
+                     account.shouldBeServiceTaskMaster.set(.single(.never))

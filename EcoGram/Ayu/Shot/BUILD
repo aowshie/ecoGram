@@ -1,18 +1,19 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
 swift_library(
-    name = "AyuBackground",
-    module_name = "AyuBackground",
+    name = "AyuShot",
+    module_name = "AyuShot",
     srcs = glob([
         "Sources/**/*.swift",
     ]),
     deps = [
-        "//EcoGram/Ayu/Settings:AyuSettings",
+        "//EcoGram/Strings:EcoStrings",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+        "//submodules/AsyncDisplayKit:AsyncDisplayKit",
+        "//submodules/Display:Display",
         "//submodules/TelegramCore:TelegramCore",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
-        "//submodules/TelegramStringFormatting:TelegramStringFormatting",
-        "//submodules/LocalizedPeerData:LocalizedPeerData",
+        "//submodules/AccountContext:AccountContext",
     ],
     visibility = [
         "//visibility:public",

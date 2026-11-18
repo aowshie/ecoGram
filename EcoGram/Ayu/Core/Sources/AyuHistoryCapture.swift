@@ -3,41 +3,189 @@ import Postbox
 import AyuSettings
 import AyuHistory
 
-enum AyuHistoryCapture {
-    static func captureDeleted(transaction: Transaction, mediaBox: MediaBox, globalIds: [Int32]) {
-        guard AyuSettings.shared.saveDeletedMessages, !globalIds.isEmpty else {
-            return
+struct AyuRetention {
+    static let empty = AyuRetention(keptIds: [], retained: [], protectedMediaIds: [])
+
+    let keptIds: Set<MessageId>
+    let retained: [StoreMessage]
+    let protectedMediaIds: Set<MediaId>
+
+    private var retainedIds: Set<MessageId> {
+        var result = Set<MessageId>()
+        for message in self.retained {
+            if case let .Id(id) = message.id {
+                result.insert(id)
+            }
         }
-        self.captureDeleted(transaction: transaction, mediaBox: mediaBox, ids: transaction.messageIdsForGlobalIds(globalIds))
+        return result
     }
 
-    static func captureDeleted(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) {
-        guard AyuSettings.shared.saveDeletedMessages, !ids.isEmpty else {
-            return
+    func isDeletable(_ id: MessageId) -> Bool {
+        return !self.keptIds.contains(id)
+    }
+
+    func isDeletable(globalId: Int32) -> Bool {
+        return !self.keptIds.contains(where: { $0.id == globalId })
+    }
+
+    func isReported(_ id: MessageId) -> Bool {
+        return !self.keptIds.contains(id) && !self.retainedIds.contains(id)
+    }
+
+    func isReported(globalId: Int32) -> Bool {
+        return !self.keptIds.contains(where: { $0.id == globalId }) && !self.retainedIds.contains(where: { $0.id == globalId })
+    }
+
+    func protects(_ media: Media) -> Bool {
+        guard let id = media.id else {
+            return false
+        }
+        return self.protectedMediaIds.contains(id)
+    }
+
+    func restore(transaction: Transaction) {
+        if !self.retained.isEmpty {
+            let _ = transaction.addMessages(self.retained, location: .Random)
+        }
+    }
+}
+
+enum AyuHistoryCapture {
+    static func retain(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) -> AyuRetention {
+        guard !ids.isEmpty else {
+            return .empty
         }
         let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
-        let now = Int32(Date().timeIntervalSince1970)
-        var records: [AyuHistoryRecord] = []
+        self.expireIfNeeded(transaction: transaction, mediaBox: mediaBox, store: store)
+        var keptIds = Set<MessageId>()
         for id in ids {
+            if transaction.getMessage(id)?.ayuIsDeleted == true {
+                keptIds.insert(id)
+            }
+        }
+        guard AyuSettings.shared.saveDeletedMessages else {
+            return AyuRetention(keptIds: keptIds, retained: [], protectedMediaIds: [])
+        }
+        let now = Int32(Date().timeIntervalSince1970)
+        let mediaLimit = AyuSettings.shared.historyMediaLimitBytes
+        var records: [AyuHistoryRecord] = []
+        var retained: [StoreMessage] = []
+        var protectedMediaIds = Set<MediaId>()
+        for id in ids where !keptIds.contains(id) {
             guard let message = transaction.getMessage(id), self.isEligible(message: message, transaction: transaction) else {
                 continue
             }
-            let attachments = message.media.compactMap { self.attachment(media: $0, mediaBox: mediaBox, store: store) }
-            if message.text.isEmpty && attachments.isEmpty {
+            if message.text.isEmpty && message.media.isEmpty {
                 continue
             }
-            records.append(self.record(kind: .deleted, message: message, transaction: transaction, savedAt: now, replacementText: nil, attachments: attachments))
+            records.append(AyuHistoryRecord(kind: .deleted, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: now, text: message.text, replacementText: nil))
+            retained.append(self.retainedMessage(message, deletedAt: now))
+            for media in message.media {
+                if let mediaId = media.id, mediaLimit > 0, self.size(of: media, mediaBox: mediaBox) <= mediaLimit {
+                    protectedMediaIds.insert(mediaId)
+                }
+            }
         }
         store.append(records)
+        return AyuRetention(keptIds: keptIds, retained: retained, protectedMediaIds: protectedMediaIds)
     }
 
     static func captureEdit(transaction: Transaction, mediaBox: MediaBox, id: MessageId, updated: StoreMessage) {
-        guard AyuSettings.shared.saveEditedMessages, let message = transaction.getMessage(id), !message.text.isEmpty, message.text != updated.text, self.isEligible(message: message, transaction: transaction) else {
+        guard AyuSettings.shared.saveEditedMessages, let message = transaction.getMessage(id), !message.ayuIsDeleted, !message.text.isEmpty, message.text != updated.text, self.isEligible(message: message, transaction: transaction) else {
             return
         }
         let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
-        let record = self.record(kind: .edited, message: message, transaction: transaction, savedAt: Int32(Date().timeIntervalSince1970), replacementText: updated.text, attachments: [])
-        store.append([record])
+        store.append([AyuHistoryRecord(kind: .edited, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: Int32(Date().timeIntervalSince1970), text: message.text, replacementText: updated.text)])
+    }
+
+    static func keepSelfDestructing(transaction: Transaction, mediaBox: MediaBox, message: Message, isRemove: Bool) -> Bool {
+        guard AyuSettings.shared.saveSelfDestructing, message.id.namespace == Namespaces.Message.Cloud, message.id.peerId.namespace != Namespaces.Peer.SecretChat else {
+            return false
+        }
+        if isRemove {
+            let retention = self.retain(transaction: transaction, mediaBox: mediaBox, ids: [message.id])
+            guard !retention.retained.isEmpty else {
+                return false
+            }
+            _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: [message.id])
+            retention.restore(transaction: transaction)
+            return true
+        }
+        transaction.updateMessage(message.id, update: { currentMessage in
+            let attributes = currentMessage.attributes.filter { attribute in
+                return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute)
+            }
+            return .update(StoreMessage(
+                id: currentMessage.id,
+                customStableId: nil,
+                globallyUniqueId: currentMessage.globallyUniqueId,
+                groupingKey: currentMessage.groupingKey,
+                threadId: currentMessage.threadId,
+                timestamp: currentMessage.timestamp,
+                flags: StoreMessageFlags(currentMessage.flags),
+                tags: currentMessage.tags,
+                globalTags: currentMessage.globalTags,
+                localTags: currentMessage.localTags,
+                forwardInfo: currentMessage.forwardInfo.map(StoreMessageForwardInfo.init),
+                authorId: currentMessage.author?.id,
+                text: currentMessage.text,
+                attributes: attributes,
+                media: currentMessage.media
+            ))
+        })
+        return true
+    }
+
+    static func deleteUnlessKept(transaction: Transaction, mediaBox: MediaBox, id: MessageId) {
+        if transaction.getMessage(id)?.ayuIsDeleted == true {
+            return
+        }
+        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: [id])
+    }
+
+    static func isKept(transaction: Transaction, id: MessageId) -> Bool {
+        return transaction.getMessage(id)?.ayuIsDeleted == true
+    }
+
+    private static func expireIfNeeded(transaction: Transaction, mediaBox: MediaBox, store: AyuHistoryStore) {
+        let expired = store.takeExpiredRecords()
+        guard !expired.isEmpty else {
+            return
+        }
+        let ids = expired.filter { $0.kind == .deleted }.map { record in
+            MessageId(peerId: PeerId(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
+        }
+        let kept = ids.filter { transaction.getMessage($0)?.ayuIsDeleted == true }
+        if !kept.isEmpty {
+            _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: kept)
+        }
+    }
+
+    private static func retainedMessage(_ message: Message, deletedAt: Int32) -> StoreMessage {
+        var attributes = message.attributes.filter { attribute in
+            return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute)
+        }
+        attributes.append(AyuDeletedMessageAttribute(date: deletedAt))
+        var flags = StoreMessageFlags(message.flags)
+        flags.remove(.TopIndexable)
+        flags.remove(.ReactionsArePossible)
+        return StoreMessage(
+            id: message.id,
+            customStableId: message.stableId,
+            globallyUniqueId: message.globallyUniqueId,
+            groupingKey: message.groupingKey,
+            threadId: message.threadId,
+            timestamp: message.timestamp,
+            flags: flags,
+            tags: [],
+            globalTags: [],
+            localTags: [],
+            forwardInfo: message.forwardInfo.map(StoreMessageForwardInfo.init),
+            authorId: message.author?.id,
+            text: message.text,
+            attributes: attributes,
+            media: message.media
+        )
     }
 
     private static func isEligible(message: Message, transaction: Transaction) -> Bool {
@@ -53,91 +201,26 @@ enum AyuHistoryCapture {
         return true
     }
 
-    private static func record(kind: AyuHistoryRecord.Kind, message: Message, transaction: Transaction, savedAt: Int32, replacementText: String?, attachments: [AyuHistoryAttachment]) -> AyuHistoryRecord {
-        let chatTitle = (transaction.getPeer(message.id.peerId) ?? message.peers[message.id.peerId])?.debugDisplayTitle ?? ""
-        return AyuHistoryRecord(
-            kind: kind,
-            peerId: message.id.peerId.toInt64(),
-            messageId: message.id.id,
-            authorId: message.author?.id.toInt64(),
-            authorName: message.author?.debugDisplayTitle ?? chatTitle,
-            chatTitle: chatTitle,
-            isOutgoing: !message.flags.contains(.Incoming),
-            sentAt: message.timestamp,
-            savedAt: savedAt,
-            text: message.text,
-            replacementText: replacementText,
-            attachments: attachments
-        )
-    }
-
-    private static func attachment(media: Media, mediaBox: MediaBox, store: AyuHistoryStore) -> AyuHistoryAttachment? {
-        if let image = media as? TelegramMediaImage {
-            guard let representation = largestImageRepresentation(image.representations) else {
-                return AyuHistoryAttachment(kind: .photo, storedName: nil, originalName: nil, size: 0)
-            }
-            return self.stored(kind: .photo, resource: representation.resource, pathExtension: "jpg", originalName: nil, mediaBox: mediaBox, store: store)
-        }
+    private static func size(of media: Media, mediaBox: MediaBox) -> Int64 {
         if let file = media as? TelegramMediaFile {
-            let kind: AyuHistoryAttachment.Kind
-            if file.isInstantVideo {
-                kind = .roundVideo
-            } else if file.isVoice {
-                kind = .voice
-            } else if file.isSticker {
-                kind = .sticker
-            } else if file.isAnimated {
-                kind = .animation
-            } else if file.isVideo {
-                kind = .video
-            } else if file.isMusic {
-                kind = .audio
-            } else {
-                kind = .file
+            if let size = file.size {
+                return size
             }
-            return self.stored(kind: kind, resource: file.resource, pathExtension: self.pathExtension(file: file, kind: kind), originalName: file.fileName, mediaBox: mediaBox, store: store)
+            return self.completedSize(file.resource, mediaBox: mediaBox)
         }
-        return AyuHistoryAttachment(kind: .other, storedName: nil, originalName: nil, size: 0)
+        if let image = media as? TelegramMediaImage {
+            return image.representations.reduce(Int64(0)) { result, representation in
+                return max(result, self.completedSize(representation.resource, mediaBox: mediaBox))
+            }
+        }
+        return 0
     }
 
-    private static func stored(kind: AyuHistoryAttachment.Kind, resource: MediaResource, pathExtension: String, originalName: String?, mediaBox: MediaBox, store: AyuHistoryStore) -> AyuHistoryAttachment {
+    private static func completedSize(_ resource: MediaResource, mediaBox: MediaBox) -> Int64 {
         guard let path = mediaBox.completedResourcePath(resource) else {
-            return AyuHistoryAttachment(kind: kind, storedName: nil, originalName: originalName, size: 0)
+            return 0
         }
         let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
-        let storedName = store.importMedia(path: path, size: size, pathExtension: pathExtension)
-        return AyuHistoryAttachment(kind: kind, storedName: storedName, originalName: originalName, size: size)
-    }
-
-    private static func pathExtension(file: TelegramMediaFile, kind: AyuHistoryAttachment.Kind) -> String {
-        if let fileName = file.fileName {
-            let value = (fileName as NSString).pathExtension
-            if !value.isEmpty {
-                return value.lowercased()
-            }
-        }
-        switch file.mimeType {
-        case "application/x-tgsticker":
-            return "tgs"
-        case "image/webp":
-            return "webp"
-        case "video/webm":
-            return "webm"
-        case "audio/ogg":
-            return "ogg"
-        default:
-            break
-        }
-        switch kind {
-        case .video, .roundVideo, .animation:
-            return "mp4"
-        case .voice:
-            return "ogg"
-        case .audio:
-            return "mp3"
-        default:
-            return ""
-        }
+        return (attributes?[.size] as? NSNumber)?.int64Value ?? 0
     }
 }

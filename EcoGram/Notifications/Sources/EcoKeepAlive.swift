@@ -2,9 +2,9 @@ import Foundation
 import UIKit
 import AVFAudio
 import SwiftSignalKit
-import AyuSettings
+import EcoPreferences
 
-public final class AyuKeepAlive {
+public final class EcoKeepAlive {
     private let beginBackgroundTask: (String, @escaping () -> Void) -> UIBackgroundTaskIdentifier?
     private let endBackgroundTask: (UIBackgroundTaskIdentifier) -> Void
     private let updated: (Bool) -> Void
@@ -46,7 +46,7 @@ public final class AyuKeepAlive {
             self.isPlaying = false
             self.apply()
         }))
-        self.observers.append(center.addObserver(forName: AyuSettings.didChange, object: nil, queue: .main, using: { [weak self] _ in
+        self.observers.append(center.addObserver(forName: EcoPreferences.didChange, object: nil, queue: .main, using: { [weak self] _ in
             self?.updateWanted()
         }))
     }
@@ -78,7 +78,7 @@ public final class AyuKeepAlive {
     }
 
     private func updateWanted() {
-        self.isActive = !self.inForeground && AyuSettings.shared.backgroundNotifications
+        self.isActive = !self.inForeground && EcoPreferences.shared.backgroundNotifications
         self.apply()
     }
 
@@ -132,7 +132,7 @@ public final class AyuKeepAlive {
             return false
         }
         if self.player == nil {
-            guard let player = try? AVAudioPlayer(data: AyuKeepAlive.silence()) else {
+            guard let player = try? AVAudioPlayer(data: EcoKeepAlive.silence()) else {
                 return false
             }
             player.numberOfLoops = -1

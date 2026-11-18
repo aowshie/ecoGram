@@ -1,0 +1,195 @@
+import Foundation
+import SwiftSignalKit
+import SGSimpleSettings
+
+public final class EcoPreferences {
+    public static let shared = EcoPreferences()
+    public static let didChange = Notification.Name("ecogram.preferencesDidChange")
+
+    private enum Key: String {
+        case backgroundNotifications
+        case avatarInTabBar
+        case selectionOrder
+        case selectionEnabled
+        case contextOrder
+        case contextEnabled
+        case swiftgramDefaultsApplied
+
+        var name: String {
+            return "ecogram." + self.rawValue
+        }
+    }
+
+    private let defaults: UserDefaults
+    private let avatarInTabBarValue: ValuePromise<Bool>
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.defaults.register(defaults: [
+            Key.backgroundNotifications.name: true,
+            Key.avatarInTabBar.name: false
+        ])
+        self.avatarInTabBarValue = ValuePromise(self.defaults.bool(forKey: Key.avatarInTabBar.name), ignoreRepeated: true)
+        self.applySwiftgramDefaults()
+    }
+
+    public var backgroundNotifications: Bool {
+        get { return self.defaults.bool(forKey: Key.backgroundNotifications.name) }
+        set { self.store(newValue, .backgroundNotifications) }
+    }
+
+    public var avatarInTabBar: Bool {
+        get { return self.defaults.bool(forKey: Key.avatarInTabBar.name) }
+        set {
+            self.store(newValue, .avatarInTabBar)
+            self.avatarInTabBarValue.set(newValue)
+        }
+    }
+
+    public var avatarInTabBarSignal: Signal<Bool, NoError> {
+        return self.avatarInTabBarValue.get()
+    }
+
+    public var selectionOrder: [EcoSelectionAction] {
+        return self.ordered(key: .selectionOrder, all: EcoSelectionAction.allCases)
+    }
+
+    public var enabledSelectionActions: [EcoSelectionAction] {
+        return self.selectionOrder.filter { self.isEnabled($0) }
+    }
+
+    public func isEnabled(_ action: EcoSelectionAction) -> Bool {
+        return self.enabledSet(key: .selectionEnabled, defaults: EcoSelectionAction.enabledByDefault).contains(action)
+    }
+
+    @discardableResult
+    public func setEnabled(_ action: EcoSelectionAction, _ value: Bool) -> Bool {
+        var enabled = self.enabledSet(key: .selectionEnabled, defaults: EcoSelectionAction.enabledByDefault)
+        if value {
+            if !enabled.contains(action) && enabled.count >= EcoSelectionAction.maximumEnabled {
+                return false
+            }
+            enabled.insert(action)
+        } else {
+            enabled.remove(action)
+        }
+        self.store(enabled.map { $0.rawValue }.sorted(), .selectionEnabled)
+        return true
+    }
+
+    public func setSelectionOrder(_ order: [EcoSelectionAction]) {
+        self.store(order.map { $0.rawValue }, .selectionOrder)
+    }
+
+    public var contextOrder: [EcoContextAction] {
+        return self.ordered(key: .contextOrder, all: EcoContextAction.allCases)
+    }
+
+    public var enabledContextActions: [EcoContextAction] {
+        return self.contextOrder.filter { self.isEnabled($0) }
+    }
+
+    public func isEnabled(_ action: EcoContextAction) -> Bool {
+        let settings = SGSimpleSettings.shared
+        switch action {
+        case .reply:
+            return settings.contextShowReply
+        case .pin:
+            return settings.contextShowPin
+        case .restrict:
+            return settings.contextShowRestrict
+        case .selectFromAuthor:
+            return settings.contextShowSelectFromUser
+        case .saveToFiles:
+            return settings.contextShowSaveMedia
+        case .report:
+            return settings.contextShowReport
+        case .viewReplies:
+            return settings.contextShowMessageReplies
+        default:
+            return self.enabledSet(key: .contextEnabled, defaults: EcoContextAction.enabledByDefault).contains(action)
+        }
+    }
+
+    public func isManagedBySwiftgram(_ action: EcoContextAction) -> Bool {
+        switch action {
+        case .reply, .pin, .restrict, .selectFromAuthor, .saveToFiles, .report, .viewReplies:
+            return true
+        default:
+            return false
+        }
+    }
+
+    public func setEnabled(_ action: EcoContextAction, _ value: Bool) {
+        let settings = SGSimpleSettings.shared
+        switch action {
+        case .reply:
+            settings.contextShowReply = value
+        case .pin:
+            settings.contextShowPin = value
+        case .restrict:
+            settings.contextShowRestrict = value
+        case .selectFromAuthor:
+            settings.contextShowSelectFromUser = value
+        case .saveToFiles:
+            settings.contextShowSaveMedia = value
+        case .report:
+            settings.contextShowReport = value
+        case .viewReplies:
+            settings.contextShowMessageReplies = value
+        default:
+            var enabled = self.enabledSet(key: .contextEnabled, defaults: EcoContextAction.enabledByDefault)
+            if value {
+                enabled.insert(action)
+            } else {
+                enabled.remove(action)
+            }
+            self.store(enabled.map { $0.rawValue }.sorted(), .contextEnabled)
+            return
+        }
+        NotificationCenter.default.post(name: EcoPreferences.didChange, object: self)
+    }
+
+    public func setContextOrder(_ order: [EcoContextAction]) {
+        self.store(order.map { $0.rawValue }, .contextOrder)
+    }
+
+    private func applySwiftgramDefaults() {
+        guard !self.defaults.bool(forKey: Key.swiftgramDefaultsApplied.name) else {
+            return
+        }
+        let settings = SGSimpleSettings.shared
+        settings.contextShowReport = false
+        settings.contextShowSaveMedia = false
+        settings.contextShowMessageReplies = false
+        settings.contextShowReply = true
+        settings.contextShowPin = true
+        settings.contextShowRestrict = true
+        settings.contextShowSelectFromUser = true
+        self.defaults.set(true, forKey: Key.swiftgramDefaultsApplied.name)
+    }
+
+    private func ordered<T: RawRepresentable & CaseIterable & Equatable>(key: Key, all: T.AllCases) -> [T] where T.RawValue == String {
+        let stored = (self.defaults.stringArray(forKey: key.name) ?? []).compactMap(T.init(rawValue:))
+        var result: [T] = []
+        for item in stored where !result.contains(item) {
+            result.append(item)
+        }
+        for item in all where !result.contains(item) {
+            result.append(item)
+        }
+        return result
+    }
+
+    private func enabledSet<T: RawRepresentable & Hashable>(key: Key, defaults: Set<T>) -> Set<T> where T.RawValue == String {
+        guard let stored = self.defaults.stringArray(forKey: key.name) else {
+            return defaults
+        }
+        return Set(stored.compactMap(T.init(rawValue:)))
+    }
+
+    private func store(_ value: Any, _ key: Key) {
+        self.defaults.set(value, forKey: key.name)
+        NotificationCenter.default.post(name: EcoPreferences.didChange, object: self)
+    }
+}

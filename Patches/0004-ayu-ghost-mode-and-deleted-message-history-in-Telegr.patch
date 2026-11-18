@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ecoGram <build@ecogram.app>
-Date: Wed, 18 Nov 2026 14:50:20 +0200
-Subject: [PATCH] ayu: hook ghost mode and message history into TelegramCore
+Date: Wed, 18 Nov 2026 15:55:49 +0200
+Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
 diff --git a/submodules/TelegramCore/BUILD b/submodules/TelegramCore/BUILD
@@ -25,6 +25,53 @@ index 9ed712747025dea831f4112ad0c1ffd5c1c503cf..7f2edd3b3d0f89145bab430a0c7df97e
      #
  ]
  
+diff --git a/submodules/TelegramCore/Sources/Account/AccountManager.swift b/submodules/TelegramCore/Sources/Account/AccountManager.swift
+index 63f588c163287c041ec868fc0df50256e3092dff..15cbf3e1c176047f27bbab59ee6a78e05cba824d 100644
+--- a/submodules/TelegramCore/Sources/Account/AccountManager.swift
++++ b/submodules/TelegramCore/Sources/Account/AccountManager.swift
+@@ -140,6 +140,7 @@ private var declaredEncodables: Void = {
+     declareEncodable(SourceReferenceMessageAttribute.self, f: { SourceReferenceMessageAttribute(decoder: $0) })
+     declareEncodable(SourceAuthorInfoMessageAttribute.self, f: { SourceAuthorInfoMessageAttribute(decoder: $0) })
+     declareEncodable(EditedMessageAttribute.self, f: { EditedMessageAttribute(decoder: $0) })
++    declareEncodable(AyuDeletedMessageAttribute.self, f: { AyuDeletedMessageAttribute(decoder: $0) })
+     declareEncodable(ReplyMarkupMessageAttribute.self, f: { ReplyMarkupMessageAttribute(decoder: $0) })
+     declareEncodable(OutgoingChatContextResultMessageAttribute.self, f: { OutgoingChatContextResultMessageAttribute(decoder: $0) })
+     declareEncodable(HttpReferenceMediaResource.self, f: { HttpReferenceMediaResource(decoder: $0) })
+diff --git a/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift b/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift
+index 9e7bd27c8e40d1b3b8b61b8bb4e8757906268d53..099b6ec00d32ec71108d43f2926d25ee5d39aec2 100644
+--- a/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift
++++ b/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift
+@@ -262,7 +262,7 @@ func historyFillReconciliation(transaction: Transaction, peer: Peer, peerInput:
+         storedIds = []
+     }
+     let candidates = storedIds.filter { id in
+-        return id.peerId == peer.id && id.namespace == namespace && filledRange.contains(id.id) && !answerIds.contains(id)
++        return id.peerId == peer.id && id.namespace == namespace && filledRange.contains(id.id) && !answerIds.contains(id) && !AyuHistoryCapture.isKept(transaction: transaction, id: id)
+     }
+     if candidates.isEmpty {
+         return nil
+diff --git a/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift b/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
+index 3dc6c7d5b63ebd351a1e41b40b204f1b31090595..aaf06365f0ddd47e665bf86678007bc5a0798556 100644
+--- a/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
++++ b/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
+@@ -992,7 +992,7 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
+                                         return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: updatedTags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                                     })
+                                 } else {
+-                                    _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
++                                    AyuHistoryCapture.deleteUnlessKept(transaction: transaction, mediaBox: postbox.mediaBox, id: id)
+                                     Logger.shared.log("HistoryValidation", "deleting message \(id) in \(id.peerId)")
+                                 }
+                             }
+@@ -1175,7 +1175,7 @@ private func validateReplyThreadBatch(postbox: Postbox, network: Network, transa
+                 
+                     for id in removedMessageIds {
+                         if !validMessageIds.contains(id) {
+-                            _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
++                            AyuHistoryCapture.deleteUnlessKept(transaction: transaction, mediaBox: postbox.mediaBox, id: id)
+                             Logger.shared.log("HistoryValidation", "deleting thread message \(id) in \(id.peerId)")
+                         }
+                     }
 diff --git a/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift b/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
 index 7256668bf953823b2c324642f04290174fbf3825..639b6c97f1ce6426b5ff1da4436d19a6067f036c 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
@@ -91,6 +138,20 @@ index 7256668bf953823b2c324642f04290174fbf3825..639b6c97f1ce6426b5ff1da4436d19a6
          let request: Signal<Api.Bool, MTRpcError>
          if isOnline {
              let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
+diff --git a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
+index 713bf6f417f5126de698975d6577fdcac694f019..8f1dd8fb2b0873eb3561d3589fe2fa49acb378e0 100644
+--- a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
++++ b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
+@@ -82,6 +82,9 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
+                     Logger.shared.log("Autoremove", "Performing autoremove for \(entry.messageId), isRemove: \(isRemove)")
+ 
+                     if let message = transaction.getMessage(entry.messageId) {
++                        if AyuHistoryCapture.keepSelfDestructing(transaction: transaction, mediaBox: postbox.mediaBox, message: message, isRemove: isRemove) {
++                            return
++                        }
+                         if message.id.peerId.namespace == Namespaces.Peer.SecretChat || isRemove {
+                             _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [entry.messageId])
+                         } else {
 diff --git a/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift b/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
 index e8e08874bb16f409fa0ab474b127f76726745a98..2c15da2cf3dbaa0a0de242d18bf8efbbe152b6a2 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
@@ -154,27 +215,56 @@ index e38c0f96c77041c97293f8cc2c0386ebf62274ed..30ace2c1e2ff87103d4fd08a88f30222
      guard let inputPeer = apiInputPeer(peer) else {
          return .complete()
      }
+diff --git a/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift b/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
+index 49d68a3791e25e97ce82d98076fc54ae4d50aca6..cc1cb210b80887a7d8b84865b12e56800395a9a7 100644
+--- a/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
++++ b/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
+@@ -211,6 +211,7 @@ func confirmStoredMessages(accountPeerId: PeerId, postbox: Postbox, source: Fetc
+ /// Returns the ids it deleted: the private-chat and basic-group ones, then the channel ones, each in the order given.
+ @discardableResult
+ func deleteStoredMessagesAsReceivedDeletion(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) -> [MessageId] {
++    let ids = ids.filter { !AyuHistoryCapture.isKept(transaction: transaction, id: $0) }
+     var regularIds: [MessageId] = []
+     var channelIds: [MessageId] = []
+     for id in ids {
 diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
-index cf1ab15d9cfae956abcb53bf5060db525b32448d..e4d914804dad86e3dc17f11b806bf47a9edc4cd7 100644
+index cf1ab15d9cfae956abcb53bf5060db525b32448d..11db104edf1d4538c73000ac20f4116ec7ca515d 100644
 --- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 +++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
-@@ -274,6 +274,7 @@ extension ReplayContext {
+@@ -274,21 +274,28 @@ extension ReplayContext {
      }
      
      func applyDeleteMessagesWithGlobalIds(_ ids: [Int32]) {
-+        AyuHistoryCapture.captureDeleted(transaction: transaction, mediaBox: mediaBox, globalIds: ids)
++        let retention = AyuHistoryCapture.retain(transaction: transaction, mediaBox: mediaBox, ids: transaction.messageIdsForGlobalIds(ids))
          var resourceIds: [MediaResourceId] = []
-         transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
+-        transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
++        transaction.deleteMessagesWithGlobalIds(ids.filter { retention.isDeletable(globalId: $0) }, forEachMedia: { media in
++            if retention.protects(media) {
++                return
++            }
              addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
-@@ -285,6 +286,7 @@ extension ReplayContext {
+         })
+         if !resourceIds.isEmpty {
+             let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
+         }
+-        deletedMessageIds.append(contentsOf: ids.map { .global($0) })
++        retention.restore(transaction: transaction)
++        deletedMessageIds.append(contentsOf: ids.filter { retention.isReported(globalId: $0) }.map { .global($0) })
      }
      
      func applyDeleteMessages(_ ids: [MessageId]) {
-+        AyuHistoryCapture.captureDeleted(transaction: transaction, mediaBox: mediaBox, ids: ids)
-         _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
+-        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
++        let retention = AyuHistoryCapture.retain(transaction: transaction, mediaBox: mediaBox, ids: ids)
++        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids.filter { retention.isDeletable($0) }, manualAddMessageThreadStatsDifference: { id, add, remove in
              self.addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
          })
-@@ -305,6 +307,7 @@ extension ReplayContext {
+-        deletedMessageIds.append(contentsOf: ids.map { .messageId($0) })
++        retention.restore(transaction: transaction)
++        deletedMessageIds.append(contentsOf: ids.filter { retention.isReported($0) }.map { .messageId($0) })
+     }
+     
+     func applyUpdateMinAvailableMessage(_ id: MessageId) {
+@@ -305,6 +312,7 @@ extension ReplayContext {
      }
      
      func applyEditMessage(_ id: MessageId, _ message: StoreMessage) {

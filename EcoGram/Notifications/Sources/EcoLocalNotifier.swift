@@ -6,9 +6,9 @@ import TelegramCore
 import TelegramPresentationData
 import TelegramStringFormatting
 import LocalizedPeerData
-import AyuSettings
+import EcoPreferences
 
-public final class AyuLocalNotifier {
+public final class EcoLocalNotifier {
     private let presentationData: () -> PresentationData?
     private let disposables = DisposableDict<AccountRecordId>()
     private var accountIds = Set<AccountRecordId>()
@@ -33,7 +33,7 @@ public final class AyuLocalNotifier {
                 guard let self, let account else {
                     return
                 }
-                guard AyuSettings.shared.backgroundNotifications, UIApplication.shared.applicationState != .active else {
+                guard EcoPreferences.shared.backgroundNotifications, UIApplication.shared.applicationState != .active else {
                     return
                 }
                 for (messages, _, notify, _) in list {
