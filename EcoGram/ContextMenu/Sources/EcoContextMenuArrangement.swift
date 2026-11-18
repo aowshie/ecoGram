@@ -37,6 +37,14 @@ private func ecoContextAction(title: String, strings: PresentationStrings) -> Ec
         return .report
     case strings.Conversation_ContextViewThread:
         return .viewReplies
+    case i18n("ContextMenu.SaveToCloud", strings.baseLanguageCode):
+        return .saveToCloud
+    case strings.NotificationSettings_Stories_CompactHideName:
+        return .hideForwardName
+    case "JSON":
+        return .json
+    case "Send Logs":
+        return .sendLogs
     default:
         return nil
     }
@@ -61,30 +69,29 @@ private func ecoTrimmedSeparators(_ items: [ContextMenuItem]) -> [ContextMenuIte
     return result
 }
 
-@discardableResult
-public func ecoArrangeContextMenu(actions: inout [ContextMenuItem], sgActions: inout [ContextMenuItem], strings: PresentationStrings) -> Bool {
+public func ecoArrangeContextMenu(actions: inout [ContextMenuItem], sgActions: inout [ContextMenuItem], strings: PresentationStrings) {
     let preferences = EcoPreferences.shared
     var known: [EcoContextAction: ContextMenuItem] = [:]
     var others: [ContextMenuItem] = []
     for item in actions {
-        if case let .action(action) = item, let kind = ecoContextAction(title: action.text, strings: strings), known[kind] == nil {
-            known[kind] = item
+        if case let .action(action) = item, let kind = ecoContextAction(title: action.text, strings: strings) {
+            if known[kind] == nil {
+                known[kind] = item
+            }
         } else {
             others.append(item)
         }
     }
-    guard !known.isEmpty else {
-        return false
+    for item in sgActions {
+        if case let .action(action) = item, let kind = ecoContextAction(title: action.text, strings: strings), known[kind] == nil {
+            known[kind] = item
+        }
     }
+    sgActions = []
     var arranged: [ContextMenuItem] = []
     for kind in preferences.contextOrder {
-        guard let item = known[kind] else {
-            continue
-        }
-        if preferences.isEnabled(kind) {
+        if let item = known[kind], preferences.isEnabled(kind) {
             arranged.append(item)
-        } else {
-            sgActions.append(item)
         }
     }
     let rest = ecoTrimmedSeparators(others)
@@ -92,5 +99,4 @@ public func ecoArrangeContextMenu(actions: inout [ContextMenuItem], sgActions: i
         arranged.append(.separator)
     }
     actions = arranged + rest
-    return true
 }

@@ -13,6 +13,7 @@ public final class AyuSettings {
         case ghostHidesOnline
         case ghostHidesTyping
         case ghostHidesStoryViews
+        case ghostKeepsUnread
         case saveDeletedMessages
         case saveEditedMessages
         case saveInBots
@@ -36,6 +37,7 @@ public final class AyuSettings {
             Key.ghostHidesOnline.name: true,
             Key.ghostHidesTyping.name: true,
             Key.ghostHidesStoryViews.name: true,
+            Key.ghostKeepsUnread.name: false,
             Key.saveDeletedMessages.name: true,
             Key.saveEditedMessages.name: true,
             Key.saveInBots.name: false,
@@ -69,6 +71,11 @@ public final class AyuSettings {
     public var ghostHidesStoryViews: Bool {
         get { return self.bool(.ghostHidesStoryViews) }
         set { self.set(newValue, .ghostHidesStoryViews) }
+    }
+
+    public var ghostKeepsUnread: Bool {
+        get { return self.bool(.ghostKeepsUnread) }
+        set { self.set(newValue, .ghostKeepsUnread) }
     }
 
     public var saveDeletedMessages: Bool {
@@ -108,6 +115,10 @@ public final class AyuSettings {
 
     public var suppressReadReceipts: Bool {
         return self.ghostMode && self.ghostHidesReadReceipts
+    }
+
+    public var keepsMessagesUnread: Bool {
+        return self.suppressReadReceipts && self.ghostKeepsUnread
     }
 
     public var suppressOnline: Bool {

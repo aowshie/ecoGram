@@ -21,6 +21,7 @@ private enum EcoSettingsSection: Int32, SGItemListSection {
 private enum EcoToggle: Hashable {
     case localNotifications
     case avatarInTabBar
+    case hideProfileShortcuts
 }
 
 private enum EcoLink: Hashable {
@@ -48,6 +49,7 @@ private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
 
     entries.append(.header(id: id.count, section: .appearance, text: strings.get(.appearanceHeader), badge: nil))
     entries.append(.toggle(id: id.count, section: .appearance, settingName: .avatarInTabBar, value: preferences.avatarInTabBar, text: strings.get(.avatarInTabBar), enabled: true))
+    entries.append(.toggle(id: id.count, section: .appearance, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
     entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.appearanceFooter)))
 
     return entries
@@ -63,6 +65,8 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
             EcoPreferences.shared.backgroundNotifications = value
         case .avatarInTabBar:
             EcoPreferences.shared.avatarInTabBar = value
+        case .hideProfileShortcuts:
+            EcoPreferences.shared.hideProfileShortcuts = value
         }
         refresh.set(true)
     }, openDisclosureLink: { link in

@@ -89,6 +89,14 @@ struct EcoActionCatalog {
             return self.strings.Conversation_ContextMenuReport
         case .viewReplies:
             return self.strings.Conversation_ContextViewThread
+        case .saveToCloud:
+            return i18n("ContextMenu.SaveToCloud", self.strings.baseLanguageCode)
+        case .hideForwardName:
+            return self.strings.NotificationSettings_Stories_CompactHideName
+        case .json:
+            return "JSON"
+        case .sendLogs:
+            return "Send Logs"
         }
     }
 
@@ -125,6 +133,14 @@ struct EcoActionCatalog {
             name = "Report"
         case .viewReplies:
             name = "Replies"
+        case .saveToCloud:
+            name = "Fave"
+        case .hideForwardName:
+            name = "Forward"
+        case .json:
+            name = "Settings"
+        case .sendLogs:
+            name = "Message"
         }
         return UIImage(bundleImageName: "Chat/Context Menu/" + name)
     }

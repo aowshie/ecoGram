@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ecoGram <build@ecogram.app>
-Date: Wed, 18 Nov 2026 15:55:49 +0200
+Date: Wed, 18 Nov 2026 20:08:47 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -37,6 +37,26 @@ index 63f588c163287c041ec868fc0df50256e3092dff..15cbf3e1c176047f27bbab59ee6a78e0
      declareEncodable(ReplyMarkupMessageAttribute.self, f: { ReplyMarkupMessageAttribute(decoder: $0) })
      declareEncodable(OutgoingChatContextResultMessageAttribute.self, f: { OutgoingChatContextResultMessageAttribute(decoder: $0) })
      declareEncodable(HttpReferenceMediaResource.self, f: { HttpReferenceMediaResource(decoder: $0) })
+diff --git a/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift b/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift
+index a38bead0e1910fca3a0dc94b41f0418df2580799..c8734ef9cce9beab4e61ecdbe10031dbe309ac20 100644
+--- a/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift
++++ b/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift
+@@ -518,6 +518,7 @@ extension StoreMessage {
+ 
+                     if let expirationTimer, expirationTimer > 0 {
+                         attributes.append(AutoclearTimeoutMessageAttribute(timeout: expirationTimer, countdownBeginTime: nil))
++                        AyuHistoryCapture.addSelfDestructSpoiler(attributes: &attributes, peerId: peerId)
+                     }
+ 
+                     if let nonPremium, nonPremium {
+@@ -1279,6 +1280,7 @@ extension StoreMessage {
+                     
+                         if let expirationTimer = expirationTimer, expirationTimer > 0 {
+                             attributes.append(AutoclearTimeoutMessageAttribute(timeout: expirationTimer, countdownBeginTime: nil))
++                            AyuHistoryCapture.addSelfDestructSpoiler(attributes: &attributes, peerId: peerId)
+                             consumableContent = (true, false)
+                         }
+                         
 diff --git a/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift b/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift
 index 9e7bd27c8e40d1b3b8b61b8bb4e8757906268d53..099b6ec00d32ec71108d43f2926d25ee5d39aec2 100644
 --- a/submodules/TelegramCore/Sources/State/HistoryFillReconciliation.swift
@@ -272,6 +292,18 @@ index cf1ab15d9cfae956abcb53bf5060db525b32448d..11db104edf1d4538c73000ac20f4116e
          var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
          transaction.updateMessage(id, update: { previousMessage in
              let peers: [PeerId:Peer] = previousMessage.peers.reduce([:], { current, value in
+diff --git a/submodules/TelegramCore/Sources/State/Sync/UpdateInterpreter+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/UpdateInterpreter+Messages.swift
+index 24f8b816944de5b26bc8917d36da55962f2c3613..8d9829ba5d69021d25535ef25f493a1837e57bce 100644
+--- a/submodules/TelegramCore/Sources/State/Sync/UpdateInterpreter+Messages.swift
++++ b/submodules/TelegramCore/Sources/State/Sync/UpdateInterpreter+Messages.swift
+@@ -179,6 +179,7 @@ extension UpdateInterpreter {
+                 }
+                 if let expirationTimer = expirationTimer {
+                     attributes.append(AutoclearTimeoutMessageAttribute(timeout: expirationTimer, countdownBeginTime: nil))
++                    AyuHistoryCapture.addSelfDestructSpoiler(attributes: &attributes, peerId: peerId)
+                 }
+                 if let videoTimestamp {
+                     attributes.append(ForwardVideoTimestampAttribute(timestamp: videoTimestamp))
 diff --git a/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift b/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
 index b2e65895ccd2f29f003474b051fee81c6f3819ed..9f38938638f6b846d32ff0994abcba1b52c05503 100644
 --- a/submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
@@ -303,8 +335,22 @@ index b2e65895ccd2f29f003474b051fee81c6f3819ed..9f38938638f6b846d32ff0994abcba1b
      if peerId.namespace == Namespaces.Peer.SecretChat {
          // Decide whether a request is needed before looking the peer up: inputSecretChat goes
          // through loadedPeerWithId, which never emits when the peer row is missing and fails
+diff --git a/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift b/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
+index e8cc0f30ef101bc89202e9f43dfed413dfae753b..2f5498f1e69f520b55bf8b2129a77487b90698e3 100644
+--- a/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
++++ b/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
+@@ -142,6 +142,9 @@ public extension Message {
+     }
+     
+     var containsSecretMedia: Bool {
++        if self.ayuRevealsSelfDestructingMedia {
++            return false
++        }
+         guard let timeout = self.minAutoremoveOrClearTimeout else {
+             return false
+         }
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
-index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..1e20787584e2d9020c7a2f2e63eb87b56c35c9ab 100644
+index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..c5b023d144f280e69052136b2ce946debc4041a9 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
 +++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
 @@ -1,4 +1,5 @@
@@ -313,7 +359,17 @@ index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..1e20787584e2d9020c7a2f2e63eb87b5
  import Postbox
  internal import TelegramApi
  import SwiftSignalKit
-@@ -219,11 +220,15 @@ func _internal_toggleForumThreadUnreadMarkInteractively(transaction: Transaction
+@@ -50,6 +51,9 @@ func _internal_applyMaxReadIndexInteractively(transaction: Transaction, stateMan
+     guard peerKeepsReadState(transaction.getPeer(index.id.peerId)) else {
+         return
+     }
++    if AyuSettings.shared.keepsMessagesUnread {
++        return
++    }
+     let messageIds = transaction.applyInteractiveReadMaxIndex(index)
+     
+     if let peer = transaction.getPeer(index.id.peerId), peer.isForumOrMonoForum {
+@@ -219,11 +223,15 @@ func _internal_toggleForumThreadUnreadMarkInteractively(transaction: Transaction
              
              if peer.isForum {
                  if let inputPeer = apiInputPeer(peer) {
@@ -331,7 +387,7 @@ index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..1e20787584e2d9020c7a2f2e63eb87b5
                  }
              }
          }
-@@ -255,11 +260,15 @@ func _internal_markForumThreadAsReadInteractively(transaction: Transaction, netw
+@@ -255,11 +263,15 @@ func _internal_markForumThreadAsReadInteractively(transaction: Transaction, netw
          
          if peer.isForum {
              if let inputPeer = apiInputPeer(peer) {
@@ -349,7 +405,7 @@ index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..1e20787584e2d9020c7a2f2e63eb87b5
              }
          }
      }
-@@ -297,11 +306,15 @@ func _internal_togglePeerUnreadMarkInteractively(transaction: Transaction, netwo
+@@ -297,11 +309,15 @@ func _internal_togglePeerUnreadMarkInteractively(transaction: Transaction, netwo
                  
                  if peer.isForum {
                      if let inputPeer = apiInputPeer(peer) {

@@ -23,6 +23,7 @@ private enum AyuToggle: Hashable {
     case hideOnline
     case hideTyping
     case hideStoryViews
+    case keepUnread
     case saveDeleted
     case saveEdited
     case saveSelfDestructing
@@ -52,6 +53,7 @@ private func ayuSettingsEntries(strings: EcoStrings) -> [AyuEntry] {
     entries.append(.toggle(id: id.count, section: .ghost, settingName: .hideOnline, value: settings.ghostHidesOnline, text: strings.get(.ghostHideOnline), enabled: settings.ghostMode))
     entries.append(.toggle(id: id.count, section: .ghost, settingName: .hideTyping, value: settings.ghostHidesTyping, text: strings.get(.ghostHideTyping), enabled: settings.ghostMode))
     entries.append(.toggle(id: id.count, section: .ghost, settingName: .hideStoryViews, value: settings.ghostHidesStoryViews, text: strings.get(.ghostHideStoryViews), enabled: settings.ghostMode))
+    entries.append(.toggle(id: id.count, section: .ghost, settingName: .keepUnread, value: settings.ghostKeepsUnread, text: strings.get(.ghostKeepUnread), enabled: settings.ghostMode && settings.ghostHidesReadReceipts))
     entries.append(.notice(id: id.count, section: .ghost, text: strings.get(.ghostFooter)))
 
     entries.append(.header(id: id.count, section: .history, text: strings.get(.historyHeader), badge: nil))
@@ -84,6 +86,8 @@ private func applyToggle(_ toggle: AyuToggle, value: Bool) {
         settings.ghostHidesTyping = value
     case .hideStoryViews:
         settings.ghostHidesStoryViews = value
+    case .keepUnread:
+        settings.ghostKeepsUnread = value
     case .saveDeleted:
         settings.saveDeletedMessages = value
     case .saveEdited:

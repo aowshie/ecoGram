@@ -9,11 +9,12 @@ public final class EcoPreferences {
     private enum Key: String {
         case backgroundNotifications
         case avatarInTabBar
+        case hideProfileShortcuts
         case selectionOrder
         case selectionEnabled
         case contextOrder
         case contextEnabled
-        case swiftgramDefaultsApplied
+        case swiftgramDefaultsApplied = "swiftgramDefaultsApplied.v2"
 
         var name: String {
             return "ecogram." + self.rawValue
@@ -27,7 +28,8 @@ public final class EcoPreferences {
         self.defaults = defaults
         self.defaults.register(defaults: [
             Key.backgroundNotifications.name: true,
-            Key.avatarInTabBar.name: false
+            Key.avatarInTabBar.name: false,
+            Key.hideProfileShortcuts.name: false
         ])
         self.avatarInTabBarValue = ValuePromise(self.defaults.bool(forKey: Key.avatarInTabBar.name), ignoreRepeated: true)
         self.applySwiftgramDefaults()
@@ -44,6 +46,11 @@ public final class EcoPreferences {
             self.store(newValue, .avatarInTabBar)
             self.avatarInTabBarValue.set(newValue)
         }
+    }
+
+    public var hideProfileShortcuts: Bool {
+        get { return self.defaults.bool(forKey: Key.hideProfileShortcuts.name) }
+        set { self.store(newValue, .hideProfileShortcuts) }
     }
 
     public var avatarInTabBarSignal: Signal<Bool, NoError> {
@@ -106,6 +113,12 @@ public final class EcoPreferences {
             return settings.contextShowReport
         case .viewReplies:
             return settings.contextShowMessageReplies
+        case .saveToCloud:
+            return settings.contextShowSaveToCloud
+        case .hideForwardName:
+            return settings.contextShowHideForwardName
+        case .json:
+            return settings.contextShowJson
         default:
             return self.enabledSet(key: .contextEnabled, defaults: EcoContextAction.enabledByDefault).contains(action)
         }
@@ -113,7 +126,7 @@ public final class EcoPreferences {
 
     public func isManagedBySwiftgram(_ action: EcoContextAction) -> Bool {
         switch action {
-        case .reply, .pin, .restrict, .selectFromAuthor, .saveToFiles, .report, .viewReplies:
+        case .reply, .pin, .restrict, .selectFromAuthor, .saveToFiles, .report, .viewReplies, .saveToCloud, .hideForwardName, .json:
             return true
         default:
             return false
@@ -137,6 +150,12 @@ public final class EcoPreferences {
             settings.contextShowReport = value
         case .viewReplies:
             settings.contextShowMessageReplies = value
+        case .saveToCloud:
+            settings.contextShowSaveToCloud = value
+        case .hideForwardName:
+            settings.contextShowHideForwardName = value
+        case .json:
+            settings.contextShowJson = value
         default:
             var enabled = self.enabledSet(key: .contextEnabled, defaults: EcoContextAction.enabledByDefault)
             if value {
@@ -162,6 +181,9 @@ public final class EcoPreferences {
         settings.contextShowReport = false
         settings.contextShowSaveMedia = false
         settings.contextShowMessageReplies = false
+        settings.contextShowSaveToCloud = false
+        settings.contextShowHideForwardName = false
+        settings.contextShowJson = false
         settings.contextShowReply = true
         settings.contextShowPin = true
         settings.contextShowRestrict = true

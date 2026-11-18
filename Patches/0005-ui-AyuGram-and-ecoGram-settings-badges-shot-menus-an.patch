@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ecoGram <build@ecogram.app>
-Date: Wed, 18 Nov 2026 15:55:50 +0200
+Date: Wed, 18 Nov 2026 20:08:48 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -139,16 +139,126 @@ index 767fd2867d058071b438b11b0d64b9bb4e096ed2..f2758c7ddc717732ee6e8d077847378b
      # "//Swiftgram/SGContentAnalysis:SGContentAnalysis"
  ]
  
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
+index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..fd25bb20e189e2c60187ed348112838ae9988156 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
+@@ -3,7 +3,8 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+ sgdeps = [
+     "//Swiftgram/SGStrings:SGStrings",
+     "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
+-    "//submodules/TranslateUI:TranslateUI"
++    "//submodules/TranslateUI:TranslateUI",
++    "//EcoGram/Ayu/Badges:AyuBadges",
+ ]
+ 
+ sgsrc = [
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..39be740fc678dcb2a6b86958c57f4b502f7182bb 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+@@ -2,6 +2,7 @@ import SGStrings // MARK: Swiftgram
+ import SGSimpleSettings // MARK: Swiftgram
+ import TranslateUI // MARK: Swiftgram
+ import Foundation
++import AyuBadges
+ import UIKit
+ import AsyncDisplayKit
+ import Display
+@@ -861,6 +862,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+     private var ephemeralBadgeIconNode: UIImageView?
+ 
+     private var credibilityIconView: ComponentHostView<Empty>?
++    private var ayuBadgeView: UIImageView?
+     private var credibilityIconComponent: EmojiStatusComponent?
+     private var credibilityIconContent: EmojiStatusComponent.Content?
+     private var credibilityButtonNode: HighlightTrackingButtonNode?
+@@ -3227,6 +3229,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                         credibilityIconWidth += 20.0
+                     }
+                 }
++                if item.message.author.flatMap { author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil } != nil {
++                    credibilityIconWidth += 21.0
++                }
+                 
+                 let rankBadgeSizeAndApply = rankBadgeLayout(TextNodeLayoutArguments(attributedString: rankBadgeString, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: max(0, maximumNodeWidth - layoutConstants.text.bubbleInsets.left - layoutConstants.text.bubbleInsets.right), height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
+                 if rankBadgeSizeAndApply.0.size.width > 0.0 {
+@@ -4666,6 +4671,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         var bubblelessLiftHeaderParts: [ChatMessageBubblelessLiftPart] = []
+         var bubblelessLiftParts: [ChatMessageBubblelessLiftPart] = []
+         var bubblelessLiftPartsByStableId: [UInt32: [ChatMessageBubblelessLiftPart]] = [:]
++        strongSelf.ayuBadgeView?.isHidden = true
+         if let nameNode = nameNodeSizeApply.1() {
+             strongSelf.nameNode = nameNode
+             nameNode.displaysAsynchronously = !item.presentationData.isPreview && !item.presentationData.theme.theme.forceSync
+@@ -4676,6 +4682,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+             var nameNodeFrame = CGRect(origin: CGPoint(x: contentOrigin.x + (bubblelessCardTopInset != nil ? 0.0 : layoutConstants.text.bubbleInsets.left), y: layoutConstants.bubble.contentInsets.top + nameNodeOriginY), size: nameNodeSizeApply.0)
+             
+             var nameNavigateButtonOffset: CGFloat = currentCredibilityIcon == nil ? 4.0 : 28.0
++            if item.message.author.flatMap { author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil } != nil {
++                nameNavigateButtonOffset += 21.0
++            }
+             nameNavigateButtonOffset += 34.0
+             
+             if hasTitleAvatar {
+@@ -5021,6 +5030,23 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                 strongSelf.credibilityHighlightNode?.removeFromSupernode()
+                 strongSelf.credibilityHighlightNode = nil
+             }
++            if let ayuBadge = item.message.author.flatMap { author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }, let ayuBadgeImage = AyuBadgeImages.image(ayuBadge) {
++                let ayuBadgeView: UIImageView
++                if let current = strongSelf.ayuBadgeView {
++                    ayuBadgeView = current
++                } else {
++                    ayuBadgeView = UIImageView()
++                    ayuBadgeView.isUserInteractionEnabled = false
++                    strongSelf.ayuBadgeView = ayuBadgeView
++                    strongSelf.clippingNode.view.addSubview(ayuBadgeView)
++                }
++                ayuBadgeView.isHidden = false
++                ayuBadgeView.image = ayuBadgeImage.withRenderingMode(.alwaysTemplate)
++                ayuBadgeView.tintColor = nameColor
++                let ayuBadgeSize = CGSize(width: 18.0, height: 18.0)
++                let ayuBadgeOriginX = (strongSelf.credibilityIconView?.frame.maxX ?? nameNode.frame.maxX) + 3.0
++                animation.animator.updateFrame(layer: ayuBadgeView.layer, frame: CGRect(origin: CGPoint(x: ayuBadgeOriginX, y: nameNode.frame.minY + floor((nameNode.bounds.height - ayuBadgeSize.height) / 2.0)), size: ayuBadgeSize), completion: nil)
++            }
+             
+             var boostCount: Int = 0
+             if incoming {
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/BUILD
+index 5982451d80fab9d8d232b24358b0b61ac73ace25..fff6d3f464781903da45d20d01b34a308fbe95b2 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/BUILD
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/BUILD
+@@ -3,7 +3,8 @@ load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
+ load("@build_bazel_rules_apple//apple/testing/default_runner:ios_test_runner.bzl", "ios_test_runner")
+ 
+ sgdeps = [
+-    "//Swiftgram/SGSimpleSettings:SGSimpleSettings"
++    "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
++    "//EcoGram/Strings:EcoStrings",
+ ]
+ 
+ swift_library(
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
-index bf71cb207328261b644bc13dda3f3563bdb761f8..dd99e9143b7be34c4a578d794a893129d60eafc5 100644
+index bf71cb207328261b644bc13dda3f3563bdb761f8..bd8a2412e99787d307c7168fae24777e50188321 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
-@@ -258,5 +258,8 @@ public func stringForMessageTimestampStatus(
+@@ -1,4 +1,5 @@
+ import Foundation
++import EcoStrings
+ import TelegramCore
+ import TelegramPresentationData
+ import TelegramUIPreferences
+@@ -258,5 +259,12 @@ public func stringForMessageTimestampStatus(
          }
      }
      
-+    if message._asMessage().ayuIsDeleted {
-+        dateText = "\u{1F5D1}\u{FE0E} " + dateText
++    let rawMessage = message._asMessage()
++    let ecoStrings = EcoStrings(languageCode: strings.baseLanguageCode)
++    if let deleted = rawMessage.ayuDeletedAttribute {
++        dateText = "\(ecoStrings.get(deleted.isExpired ? .labelExpired : .labelDeleted)) \(dateText)"
++    } else if rawMessage.ayuIsViewOnce {
++        dateText = "\(ecoStrings.get(.labelOneView)) \(dateText)"
 +    }
      return dateText
  }
@@ -470,8 +580,28 @@ index 446979e1d4d5fb491531f9e23f8593836709fe2b..089b85b6731bf5d8d0380fdf4fdeaaf8
          case .avatar:
              self.controller?.openAvatarForEditing()
          case .edit:
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+index bb35640b764b8f450e904f6420d0e6248c2c9770..3fb015eb62eb2419b124c75e1d2a36aa7f81fee2 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+@@ -1,4 +1,5 @@
+ import Foundation
++import EcoPreferences
+ import UIKit
+ import Display
+ import AccountContext
+@@ -85,6 +86,9 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
+         }))
+     }
+     
++    if EcoPreferences.shared.hideProfileShortcuts {
++        items[.edit] = []
++    }
+     items[.edit]!.append(contentsOf: sgPeerInfoSettingsProfileIdItems(data: data, interaction: interaction)) // MARK: Swiftgram
+     
+     if let settings = data.globalSettings {
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..104f4efeaf1343fa5f4a925cdd9a4823cad1eb50 100644
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..482407355cc1d419f432aed14e911426027e36b2 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 +++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 @@ -1,6 +1,9 @@
@@ -484,7 +614,7 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..104f4efeaf1343fa5f4a925cdd9a4823
  import UIKit
  import TelegramCore
  import AsyncDisplayKit
-@@ -2297,6 +2300,14 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+@@ -2297,6 +2300,12 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
              canViewStats = canViewReadStats(message: message, participantCount: infoSummaryData.participantCount, isMessageRead: isMessageRead, isPremium: isPremium, appConfig: appConfig)
          }
  
@@ -493,9 +623,7 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..104f4efeaf1343fa5f4a925cdd9a4823
 +        }) {
 +            actions.append(editHistoryItem)
 +        }
-+        if ecoArrangeContextMenu(actions: &actions, sgActions: &sgActions, strings: chatPresentationInterfaceState.strings) {
-+            sgActionsIndex = nil
-+        }
++        ecoArrangeContextMenu(actions: &actions, sgActions: &sgActions, strings: chatPresentationInterfaceState.strings)
          sgInsertContextMenu(actions: &actions, sgActions: &sgActions, index: sgActionsIndex, chatPresentationInterfaceState: chatPresentationInterfaceState) // MARK: Swiftgram
          
          var reactionCount = 0

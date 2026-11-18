@@ -51,7 +51,7 @@ struct AyuRetention {
 }
 
 enum AyuHistoryCapture {
-    static func retain(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) -> AyuRetention {
+    static func retain(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId], isExpired: Bool = false) -> AyuRetention {
         guard !ids.isEmpty else {
             return .empty
         }
@@ -79,7 +79,7 @@ enum AyuHistoryCapture {
                 continue
             }
             records.append(AyuHistoryRecord(kind: .deleted, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: now, text: message.text, replacementText: nil))
-            retained.append(self.retainedMessage(message, deletedAt: now))
+            retained.append(self.retainedMessage(message, deletedAt: now, isExpired: isExpired))
             for media in message.media {
                 if let mediaId = media.id, mediaLimit > 0, self.size(of: media, mediaBox: mediaBox) <= mediaLimit {
                     protectedMediaIds.insert(mediaId)
@@ -103,7 +103,7 @@ enum AyuHistoryCapture {
             return false
         }
         if isRemove {
-            let retention = self.retain(transaction: transaction, mediaBox: mediaBox, ids: [message.id])
+            let retention = self.retain(transaction: transaction, mediaBox: mediaBox, ids: [message.id], isExpired: true)
             guard !retention.retained.isEmpty else {
                 return false
             }
@@ -136,6 +136,15 @@ enum AyuHistoryCapture {
         return true
     }
 
+    static func addSelfDestructSpoiler(attributes: inout [MessageAttribute], peerId: PeerId) {
+        guard AyuSettings.shared.saveSelfDestructing, peerId.namespace != Namespaces.Peer.SecretChat else {
+            return
+        }
+        if !attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {
+            attributes.append(MediaSpoilerMessageAttribute())
+        }
+    }
+
     static func deleteUnlessKept(transaction: Transaction, mediaBox: MediaBox, id: MessageId) {
         if transaction.getMessage(id)?.ayuIsDeleted == true {
             return
@@ -161,11 +170,14 @@ enum AyuHistoryCapture {
         }
     }
 
-    private static func retainedMessage(_ message: Message, deletedAt: Int32) -> StoreMessage {
+    private static func retainedMessage(_ message: Message, deletedAt: Int32, isExpired: Bool) -> StoreMessage {
         var attributes = message.attributes.filter { attribute in
             return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute)
         }
-        attributes.append(AyuDeletedMessageAttribute(date: deletedAt))
+        attributes.append(AyuDeletedMessageAttribute(date: deletedAt, isExpired: isExpired))
+        if message.ayuIsViewOnce || message.containsSecretMedia, !attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {
+            attributes.append(MediaSpoilerMessageAttribute())
+        }
         var flags = StoreMessageFlags(message.flags)
         flags.remove(.TopIndexable)
         flags.remove(.ReactionsArePossible)
