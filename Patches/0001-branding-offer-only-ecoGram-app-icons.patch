@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ecoGram <build@ecogram.app>
+Date: Wed, 18 Nov 2026 07:31:50 +0200
+Subject: [PATCH 1/2] branding: offer only ecoGram app icons
+
+
+diff --git a/submodules/SettingsUI/Sources/Themes/ThemeSettingsAppIconItem.swift b/submodules/SettingsUI/Sources/Themes/ThemeSettingsAppIconItem.swift
+index 4c6700e21297886aec1d0ad4b7e0e14888f29ab9..a7825e7b400c40c74aac33121383beceaa6b97ed 100644
+--- a/submodules/SettingsUI/Sources/Themes/ThemeSettingsAppIconItem.swift
++++ b/submodules/SettingsUI/Sources/Themes/ThemeSettingsAppIconItem.swift
+@@ -387,6 +387,11 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
+                             var name = "Icon"
+                             var bordered = true
+                             switch icon.name {
++                                case "EcoDark":
++                                    name = item.strings.Appearance_ThemeCarouselNewNight
++                                    bordered = false
++                                case "EcoLight":
++                                    name = item.strings.Appearance_ThemeCarouselDay
+                                 case "SGDefault":
+                                     name = item.strings.Appearance_AppIconDefault
+                                     bordered = false
+diff --git a/submodules/TelegramUI/Sources/AppDelegate.swift b/submodules/TelegramUI/Sources/AppDelegate.swift
+index fe72c3ad205712809fd099aaa77f4e8a137517dc..33783a8cecb8b2f90cfb351062823227a68635b3 100644
+--- a/submodules/TelegramUI/Sources/AppDelegate.swift
++++ b/submodules/TelegramUI/Sources/AppDelegate.swift
+@@ -1056,27 +1056,9 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+                 
+                 // MARK: Swiftgram
+                 icons = [
+-                    PresentationAppIcon(name: "SGDefault", imageName: "SGDefault", isDefault: true),
+-                    PresentationAppIcon(name: "SGBlack", imageName: "SGBlack"),
+-                    PresentationAppIcon(name: "SGLegacy", imageName: "SGLegacy"),
+-                    PresentationAppIcon(name: "SGInverted", imageName: "SGInverted"),
+-                    PresentationAppIcon(name: "SGWhite", imageName: "SGWhite"),
+-                    PresentationAppIcon(name: "SGNight", imageName: "SGNight"),
+-                    PresentationAppIcon(name: "SGSky", imageName: "SGSky"),
+-                    PresentationAppIcon(name: "SGTitanium", imageName: "SGTitanium"),
+-                    PresentationAppIcon(isSGPro: true, name: "SGPro", imageName: "SGPro"),
+-                    PresentationAppIcon(isSGPro: true, name: "SGDay", imageName: "SGDay"),
+-                    PresentationAppIcon(isSGPro: true, name: "SGGold", imageName: "SGGold"),
+-                    SGSimpleSettings.shared.duckyAppIconAvailable ? PresentationAppIcon(isSGPro: true, name: "SGDucky", imageName: "SGDucky") : PresentationAppIcon(name: "", imageName: ""), // Empty
+-                    PresentationAppIcon(name: "SGNeon", imageName: "SGNeon"),
+-                    PresentationAppIcon(name: "SGNeonBlue", imageName: "SGNeonBlue"),
+-                    PresentationAppIcon(name: "SGGlass", imageName: "SGGlass"),
+-                    PresentationAppIcon(name: "SGSparkling", imageName: "SGSparkling"),
++                    PresentationAppIcon(name: "EcoDark", imageName: "EcoDark", isDefault: true),
++                    PresentationAppIcon(name: "EcoLight", imageName: "EcoLight")
+                 ]
+-
+-                if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+-                    icons.append(PresentationAppIcon(name: "SGBeta", imageName: "SGBeta"))
+-                }
+                 //
+                 
+                 return icons

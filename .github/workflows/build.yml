@@ -1,0 +1,104 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Build configuration
+        type: choice
+        options: [release_arm64, debug_arm64]
+        default: release_arm64
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ipa:
+    runs-on: ${{ vars.ECOGRAM_RUNNER || 'xcode-27' }}
+    timeout-minutes: 360
+    env:
+      TREE: ${{ github.workspace }}/.work/swiftgram
+      ECOGRAM_BAZEL_CACHE: ${{ github.workspace }}/../bazel-cache
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: brew install ccache librsvg
+
+      - name: Prepare tree
+        run: python -m Tools.ecogram prepare --tree "$TREE"
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          version="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["xcode"])' "$TREE/versions.json")"
+          developer="/Applications/Xcode_${version}.app/Contents/Developer"
+          [[ -d "$developer" ]] || { echo "::error::Xcode $version is not installed on this runner"; ls -d /Applications/Xcode*.app; exit 1; }
+          sudo xcode-select --switch "$developer"
+          echo "DEVELOPER_DIR=$developer" >> "$GITHUB_ENV"
+
+      - name: Free disk space
+        run: |
+          set -uo pipefail
+          keep="$(cd "${DEVELOPER_DIR%/Contents/Developer}" && pwd -P)"
+          for app in /Applications/Xcode*.app; do
+            [[ ! -L "$app" && "$(cd "$app" && pwd -P)" != "$keep" ]] && sudo rm -rf "$app" &
+          done
+          xcrun simctl runtime delete all 2>/dev/null || true
+          sudo rm -rf ~/Library/Android /usr/local/share/dotnet ~/.dotnet ~/Library/Developer/CoreSimulator/Caches &
+          wait || true
+          df -h /
+
+      - name: Install Metal toolchain
+        run: |
+          set -euo pipefail
+          xcrun metal --version >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
+          for _ in $(seq 60); do xcrun metal --version >/dev/null 2>&1 && break; sleep 5; done
+          xcrun metal --version
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.ECOGRAM_BAZEL_CACHE }}
+          key: bazel-${{ github.run_id }}
+          restore-keys: bazel-
+
+      - name: Build
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: python -u -m Tools.ecogram build --tree "$TREE" --output artifacts --configuration "${{ inputs.configuration || 'release_arm64' }}"
+
+      - uses: actions/cache/save@v4
+        if: always()
+        continue-on-error: true
+        with:
+          path: ${{ env.ECOGRAM_BAZEL_CACHE }}
+          key: bazel-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ecogram-${{ github.run_number }}
+          path: |
+            artifacts/*.ipa
+            artifacts/build-manifest.json
+          retention-days: 30
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          read -r version build ipa < <(python -c 'import json; m=json.load(open("artifacts/build-manifest.json")); print(m["app"]["CFBundleShortVersionString"], m["build_number"], m["ipa"])')
+          tag="${GITHUB_REF_NAME}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || tag="build-$build"
+          gh release create "$tag" "artifacts/$ipa" --title "ecoGram $version ($build)" --notes "Unsigned IPA, sign it with your installer before use." --prerelease

@@ -1,0 +1,7 @@
+{
+  "display_name": "ecoGram",
+  "bundle_id": "app.ecogram.ios",
+  "team_id": "ECOGRAM000",
+  "url_scheme": "tg",
+  "artifact_prefix": "ecoGram"
+}

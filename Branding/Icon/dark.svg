@@ -1,0 +1,7 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<path transform="translate(-20 0)" d="M336.6 194C261.933 194 224.6 231.333 224.6 306V400C224.6 474.667 194.733 512 135 512C194.733 512 224.6 549.333 224.6 624V718C224.6 792.667 261.933 830 336.6 830" stroke-width="70" stroke-linecap="round" stroke-linejoin="round" stroke="white" stroke-opacity="0.28"/>
+<path transform="translate(20 0)" d="M687.6 194C762.266 194 799.6 231.333 799.6 306V400C799.6 474.667 829.466 512 889.2 512C829.466 512 799.6 549.333 799.6 624V718C799.6 792.667 762.266 830 687.6 830" stroke-width="70" stroke-linecap="round" stroke-linejoin="round" stroke="white" stroke-opacity="0.28"/>
+<path transform="translate(504 522) scale(1.1) translate(-512 -512)" d="M634.121 354.612C661.221 345.759 677.283 360.114 668.664 387.038C647.028 454.698 604.543 578.121 577.54 656.054C570.468 676.438 537.744 675.64 529.528 655.686C515.431 621.473 494.679 581.645 466.357 552.616C439.274 524.863 401.35 504.798 367.676 491.079C347.167 482.723 346.441 448.605 367.514 441.731L634.121 354.607V354.612Z" fill="white" stroke-width="76.4448" stroke-linejoin="round" stroke="white"/>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse"><stop stop-color="#2E2E2E"/><stop offset="1" stop-color="#000"/></linearGradient></defs>
+</svg>
