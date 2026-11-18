@@ -37,7 +37,7 @@ jobs:
           commit="$(python -c 'import json; print(json.load(open("upstream.json"))["commit"][:10])')"
           git config user.name "ecoGram"
           git config user.email "build@ecogram.app"
-          git commit -am "chore: sync Swiftgram $commit"
+          git commit -am "upd"
           git push
 
       - name: Report conflict
