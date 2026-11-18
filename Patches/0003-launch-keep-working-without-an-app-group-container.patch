@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ecoGram <build@ecogram.app>
+Date: Wed, 18 Nov 2026 10:13:14 +0200
+Subject: [PATCH 3/3] launch: keep working without an app group container
+
+
+diff --git a/submodules/TelegramUI/Sources/AppDelegate.swift b/submodules/TelegramUI/Sources/AppDelegate.swift
+index 33783a8cecb8b2f90cfb351062823227a68635b3..c798db685cd21e98fccd82d79ada25e8e3e62cd1 100644
+--- a/submodules/TelegramUI/Sources/AppDelegate.swift
++++ b/submodules/TelegramUI/Sources/AppDelegate.swift
+@@ -599,7 +599,14 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+             BuildConfig.keychainAccessGroup(baseAppBundleId: baseAppBundleId)
+         })
+         NSLog("[SG.Launch] Resolving app-group container") // MARK: Swiftgram
+-        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
++        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) ?? { () -> URL? in
++            guard let support = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true) else {
++                return nil
++            }
++            let container = support.appendingPathComponent("SharedContainer", isDirectory: true)
++            try? FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
++            return container
++        }()
+         NSLog("[SG.Launch] App-group container resolved: \(maybeAppGroupUrl != nil)") // MARK: Swiftgram
+         
+         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
+@@ -724,6 +731,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+         )
+         
+         guard let appGroupUrl = maybeAppGroupUrl else {
++            self.window?.makeKeyAndVisible()
+             self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
+             return true
+         }
