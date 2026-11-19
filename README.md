@@ -16,7 +16,7 @@
 
 ## Features
 
-### AyuGram
+### Swiftgram
 
 - Based on
 
