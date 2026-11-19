@@ -58,10 +58,7 @@ public extension TelegramEngine.Messages {
     func ayuDeleteKeptMessages(ids: [EngineMessage.Id]) -> Signal<Never, NoError> {
         let mediaBox = self.account.postbox.mediaBox
         return self.account.postbox.transaction { transaction -> Void in
-            let kept = ids.filter { transaction.getMessage($0)?.ayuIsDeleted == true }
-            if !kept.isEmpty {
-                _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: kept)
-            }
+            AyuHistoryCapture.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: ids)
         }
         |> ignoreValues
     }

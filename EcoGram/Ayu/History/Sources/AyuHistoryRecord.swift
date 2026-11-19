@@ -4,6 +4,7 @@ public struct AyuHistoryRecord: Codable, Equatable {
     public enum Kind: String, Codable {
         case deleted
         case edited
+        case expired
     }
 
     public let id: String

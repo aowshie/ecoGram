@@ -1,15 +1,19 @@
 import Foundation
 import UIKit
 import Photos
+import AsyncDisplayKit
+import Display
 import TelegramPresentationData
 import ComponentFlow
 import GlassBarButtonComponent
 import BundleIconComponent
+import ContextUI
+import UndoUI
 import AppBundle
 import AccountContext
 import EcoStrings
 
-final class AyuShotPreviewController: UIViewController {
+final class AyuShotPreviewController: ViewController {
     private static let backgroundKey = "ecogram.shot.showBackground"
     private static let dateKey = "ecogram.shot.showDate"
     private static let rowHeight: CGFloat = 52.0
@@ -18,83 +22,76 @@ final class AyuShotPreviewController: UIViewController {
 
     private let renderer: AyuShotRenderer
     private let renderWidth: CGFloat
-    private let theme: PresentationTheme
+    private let presentationData: PresentationData
     private let strings: EcoStrings
 
     private var options: AyuShotOptions
     private var images: [AyuShotOptions: UIImage] = [:]
     private var isRendering = false
     private var image: UIImage?
+    private var validLayout: ContainerViewLayout?
+    private var didAppear = false
+    private var isDismissing = false
 
     private let dimView = UIView()
     private let sheetView = UIView()
     private let titleLabel = UILabel()
     private let closeButton = ComponentView<Empty>()
     private let moreButton = ComponentView<Empty>()
-    private let moreMenuButton = UIButton(type: .custom)
     private let scrollView = UIScrollView()
     private let imageView = UIImageView()
     private let activityView = UIActivityIndicatorView(style: .medium)
     private let preferencesLabel = UILabel()
     private let preferencesCard = UIView()
+    private let separatorView = UIView()
     private let backgroundSwitch = UISwitch()
     private let dateSwitch = UISwitch()
-    private let toastLabel = UILabel()
-    private var didAppear = false
+    private var rows: [AyuShotPreferenceRow] = []
+
+    private var theme: PresentationTheme {
+        return self.presentationData.theme
+    }
 
     init(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat) {
         self.renderer = renderer
         self.renderWidth = renderWidth
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        self.theme = presentationData.theme
-        self.strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
+        self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        self.strings = EcoStrings(languageCode: self.presentationData.strings.baseLanguageCode)
         let defaults = UserDefaults.standard
         self.options = AyuShotOptions(
             showBackground: defaults.object(forKey: AyuShotPreviewController.backgroundKey) as? Bool ?? true,
             showDate: defaults.object(forKey: AyuShotPreviewController.dateKey) as? Bool ?? false
         )
-        super.init(nibName: nil, bundle: nil)
-        self.modalPresentationStyle = .overFullScreen
-        self.modalPresentationCapturesStatusBarAppearance = true
+        super.init(navigationBarPresentationData: nil)
+        self.statusBar.statusBarStyle = .Ignore
     }
 
-    required init?(coder: NSCoder) {
-        return nil
+    required init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    override func displayNodeDidLoad() {
+        super.displayNodeDidLoad()
+        let view = self.displayNode.view
         let list = self.theme.list
-        self.view.backgroundColor = .clear
 
         self.dimView.backgroundColor = UIColor(white: 0.0, alpha: 0.4)
         self.dimView.alpha = 0.0
         self.dimView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.closePressed)))
-        self.view.addSubview(self.dimView)
+        view.addSubview(self.dimView)
 
         self.sheetView.backgroundColor = list.blocksBackgroundColor
         self.sheetView.layer.cornerRadius = 38.0
         self.sheetView.layer.cornerCurve = .continuous
         self.sheetView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         self.sheetView.clipsToBounds = true
-        self.view.addSubview(self.sheetView)
+        view.addSubview(self.sheetView)
 
         self.titleLabel.text = self.strings.get(.actionShot)
         self.titleLabel.font = UIFont.systemFont(ofSize: 17.0, weight: .semibold)
         self.titleLabel.textColor = list.itemPrimaryTextColor
         self.titleLabel.textAlignment = .center
         self.sheetView.addSubview(self.titleLabel)
-
-        self.moreMenuButton.accessibilityLabel = self.strings.get(.shotCopy)
-        self.moreMenuButton.showsMenuAsPrimaryAction = true
-        self.moreMenuButton.menu = UIMenu(children: [
-            UIAction(title: self.strings.get(.shotCopy), image: UIImage(bundleImageName: "Chat/Context Menu/Copy")?.withRenderingMode(.alwaysTemplate), handler: { [weak self] _ in
-                self?.copyImage()
-            }),
-            UIAction(title: self.strings.get(.shotSave), image: UIImage(bundleImageName: "Chat/Context Menu/Download")?.withRenderingMode(.alwaysTemplate), handler: { [weak self] _ in
-                self?.saveImage()
-            })
-        ])
 
         self.scrollView.showsVerticalScrollIndicator = false
         self.scrollView.alwaysBounceVertical = true
@@ -121,76 +118,65 @@ final class AyuShotPreviewController: UIViewController {
         self.preferencesCard.clipsToBounds = true
         self.sheetView.addSubview(self.preferencesCard)
 
-        self.addRow(title: self.strings.get(.shotShowBackground), toggle: self.backgroundSwitch, index: 0, isOn: self.options.showBackground)
-        self.addRow(title: self.strings.get(.shotShowDate), toggle: self.dateSwitch, index: 1, isOn: self.options.showDate)
-        let separator = UIView()
-        separator.backgroundColor = list.itemBlocksSeparatorColor
-        separator.tag = 100
-        self.preferencesCard.addSubview(separator)
+        self.addRow(title: self.strings.get(.shotShowBackground), toggle: self.backgroundSwitch, isOn: self.options.showBackground)
+        self.addRow(title: self.strings.get(.shotShowDate), toggle: self.dateSwitch, isOn: self.options.showDate)
+        self.separatorView.backgroundColor = list.itemBlocksSeparatorColor
+        self.preferencesCard.addSubview(self.separatorView)
 
-        self.toastLabel.font = UIFont.systemFont(ofSize: 14.0, weight: .medium)
-        self.toastLabel.textColor = .white
-        self.toastLabel.textAlignment = .center
-        self.toastLabel.backgroundColor = UIColor(white: 0.0, alpha: 0.75)
-        self.toastLabel.layer.cornerRadius = 20.0
-        self.toastLabel.layer.cornerCurve = .continuous
-        self.toastLabel.clipsToBounds = true
-        self.toastLabel.alpha = 0.0
-        self.view.addSubview(self.toastLabel)
-
-        self.updateButtons()
+        self.updateHeaderButtons()
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let bounds = self.view.bounds
-        let insets = self.view.safeAreaInsets
-        self.dimView.frame = bounds
+    override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        self.validLayout = layout
+        self.layoutSheet()
+    }
+
+    private func layoutSheet() {
+        guard let layout = self.validLayout, self.isNodeLoaded else {
+            return
+        }
+        let size = layout.size
+        let topInset = layout.statusBarHeight ?? layout.safeInsets.top
+        self.dimView.frame = CGRect(origin: .zero, size: size)
 
         let side: CGFloat = 16.0
-        let cardHeight = AyuShotPreviewController.rowHeight * 2.0
+        let rowHeight = AyuShotPreviewController.rowHeight
+        let headerHeight = AyuShotPreviewController.headerHeight
+        let cardHeight = rowHeight * 2.0
         let preferencesHeight: CGFloat = 32.0 + cardHeight
-        let bottomInset = max(insets.bottom, 16.0)
-        let maxSheetHeight = bounds.height - insets.top - 12.0
-        let imageWidth = bounds.width - side * 2.0
+        let bottomInset = max(layout.intrinsicInsets.bottom, 16.0)
+        let maxSheetHeight = size.height - topInset - 12.0
+        let imageWidth = size.width - side * 2.0
         var imageHeight: CGFloat = 220.0
         if let image = self.image, image.size.width > 0.0 {
             imageHeight = ceil(imageWidth * image.size.height / image.size.width)
         }
-        let fixedHeight = AyuShotPreviewController.headerHeight + 8.0 + preferencesHeight + 16.0 + bottomInset
+        let fixedHeight = headerHeight + 8.0 + preferencesHeight + 16.0 + bottomInset
         let scrollHeight = min(imageHeight, max(120.0, maxSheetHeight - fixedHeight))
         let sheetHeight = fixedHeight + scrollHeight
-        let sheetOrigin = self.didAppear ? bounds.height - sheetHeight : bounds.height
-        self.sheetView.frame = CGRect(x: 0.0, y: sheetOrigin, width: bounds.width, height: sheetHeight)
+        let sheetOrigin = self.didAppear ? size.height - sheetHeight : size.height
+        self.sheetView.frame = CGRect(x: 0.0, y: sheetOrigin, width: size.width, height: sheetHeight)
 
         let buttonSize = AyuShotPreviewController.buttonSize
-        let buttonY = floor((AyuShotPreviewController.headerHeight - buttonSize) / 2.0)
-        self.updateHeaderButtons()
+        let buttonY = floor((headerHeight - buttonSize) / 2.0)
         self.closeButton.view?.frame = CGRect(x: side, y: buttonY, width: buttonSize, height: buttonSize)
-        let moreFrame = CGRect(x: bounds.width - side - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
-        self.moreButton.view?.frame = moreFrame
-        self.moreMenuButton.frame = moreFrame
-        self.titleLabel.frame = CGRect(x: side + buttonSize + 8.0, y: 0.0, width: bounds.width - (side + buttonSize + 8.0) * 2.0, height: AyuShotPreviewController.headerHeight)
+        self.moreButton.view?.frame = CGRect(x: size.width - side - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
+        self.titleLabel.frame = CGRect(x: side + buttonSize + 8.0, y: 0.0, width: size.width - (side + buttonSize + 8.0) * 2.0, height: headerHeight)
 
-        self.scrollView.frame = CGRect(x: 0.0, y: AyuShotPreviewController.headerHeight, width: bounds.width, height: scrollHeight)
+        self.scrollView.frame = CGRect(x: 0.0, y: headerHeight, width: size.width, height: scrollHeight)
         self.imageView.frame = CGRect(x: side, y: 0.0, width: imageWidth, height: imageHeight)
-        self.scrollView.contentSize = CGSize(width: bounds.width, height: imageHeight)
+        self.scrollView.contentSize = CGSize(width: size.width, height: imageHeight)
         self.activityView.center = CGPoint(x: self.scrollView.frame.midX, y: self.scrollView.frame.midY)
 
         let preferencesTop = self.scrollView.frame.maxY + 8.0
-        self.preferencesLabel.frame = CGRect(x: side * 2.0, y: preferencesTop + 8.0, width: bounds.width - side * 4.0, height: 18.0)
-        self.preferencesCard.frame = CGRect(x: side, y: preferencesTop + 32.0, width: bounds.width - side * 2.0, height: cardHeight)
-        for subview in self.preferencesCard.subviews {
-            if subview.tag == 100 {
-                subview.frame = CGRect(x: side, y: AyuShotPreviewController.rowHeight - 0.33, width: self.preferencesCard.bounds.width - side, height: 0.33)
-            } else if let row = subview as? AyuShotPreferenceRow {
-                row.frame = CGRect(x: 0.0, y: CGFloat(row.index) * AyuShotPreviewController.rowHeight, width: self.preferencesCard.bounds.width, height: AyuShotPreviewController.rowHeight)
-            }
+        self.preferencesLabel.frame = CGRect(x: side * 2.0, y: preferencesTop + 8.0, width: size.width - side * 4.0, height: 18.0)
+        self.preferencesCard.frame = CGRect(x: side, y: preferencesTop + 32.0, width: size.width - side * 2.0, height: cardHeight)
+        let cardWidth = self.preferencesCard.bounds.width
+        for (index, row) in self.rows.enumerated() {
+            row.frame = CGRect(x: 0.0, y: CGFloat(index) * rowHeight, width: cardWidth, height: rowHeight)
         }
-
-        self.toastLabel.sizeToFit()
-        let toastSize = CGSize(width: self.toastLabel.bounds.width + 32.0, height: 40.0)
-        self.toastLabel.frame = CGRect(x: floor((bounds.width - toastSize.width) / 2.0), y: max(insets.top, 20.0) + 8.0, width: toastSize.width, height: toastSize.height)
+        self.separatorView.frame = CGRect(x: side, y: rowHeight - UIScreenPixel, width: cardWidth - side, height: UIScreenPixel)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -201,17 +187,18 @@ final class AyuShotPreviewController: UIViewController {
         self.didAppear = true
         UIView.animate(withDuration: 0.4, delay: 0.0, usingSpringWithDamping: 1.0, initialSpringVelocity: 0.0, options: [], animations: {
             self.dimView.alpha = 1.0
-            self.view.setNeedsLayout()
-            self.view.layoutIfNeeded()
+            self.layoutSheet()
         })
         self.renderCurrent()
     }
 
     private func updateHeaderButtons() {
+        guard self.isNodeLoaded else {
+            return
+        }
         let size = CGSize(width: AyuShotPreviewController.buttonSize, height: AyuShotPreviewController.buttonSize)
         let isDark = self.theme.overallDarkAppearance
         let iconColor = self.theme.chat.inputPanel.panelControlColor
-        let isEnabled = self.image != nil && !self.isRendering
         let _ = self.closeButton.update(
             transition: .immediate,
             component: AnyComponent(GlassBarButtonComponent(
@@ -235,9 +222,11 @@ final class AyuShotPreviewController: UIViewController {
                 backgroundColor: nil,
                 isDark: isDark,
                 state: .glass,
-                isEnabled: isEnabled,
+                isEnabled: self.image != nil && !self.isRendering,
                 component: AnyComponentWithIdentity(id: "more", component: AnyComponent(BundleIconComponent(name: "Chat/Context Menu/More", tintColor: iconColor))),
-                action: nil
+                action: { [weak self] view in
+                    self?.morePressed(view: view)
+                }
             )),
             environment: {},
             containerSize: size
@@ -247,13 +236,40 @@ final class AyuShotPreviewController: UIViewController {
         }
         if let view = self.moreButton.view, view.superview == nil {
             self.sheetView.addSubview(view)
-            self.sheetView.addSubview(self.moreMenuButton)
         }
-        self.moreMenuButton.isEnabled = isEnabled
     }
 
-    private func addRow(title: String, toggle: UISwitch, index: Int, isOn: Bool) {
-        let row = AyuShotPreferenceRow(index: index)
+    private func morePressed(view: UIView) {
+        guard self.image != nil else {
+            return
+        }
+        let items: [ContextMenuItem] = [
+            .action(ContextMenuActionItem(text: self.strings.get(.shotCopy), icon: { theme in
+                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Copy"), color: theme.contextMenu.primaryColor)
+            }, action: { [weak self] _, f in
+                f(.default)
+                self?.copyImage()
+            })),
+            .action(ContextMenuActionItem(text: self.strings.get(.shotSave), icon: { theme in
+                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Download"), color: theme.contextMenu.primaryColor)
+            }, action: { [weak self] _, f in
+                f(.default)
+                self?.saveImage()
+            }))
+        ]
+        let sourceView = (view as? GlassBarButtonComponent.View)?.menuSourceView ?? view
+        let contextController = makeContextController(
+            presentationData: self.presentationData,
+            source: .reference(AyuShotContextReferenceContentSource(sourceView: sourceView)),
+            items: .single(ContextController.Items(content: .list(items))),
+            recognizer: nil,
+            gesture: nil
+        )
+        self.presentInGlobalOverlay(contextController)
+    }
+
+    private func addRow(title: String, toggle: UISwitch, isOn: Bool) {
+        let row = AyuShotPreferenceRow()
         row.label.text = title
         row.label.font = UIFont.systemFont(ofSize: 17.0)
         row.label.textColor = self.theme.list.itemPrimaryTextColor
@@ -265,6 +281,7 @@ final class AyuShotPreviewController: UIViewController {
         row.addSubview(row.label)
         row.addSubview(toggle)
         self.preferencesCard.addSubview(row)
+        self.rows.append(row)
     }
 
     @objc private func optionsChanged() {
@@ -286,8 +303,8 @@ final class AyuShotPreviewController: UIViewController {
         self.isRendering = true
         self.activityView.startAnimating()
         self.imageView.alpha = 0.4
-        self.updateButtons()
-        self.renderer.render(in: self.view, width: self.renderWidth, options: options, completion: { [weak self] image in
+        self.updateHeaderButtons()
+        self.renderer.render(in: self.displayNode.view, width: self.renderWidth, options: options, completion: { [weak self] image in
             guard let self else {
                 return
             }
@@ -304,8 +321,8 @@ final class AyuShotPreviewController: UIViewController {
                 self.show(image)
             } else {
                 self.imageView.alpha = 1.0
-                self.updateButtons()
-                self.showToast(self.strings.get(.shotFailed))
+                self.updateHeaderButtons()
+                self.presentToast(.info(title: nil, text: self.strings.get(.shotFailed), timeout: nil, customUndoText: nil))
             }
         })
     }
@@ -314,17 +331,10 @@ final class AyuShotPreviewController: UIViewController {
         self.image = image
         self.imageView.image = image
         self.imageView.alpha = 1.0
-        self.updateButtons()
+        self.updateHeaderButtons()
         UIView.animate(withDuration: 0.25, animations: {
-            self.view.setNeedsLayout()
-            self.view.layoutIfNeeded()
+            self.layoutSheet()
         })
-    }
-
-    private func updateButtons() {
-        if self.isViewLoaded {
-            self.updateHeaderButtons()
-        }
     }
 
     private func copyImage() {
@@ -332,7 +342,7 @@ final class AyuShotPreviewController: UIViewController {
             return
         }
         UIPasteboard.general.setData(data, forPasteboardType: "public.png")
-        self.showToast(self.strings.get(.shotCopied))
+        self.presentToast(.copy(text: self.strings.get(.shotCopied)))
     }
 
     private func saveImage() {
@@ -342,7 +352,7 @@ final class AyuShotPreviewController: UIViewController {
         PHPhotoLibrary.requestAuthorization(for: .addOnly, handler: { [weak self] status in
             guard status == .authorized || status == .limited else {
                 DispatchQueue.main.async {
-                    self?.showToast(self?.strings.get(.shotFailed) ?? "")
+                    self?.presentFailure()
                 }
                 return
             }
@@ -353,49 +363,55 @@ final class AyuShotPreviewController: UIViewController {
                     guard let self else {
                         return
                     }
-                    self.showToast(self.strings.get(success ? .shotSaved : .shotFailed))
+                    if success {
+                        self.presentToast(.mediaSaved(text: self.strings.get(.shotSaved)))
+                    } else {
+                        self.presentFailure()
+                    }
                 }
             })
         })
     }
 
-    private func showToast(_ text: String) {
-        self.toastLabel.text = text
-        self.view.setNeedsLayout()
-        self.view.layoutIfNeeded()
-        self.toastLabel.layer.removeAllAnimations()
-        UIView.animate(withDuration: 0.2, animations: {
-            self.toastLabel.alpha = 1.0
-        }, completion: { _ in
-            UIView.animate(withDuration: 0.3, delay: 1.6, options: [.beginFromCurrentState], animations: {
-                self.toastLabel.alpha = 0.0
-            })
-        })
+    private func presentFailure() {
+        self.presentToast(.info(title: nil, text: self.strings.get(.shotFailed), timeout: nil, customUndoText: nil))
+    }
+
+    private func presentToast(_ content: UndoOverlayContent) {
+        self.present(UndoOverlayController(presentationData: self.presentationData, content: content, elevatedLayout: false, position: .top, action: { _ in
+            return false
+        }), in: .current)
     }
 
     @objc private func closePressed() {
+        guard !self.isDismissing else {
+            return
+        }
+        self.isDismissing = true
         UIView.animate(withDuration: 0.25, delay: 0.0, options: [.curveEaseIn], animations: {
             self.dimView.alpha = 0.0
-            self.sheetView.frame.origin.y = self.view.bounds.height
-        }, completion: { _ in
-            self.dismiss(animated: false)
+            self.sheetView.frame.origin.y = self.displayNode.view.bounds.height
+        }, completion: { [weak self] _ in
+            self?.dismiss()
         })
     }
 }
 
+private final class AyuShotContextReferenceContentSource: ContextReferenceContentSource {
+    private let sourceView: UIView
+
+    init(sourceView: UIView) {
+        self.sourceView = sourceView
+    }
+
+    func transitionInfo() -> ContextControllerReferenceViewInfo? {
+        return ContextControllerReferenceViewInfo(referenceView: self.sourceView, contentAreaInScreenSpace: mainWindowScreenBounds)
+    }
+}
+
 private final class AyuShotPreferenceRow: UIView {
-    let index: Int
     let label = UILabel()
     var toggle: UISwitch?
-
-    init(index: Int) {
-        self.index = index
-        super.init(frame: .zero)
-    }
-
-    required init?(coder: NSCoder) {
-        return nil
-    }
 
     override func layoutSubviews() {
         super.layoutSubviews()

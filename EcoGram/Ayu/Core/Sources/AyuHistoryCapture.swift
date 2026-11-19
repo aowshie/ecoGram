@@ -112,7 +112,7 @@ enum AyuHistoryCapture {
             return true
         }
         let timeout = message.attributes.compactMap({ ($0 as? AutoclearTimeoutMessageAttribute)?.timeout ?? ($0 as? AutoremoveTimeoutMessageAttribute)?.timeout }).first ?? 0
-        self.expireSelfDestructing(transaction: transaction, message: message, timeout: timeout)
+        self.expireSelfDestructing(transaction: transaction, mediaBox: mediaBox, message: message, timeout: timeout)
         return true
     }
 
@@ -141,13 +141,10 @@ enum AyuHistoryCapture {
         guard !expired.isEmpty else {
             return
         }
-        let ids = expired.filter { $0.kind == .deleted }.map { record in
+        let ids = expired.filter { $0.kind == .deleted || $0.kind == .expired }.map { record in
             MessageId(peerId: PeerId(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
         }
-        let kept = ids.filter { transaction.getMessage($0)?.ayuIsDeleted == true }
-        if !kept.isEmpty {
-            _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: kept)
-        }
+        self.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: ids)
     }
 
     private static func retainedMessage(_ message: Message, deletedAt: Int32, isExpired: Bool) -> StoreMessage {

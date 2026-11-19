@@ -69,7 +69,9 @@ private func ecoTrimmedSeparators(_ items: [ContextMenuItem]) -> [ContextMenuIte
     return result
 }
 
-public func ecoArrangeContextMenu(actions: inout [ContextMenuItem], sgActions: inout [ContextMenuItem], strings: PresentationStrings) {
+private let ecoKeptMessageHiddenActions: Set<EcoContextAction> = [.reply, .pin, .forward]
+
+public func ecoArrangeContextMenu(actions: inout [ContextMenuItem], sgActions: inout [ContextMenuItem], strings: PresentationStrings, isKeptMessage: Bool = false) {
     let preferences = EcoPreferences.shared
     var known: [EcoContextAction: ContextMenuItem] = [:]
     var others: [ContextMenuItem] = []
@@ -90,6 +92,9 @@ public func ecoArrangeContextMenu(actions: inout [ContextMenuItem], sgActions: i
     sgActions = []
     var arranged: [ContextMenuItem] = []
     for kind in preferences.contextOrder {
+        if isKeptMessage && ecoKeptMessageHiddenActions.contains(kind) {
+            continue
+        }
         if let item = known[kind], preferences.isEnabled(kind) {
             arranged.append(item)
         }

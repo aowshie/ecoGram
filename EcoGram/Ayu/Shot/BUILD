@@ -20,6 +20,8 @@ swift_library(
         "//submodules/TelegramUI/Components/GlassBarButtonComponent:GlassBarButtonComponent",
         "//submodules/Components/BundleIconComponent:BundleIconComponent",
         "//submodules/AppBundle:AppBundle",
+        "//submodules/ContextUI:ContextUI",
+        "//submodules/UndoUI:UndoUI",
     ],
     visibility = [
         "//visibility:public",

@@ -3,6 +3,7 @@ import Postbox
 internal import TelegramApi
 import SwiftSignalKit
 import AyuSettings
+import AyuHistory
 
 public final class AyuExpiredMediaAttribute: MessageAttribute {
     public let timeout: Int32
@@ -125,7 +126,80 @@ public extension TelegramEngine.Messages {
 }
 
 extension AyuHistoryCapture {
-    static func expireSelfDestructing(transaction: Transaction, message: Message, timeout: Int32) {
+    static func releaseKept(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) {
+        var deleted: [MessageId] = []
+        var resourceIds: [MediaResourceId] = []
+        for id in ids {
+            guard let message = transaction.getMessage(id) else {
+                continue
+            }
+            if message.ayuIsDeleted {
+                deleted.append(id)
+            } else if message.ayuIsMediaExpired {
+                for media in message.media {
+                    addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
+                }
+                self.restoreExpiredContent(transaction: transaction, message: message)
+            }
+        }
+        if !deleted.isEmpty {
+            _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: deleted)
+        }
+        if !resourceIds.isEmpty {
+            let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
+        }
+    }
+
+    private static func expiredContentData(_ media: [Media]) -> TelegramMediaExpiredContentData {
+        for item in media {
+            if let file = item as? TelegramMediaFile {
+                if file.isVoice {
+                    return .voiceMessage
+                }
+                if file.isInstantVideo {
+                    return .videoMessage
+                }
+                return .file
+            }
+        }
+        return .image
+    }
+
+    private static func restoreExpiredContent(transaction: Transaction, message: Message) {
+        let data = self.expiredContentData(message.media)
+        transaction.updateMessage(message.id, update: { currentMessage in
+            let attributes = currentMessage.attributes.filter { attribute in
+                return !(attribute is AyuExpiredMediaAttribute) && !(attribute is MediaSpoilerMessageAttribute)
+            }
+            return .update(StoreMessage(
+                id: currentMessage.id,
+                customStableId: nil,
+                globallyUniqueId: currentMessage.globallyUniqueId,
+                groupingKey: currentMessage.groupingKey,
+                threadId: currentMessage.threadId,
+                timestamp: currentMessage.timestamp,
+                flags: StoreMessageFlags(currentMessage.flags),
+                tags: currentMessage.tags,
+                globalTags: currentMessage.globalTags,
+                localTags: currentMessage.localTags,
+                forwardInfo: currentMessage.forwardInfo.map(StoreMessageForwardInfo.init),
+                authorId: currentMessage.author?.id,
+                text: currentMessage.text,
+                attributes: attributes,
+                media: [TelegramMediaExpiredContent(data: data)]
+            ))
+        })
+    }
+
+    static func recordExpired(mediaBox: MediaBox, id: MessageId, sentAt: Int32) {
+        let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
+        store.append([AyuHistoryRecord(kind: .expired, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: sentAt, savedAt: Int32(Date().timeIntervalSince1970), text: "", replacementText: nil)])
+    }
+
+    static func expireSelfDestructing(transaction: Transaction, mediaBox: MediaBox, message: Message, timeout: Int32) {
+        if !message.ayuIsMediaExpired {
+            self.recordExpired(mediaBox: mediaBox, id: message.id, sentAt: message.timestamp)
+        }
         transaction.updateMessage(message.id, update: { currentMessage in
             var attributes: [MessageAttribute] = currentMessage.attributes.compactMap { attribute -> MessageAttribute? in
                 if attribute is AutoremoveTimeoutMessageAttribute || attribute is AutoclearTimeoutMessageAttribute || attribute is AyuExpiredMediaAttribute {
@@ -160,11 +234,14 @@ extension AyuHistoryCapture {
         })
     }
 
-    static func preserveSelfDestructing(transaction: Transaction, id: MessageId, updated: StoreMessage) -> StoreMessage {
+    static func preserveSelfDestructing(transaction: Transaction, mediaBox: MediaBox, id: MessageId, updated: StoreMessage) -> StoreMessage {
         guard let current = transaction.getMessage(id), current.ayuIsMediaExpired || current.ayuSelfDestructTimeout != nil, updated.media.contains(where: { $0 is TelegramMediaExpiredContent }) else {
             return updated
         }
         let timeout = current.ayuSelfDestructTimeout ?? current.attributes.compactMap({ ($0 as? AyuExpiredMediaAttribute)?.timeout }).first ?? 0
+        if !current.ayuIsMediaExpired {
+            self.recordExpired(mediaBox: mediaBox, id: id, sentAt: current.timestamp)
+        }
         var attributes = updated.attributes.filter { attribute in
             return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute) && !(attribute is AyuExpiredMediaAttribute)
         }

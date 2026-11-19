@@ -9,7 +9,7 @@ func ayuHistoryStore(context: AccountContext) -> AyuHistoryStore {
 }
 
 private func ayuDeleteKeptMessages(context: AccountContext, records: [AyuHistoryRecord]) {
-    let ids = records.filter { $0.kind == .deleted }.map { record in
+    let ids = records.filter { $0.kind == .deleted || $0.kind == .expired }.map { record in
         EngineMessage.Id(peerId: EnginePeer.Id(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
     }
     if !ids.isEmpty {
@@ -24,7 +24,11 @@ func ayuExpireHistory(context: AccountContext) {
 }
 
 func ayuClearDeleted(context: AccountContext) {
-    ayuHistoryStore(context: context).remove(kind: .deleted) { removed in
+    let store = ayuHistoryStore(context: context)
+    store.remove(kind: .deleted) { removed in
+        ayuDeleteKeptMessages(context: context, records: removed)
+    }
+    store.remove(kind: .expired) { removed in
         ayuDeleteKeptMessages(context: context, records: removed)
     }
 }

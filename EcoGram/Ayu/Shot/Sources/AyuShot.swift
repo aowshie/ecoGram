@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import SwiftSignalKit
 import TelegramCore
+import Display
 import AccountContext
 
 public func ayuPresentShot(context: AccountContext, messageIds: [EngineMessage.Id], sourceView: UIView) {
@@ -18,12 +19,8 @@ public func ayuPresentShot(context: AccountContext, messageIds: [EngineMessage.I
         guard !groups.isEmpty else {
             return
         }
-        var presenter = window.rootViewController
-        while let presented = presenter?.presentedViewController {
-            presenter = presented
-        }
         let renderer = AyuShotRenderer(context: context, groups: groups)
-        presenter?.present(AyuShotPreviewController(context: context, renderer: renderer, renderWidth: min(window.bounds.width, 430.0)), animated: false)
+        context.sharedContext.mainWindow?.present(AyuShotPreviewController(context: context, renderer: renderer, renderWidth: min(window.bounds.width, 430.0)), on: .root)
     })
 }
 

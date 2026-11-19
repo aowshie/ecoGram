@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 08:31:14 +0200
+Date: Thu, 19 Nov 2026 08:58:39 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -827,7 +827,7 @@ index bb35640b764b8f450e904f6420d0e6248c2c9770..3fb015eb62eb2419b124c75e1d2a36aa
      
      if let settings = data.globalSettings {
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..482407355cc1d419f432aed14e911426027e36b2 100644
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..39513c2ac3fb2a071875dbaa3c06775ce3e91c39 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 +++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 @@ -1,6 +1,9 @@
@@ -849,7 +849,7 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..482407355cc1d419f432aed14e911426
 +        }) {
 +            actions.append(editHistoryItem)
 +        }
-+        ecoArrangeContextMenu(actions: &actions, sgActions: &sgActions, strings: chatPresentationInterfaceState.strings)
++        ecoArrangeContextMenu(actions: &actions, sgActions: &sgActions, strings: chatPresentationInterfaceState.strings, isKeptMessage: messages.contains(where: { $0.ayuIsDeleted || $0.ayuIsMediaExpired }))
          sgInsertContextMenu(actions: &actions, sgActions: &sgActions, index: sgActionsIndex, chatPresentationInterfaceState: chatPresentationInterfaceState) // MARK: Swiftgram
          
          var reactionCount = 0
