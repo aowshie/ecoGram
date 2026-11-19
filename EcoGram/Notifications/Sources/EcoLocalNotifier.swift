@@ -11,6 +11,9 @@ import EcoPreferences
 public final class EcoLocalNotifier {
     private let presentationData: () -> PresentationData?
     private let disposables = DisposableDict<AccountRecordId>()
+    private let readDisposables = DisposableDict<AccountRecordId>()
+    private var tracked: [AccountRecordId: [EnginePeer.Id: [EngineMessage.Index]]] = [:]
+    private var trackedPeers: [AccountRecordId: ValuePromise<Set<EnginePeer.Id>>] = [:]
     private var accountIds = Set<AccountRecordId>()
     private var seenGroups: [String] = []
 
@@ -20,12 +23,16 @@ public final class EcoLocalNotifier {
 
     deinit {
         self.disposables.dispose()
+        self.readDisposables.dispose()
     }
 
     public func update(accounts: [(AccountRecordId, Account)]) {
         let ids = Set(accounts.map { $0.0 })
         for id in self.accountIds.subtracting(ids) {
             self.disposables.set(nil, forKey: id)
+            self.readDisposables.set(nil, forKey: id)
+            self.tracked[id] = nil
+            self.trackedPeers[id] = nil
         }
         for (id, account) in accounts where !self.accountIds.contains(id) {
             self.disposables.set((account.stateManager.notificationMessages
@@ -54,8 +61,86 @@ public final class EcoLocalNotifier {
                     self.post(accountId: id, accountPeerId: account.peerId, message: EngineMessage(message), count: messages.count)
                 }
             }), forKey: id)
+            self.observeReadState(accountId: id, account: account)
         }
         self.accountIds = ids
+    }
+
+    private func observeReadState(accountId: AccountRecordId, account: Account) {
+        let peers = ValuePromise<Set<EnginePeer.Id>>(Set(), ignoreRepeated: true)
+        self.trackedPeers[accountId] = peers
+        self.tracked[accountId] = [:]
+        let engine = TelegramEngine(account: account)
+        self.readDisposables.set((peers.get()
+        |> mapToSignal { peerIds -> Signal<[EnginePeer.Id: EnginePeerReadCounters], NoError> in
+            if peerIds.isEmpty {
+                return .single([:])
+            }
+            return engine.data.subscribe(EngineDataMap(peerIds.map(TelegramEngine.EngineData.Item.Messages.PeerReadCounters.init(id:))))
+        }
+        |> deliverOnMainQueue).startStrict(next: { [weak self] counters in
+            self?.removeRead(accountId: accountId, counters: counters)
+        }), forKey: accountId)
+
+        UNUserNotificationCenter.current().getDeliveredNotifications(completionHandler: { [weak self] notifications in
+            let indices = notifications.compactMap { notification -> EngineMessage.Index? in
+                let userInfo = notification.request.content.userInfo
+                guard notification.request.identifier.hasPrefix("ecogram-"), userInfo["accountId"] as? Int64 == accountId.int64, let peerId = userInfo["peerId"] as? Int64, let namespace = userInfo["messageId.namespace"] as? Int32, let id = userInfo["messageId.id"] as? Int32, let timestamp = userInfo["timestamp"] as? Int32 else {
+                    return nil
+                }
+                return EngineMessage.Index(id: EngineMessage.Id(peerId: EnginePeer.Id(peerId), namespace: namespace, id: id), timestamp: timestamp)
+            }
+            DispatchQueue.main.async {
+                guard let self else {
+                    return
+                }
+                for index in indices {
+                    self.track(accountId: accountId, index: index)
+                }
+            }
+        })
+    }
+
+    private func track(accountId: AccountRecordId, index: EngineMessage.Index) {
+        guard var peers = self.tracked[accountId] else {
+            return
+        }
+        var indices = peers[index.id.peerId] ?? []
+        if !indices.contains(index) {
+            indices.append(index)
+        }
+        peers[index.id.peerId] = indices
+        self.tracked[accountId] = peers
+        self.trackedPeers[accountId]?.set(Set(peers.keys))
+    }
+
+    private func removeRead(accountId: AccountRecordId, counters: [EnginePeer.Id: EnginePeerReadCounters]) {
+        guard var peers = self.tracked[accountId] else {
+            return
+        }
+        var identifiers: [String] = []
+        for (peerId, readCounters) in counters {
+            guard let indices = peers[peerId] else {
+                continue
+            }
+            let read = indices.filter { readCounters.isIncomingMessageIndexRead($0) }
+            if read.isEmpty {
+                continue
+            }
+            identifiers.append(contentsOf: read.map { EcoLocalNotifier.identifier(accountId: accountId, messageId: $0.id) })
+            let remaining = indices.filter { !read.contains($0) }
+            peers[peerId] = remaining.isEmpty ? nil : remaining
+        }
+        if identifiers.isEmpty {
+            return
+        }
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
+        self.tracked[accountId] = peers
+        self.trackedPeers[accountId]?.set(Set(peers.keys))
+    }
+
+    private static func identifier(accountId: AccountRecordId, messageId: EngineMessage.Id) -> String {
+        return "ecogram-\(accountId.int64)-\(messageId.peerId.toInt64())-\(messageId.namespace)-\(messageId.id)"
     }
 
     private func post(accountId: AccountRecordId, accountPeerId: EnginePeer.Id, message: EngineMessage, count: Int) {
@@ -109,7 +194,8 @@ public final class EcoLocalNotifier {
             "accountId": accountId.int64,
             "peerId": message.id.peerId.toInt64(),
             "messageId.namespace": message.id.namespace,
-            "messageId.id": message.id.id
+            "messageId.id": message.id.id,
+            "timestamp": message.timestamp
         ]
         if let threadId = message.threadId, case let .channel(channel) = chatPeer, channel.isForumOrMonoForum {
             userInfo["threadId"] = threadId
@@ -124,7 +210,8 @@ public final class EcoLocalNotifier {
         if !isMuted {
             content.sound = .default
         }
-        let identifier = "ecogram-\(accountId.int64)-\(message.id.peerId.toInt64())-\(message.id.namespace)-\(message.id.id)"
+        let identifier = EcoLocalNotifier.identifier(accountId: accountId, messageId: message.id)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil), withCompletionHandler: nil)
+        self.track(accountId: accountId, index: message.index)
     }
 }
