@@ -12,6 +12,15 @@ public struct EcoStrings {
         case ghostHideStoryViews
         case ghostKeepUnread
         case ghostFooter
+        case ghostReadOnInteract
+        case ghostEssentials
+        case spyEssentials
+        case ghostEnabledCount
+        case stateOn
+        case stateOff
+        case historyTitle
+        case exceptionsHeader
+        case exceptionsFooter
         case historyHeader
         case historySaveDeleted
         case historySaveSelfDestructing
@@ -48,7 +57,8 @@ public struct EcoStrings {
         case appearanceHeader
         case avatarInTabBar
         case hideProfileShortcuts
-        case avatarFooter
+        case islandAvatarAnimation
+        case islandAvatarFooter
         case profileSuggestionsFooter
         case badgeSupporterInfo
         case badgeOfficialInfo
@@ -77,12 +87,21 @@ public struct EcoStrings {
         .ayuTitle: ("AyuGram", "AyuGram", "AyuGram"),
         .ghostHeader: ("GHOST MODE", "РЕЖИМ ПРИЗРАКА", "ゴーストモード"),
         .ghostMode: ("Ghost Mode", "Режим призрака", "ゴーストモード"),
-        .ghostHideRead: ("Don't Send Read Receipts", "Не отправлять прочтение", "既読を送信しない"),
-        .ghostHideOnline: ("Don't Send Online Status", "Не показывать онлайн", "オンライン状態を送信しない"),
-        .ghostHideTyping: ("Don't Send Typing Status", "Не показывать «печатает»", "入力中を送信しない"),
-        .ghostHideStoryViews: ("Don't Mark Stories as Viewed", "Не отмечать истории просмотренными", "ストーリーを既読にしない"),
-        .ghostKeepUnread: ("Keep Messages Unread for Me", "Не отмечать прочитанным у себя", "自分側でも未読のままにする"),
-        .ghostFooter: ("Others won't see that you are online, typing or reading their messages. With «Keep Messages Unread for Me» chats you open stay unread on this device too.", "Собеседники не увидят, что вы в сети, печатаете или прочитали их сообщения. С «Не отмечать прочитанным у себя» открытые чаты остаются непрочитанными и на этом устройстве.", "相手にオンライン、入力中、既読であることが表示されません。「自分側でも未読のままにする」をオンにすると、開いたチャットもこの端末で未読のままになります。"),
+        .ghostHideRead: ("Don't Read Messages", "Не читать сообщения", "メッセージを既読にしない"),
+        .ghostHideOnline: ("Don't Send Online", "Не отправлять онлайн", "オンラインを送信しない"),
+        .ghostHideTyping: ("Don't Send Typing", "Не отправлять «печатает»", "入力中を送信しない"),
+        .ghostHideStoryViews: ("Don't Read Stories", "Не читать истории", "ストーリーを既読にしない"),
+        .ghostKeepUnread: ("Keep Unread Locally", "Не читать у себя", "自分側でも未読のままにする"),
+        .ghostFooter: ("Others won't see that you are online, typing, reading their messages or viewing their stories. «Keep Unread Locally» leaves opened chats unread on this device too. «Read on Interact» marks a chat as read when you send a message to it.", "Собеседники не увидят, что вы в сети, печатаете, читаете их сообщения или смотрите истории. «Не читать у себя» оставляет открытые чаты непрочитанными и на этом устройстве. «Читать при ответе» отмечает чат прочитанным, когда вы отправляете в него сообщение.", "相手にオンライン、入力中、メッセージの既読、ストーリーの閲覧が表示されません。「自分側でも未読のままにする」をオンにすると、開いたチャットもこの端末で未読のままになります。「操作時に既読」はメッセージを送信したチャットを既読にします。"),
+        .ghostReadOnInteract: ("Read on Interact", "Читать при ответе", "操作時に既読"),
+        .ghostEssentials: ("GHOST ESSENTIALS", "ПРИЗРАК", "ゴースト"),
+        .spyEssentials: ("SPY ESSENTIALS", "ШПИОН", "スパイ"),
+        .ghostEnabledCount: ("%d of %d enabled", "Включено %d из %d", "%d / %d 有効"),
+        .stateOn: ("On", "Вкл.", "オン"),
+        .stateOff: ("Off", "Выкл.", "オフ"),
+        .historyTitle: ("Message History", "История сообщений", "メッセージ履歴"),
+        .exceptionsHeader: ("EXCEPTIONS", "ИСКЛЮЧЕНИЯ", "例外"),
+        .exceptionsFooter: ("Exceptions turn Ghost Mode on or off for specific chats. Online status is shared by all chats.", "Исключения включают или выключают режим призрака для отдельных чатов. Онлайн-статус общий для всех чатов.", "例外では特定のチャットでゴーストモードをオン・オフできます。オンライン状態はすべてのチャット共通です。"),
         .historyHeader: ("MESSAGE HISTORY", "ИСТОРИЯ СООБЩЕНИЙ", "メッセージ履歴"),
         .historySaveDeleted: ("Save Deleted Messages", "Сохранять удалённые", "削除されたメッセージを保存"),
         .historySaveSelfDestructing: ("Save Self-Destructing Messages", "Сохранять самоудаляющиеся", "自動削除メッセージを保存"),
@@ -113,13 +132,14 @@ public struct EcoStrings {
         .selectionPanel: ("Selection Bar", "Панель выделения", "選択バー"),
         .contextMenu: ("Message Menu", "Меню сообщения", "メッセージメニュー"),
         .chatFooter: ("Choose which buttons are shown and in what order.", "Выберите, какие кнопки показывать и в каком порядке.", "表示するボタンと順番を選べます。"),
-        .selectionFooter: ("Buttons shown at the bottom while messages are selected. Check up to 6 and drag to reorder.", "Кнопки внизу экрана при выделении сообщений. Отметьте до 6 кнопок и перетащите, чтобы изменить порядок.", "メッセージ選択中に下部に表示されるボタンです。最大6つまでチェックでき、ドラッグで並べ替えます。"),
-        .selectionLimit: ("You can enable up to 6 buttons", "Можно включить не больше 6 кнопок", "有効にできるボタンは6つまでです"),
+        .selectionFooter: ("Buttons shown at the bottom while messages are selected. Check up to 5 and drag to reorder.", "Кнопки внизу экрана при выделении сообщений. Отметьте до 5 кнопок и перетащите, чтобы изменить порядок.", "メッセージ選択中に下部に表示されるボタンです。最大5つまでチェックでき、ドラッグで並べ替えます。"),
+        .selectionLimit: ("You can enable up to 5 buttons", "Можно включить не больше 5 кнопок", "有効にできるボタンは5つまでです"),
         .contextFooter: ("Items shown when you hold a message. Check the ones you need and drag to reorder. Unchecked items are hidden, and the switches match the Swiftgram section.", "Пункты, которые появляются при удержании сообщения. Отметьте нужные и перетащите, чтобы изменить порядок. Неотмеченные пункты скрыты, переключатели совпадают с разделом Swiftgram.", "メッセージを長押ししたときに表示される項目です。必要なものにチェックを入れ、ドラッグで並べ替えます。チェックしない項目は非表示になり、Swiftgramの設定と連動します。"),
         .appearanceHeader: ("APPEARANCE", "ОФОРМЛЕНИЕ", "外観"),
         .avatarInTabBar: ("Avatar Instead of Settings Icon", "Аватарка вместо шестерёнки", "設定アイコンの代わりにアバター"),
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
-        .avatarFooter: ("Shows your profile photo on the Settings tab.", "Во вкладке «Настройки» показывается ваша аватарка.", "設定タブにプロフィール写真を表示します。"),
+        .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
+        .islandAvatarFooter: ("On iPhones without the Dynamic Island, the profile photo flows into the top of the screen like a drop as you scroll.", "На iPhone без Dynamic Island аватарка при прокрутке профиля втягивается в верх экрана, как капля.", "Dynamic IslandのないiPhoneで、スクロールするとプロフィール写真が水滴のように画面上部へ吸い込まれます。"),
         .profileSuggestionsFooter: ("Hides the suggestions to set an emoji status, profile color, profile photo and username at the top of Settings.", "Скрывает предложения «Изменить статус», «Изменить цвет профиля», «Изменить фото» и «Имя пользователя» вверху настроек.", "設定上部の絵文字ステータス、プロフィールの色、プロフィール写真、ユーザー名の提案を非表示にします。"),
         .badgeSupporterInfo: ("**%@** supported the development of exteraGram or AyuGram and received a unique badge.", "За поддержку разработки exteraGram или AyuGram **%@** получает уникальный значок.", "**%@**はexteraGramまたはAyuGramの開発を支援し、特別なバッジを受け取りました。"),
         .badgeOfficialInfo: ("**%@** is the official resource of exteraGram or AyuGram.", "**%@** — официальный ресурс exteraGram или AyuGram.", "**%@**はexteraGramまたはAyuGramの公式リソースです。"),

@@ -16,6 +16,8 @@ INTRO_LOGO = "telegram_sphere@2x.png"
 INTRO_OVERLAY = "telegram_plane1@2x.png"
 INTRO_CORNER_RATIO = 0.2237
 UPSTREAM_NAME = "Swiftgram"
+APP_BADGE_SOURCE = BRANDING / "AppBadge" / "ecoBadge.png"
+APP_BADGE_TARGET = "submodules/TelegramUI/Images.xcassets/Components/AppBadge.imageset/AppBadge@3x.png"
 STRING_VALUE = re.compile(r"(<string>)([^<]*)(</string>)")
 STRINGS_ENTRY = re.compile(r'^(\s*"[^"]+"\s*=\s*")(.*)(";\s*)$', re.MULTILINE)
 
@@ -104,6 +106,11 @@ def _install_intro(tree: Path) -> None:
         _render_svg(f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg"/>', (width, height), overlay_path)
 
 
+def _install_app_badge(tree: Path) -> None:
+    if APP_BADGE_SOURCE.exists():
+        shutil.copyfile(APP_BADGE_SOURCE, tree / APP_BADGE_TARGET)
+
+
 def install(tree: Path) -> None:
     name = branding().display_name
     _brand_build_file(tree, name)
@@ -111,3 +118,4 @@ def install(tree: Path) -> None:
     _install_composer_icon(tree)
     _install_alternate_icons(tree)
     _install_intro(tree)
+    _install_app_badge(tree)

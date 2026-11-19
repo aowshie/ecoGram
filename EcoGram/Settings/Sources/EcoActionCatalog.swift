@@ -41,7 +41,7 @@ struct EcoActionCatalog {
         case .delete:
             return UIImage(bundleImageName: "Chat/Context Menu/Delete")
         case .shot:
-            return UIImage(systemName: "camera.viewfinder", withConfiguration: UIImage.SymbolConfiguration(pointSize: 18.0, weight: .medium))
+            return UIImage(bundleImageName: "Chat/Context Menu/Camera")
         case .forward:
             return UIImage(bundleImageName: "Chat/Context Menu/Forward")
         case .share:

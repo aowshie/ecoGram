@@ -22,6 +22,7 @@ private enum EcoSettingsSection: Int32, SGItemListSection {
 private enum EcoToggle: Hashable {
     case localNotifications
     case avatarInTabBar
+    case islandAvatarAnimation
     case hideProfileShortcuts
 }
 
@@ -50,7 +51,8 @@ private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
 
     entries.append(.header(id: id.count, section: .appearance, text: strings.get(.appearanceHeader), badge: nil))
     entries.append(.toggle(id: id.count, section: .appearance, settingName: .avatarInTabBar, value: preferences.avatarInTabBar, text: strings.get(.avatarInTabBar), enabled: true))
-    entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.avatarFooter)))
+    entries.append(.toggle(id: id.count, section: .appearance, settingName: .islandAvatarAnimation, value: preferences.islandAvatarAnimation, text: strings.get(.islandAvatarAnimation), enabled: true))
+    entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.islandAvatarFooter)))
 
     entries.append(.toggle(id: id.count, section: .profile, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
     entries.append(.notice(id: id.count, section: .profile, text: strings.get(.profileSuggestionsFooter)))
@@ -68,6 +70,8 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
             EcoPreferences.shared.backgroundNotifications = value
         case .avatarInTabBar:
             EcoPreferences.shared.avatarInTabBar = value
+        case .islandAvatarAnimation:
+            EcoPreferences.shared.islandAvatarAnimation = value
         case .hideProfileShortcuts:
             EcoPreferences.shared.hideProfileShortcuts = value
         }

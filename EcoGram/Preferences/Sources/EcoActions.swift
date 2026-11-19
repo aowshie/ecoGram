@@ -10,7 +10,7 @@ public enum EcoSelectionAction: String, CaseIterable {
     case hideSenderNames
     case report
 
-    public static let maximumEnabled = 6
+    public static let maximumEnabled = 5
     static let enabledByDefault: Set<EcoSelectionAction> = [.delete, .shot, .forward]
 }
 

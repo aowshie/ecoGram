@@ -14,6 +14,9 @@ public final class AyuSettings {
         case ghostHidesTyping
         case ghostHidesStoryViews
         case ghostKeepsUnread
+        case ghostReadOnInteract
+        case ghostExceptions
+        case ghostMigrated = "ghostMigrated.v2"
         case saveDeletedMessages
         case saveEditedMessages
         case saveInBots
@@ -31,13 +34,15 @@ public final class AyuSettings {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.migrateGhostMode()
         self.defaults.register(defaults: [
             Key.ghostMode.name: false,
-            Key.ghostHidesReadReceipts.name: true,
-            Key.ghostHidesOnline.name: true,
-            Key.ghostHidesTyping.name: true,
-            Key.ghostHidesStoryViews.name: true,
+            Key.ghostHidesReadReceipts.name: false,
+            Key.ghostHidesOnline.name: false,
+            Key.ghostHidesTyping.name: false,
+            Key.ghostHidesStoryViews.name: false,
             Key.ghostKeepsUnread.name: false,
+            Key.ghostReadOnInteract.name: true,
             Key.saveDeletedMessages.name: true,
             Key.saveEditedMessages.name: true,
             Key.saveInBots.name: false,
@@ -48,9 +53,69 @@ public final class AyuSettings {
         ])
     }
 
+    private func migrateGhostMode() {
+        guard !self.defaults.bool(forKey: Key.ghostMigrated.name) else {
+            return
+        }
+        let wasEnabled = self.defaults.bool(forKey: Key.ghostMode.name)
+        for key in [Key.ghostHidesReadReceipts, .ghostHidesOnline, .ghostHidesTyping, .ghostHidesStoryViews] {
+            let stored = self.defaults.object(forKey: key.name) as? Bool ?? true
+            self.defaults.set(wasEnabled && stored, forKey: key.name)
+        }
+        self.defaults.removeObject(forKey: Key.ghostMode.name)
+        self.defaults.set(true, forKey: Key.ghostMigrated.name)
+    }
+
+    public var ghostEnabledCount: Int {
+        return [self.ghostHidesReadReceipts, self.ghostHidesStoryViews, self.ghostHidesOnline, self.ghostHidesTyping].filter { $0 }.count
+    }
+
+    public static let ghostOptionCount = 4
+
     public var ghostMode: Bool {
-        get { return self.bool(.ghostMode) }
-        set { self.set(newValue, .ghostMode) }
+        get { return self.ghostEnabledCount == AyuSettings.ghostOptionCount }
+        set {
+            for key in [Key.ghostHidesReadReceipts, .ghostHidesOnline, .ghostHidesTyping, .ghostHidesStoryViews] {
+                self.defaults.set(newValue, forKey: key.name)
+            }
+            NotificationCenter.default.post(name: AyuSettings.didChange, object: self)
+        }
+    }
+
+    public var ghostReadOnInteract: Bool {
+        get { return self.bool(.ghostReadOnInteract) }
+        set { self.set(newValue, .ghostReadOnInteract) }
+    }
+
+    public var ghostExceptions: [Int64: Bool] {
+        get {
+            let stored = self.defaults.dictionary(forKey: Key.ghostExceptions.name) as? [String: Bool] ?? [:]
+            var result: [Int64: Bool] = [:]
+            for (key, value) in stored {
+                if let peerId = Int64(key) {
+                    result[peerId] = value
+                }
+            }
+            return result
+        }
+        set {
+            var stored: [String: Bool] = [:]
+            for (key, value) in newValue {
+                stored[String(key)] = value
+            }
+            self.set(stored, .ghostExceptions)
+        }
+    }
+
+    public func setGhostException(peerId: Int64, value: Bool?) {
+        var exceptions = self.ghostExceptions
+        exceptions[peerId] = value
+        self.ghostExceptions = exceptions
+    }
+
+    private func ghostOverride(_ peerId: Int64) -> Bool? {
+        let stored = self.defaults.dictionary(forKey: Key.ghostExceptions.name) as? [String: Bool]
+        return stored?[String(peerId)]
     }
 
     public var ghostHidesReadReceipts: Bool {
@@ -114,23 +179,31 @@ public final class AyuSettings {
     }
 
     public var suppressReadReceipts: Bool {
-        return self.ghostMode && self.ghostHidesReadReceipts
-    }
-
-    public var keepsMessagesUnread: Bool {
-        return self.suppressReadReceipts && self.ghostKeepsUnread
+        return self.ghostHidesReadReceipts
     }
 
     public var suppressOnline: Bool {
-        return self.ghostMode && self.ghostHidesOnline
+        return self.ghostHidesOnline
     }
 
-    public var suppressTyping: Bool {
-        return self.ghostMode && self.ghostHidesTyping
+    public func suppressReadReceipts(peerId: Int64) -> Bool {
+        return self.ghostOverride(peerId) ?? self.ghostHidesReadReceipts
     }
 
-    public var suppressStoryViews: Bool {
-        return self.ghostMode && self.ghostHidesStoryViews
+    public func keepsMessagesUnread(peerId: Int64) -> Bool {
+        return self.suppressReadReceipts(peerId: peerId) && self.ghostKeepsUnread
+    }
+
+    public func readsOnInteract(peerId: Int64) -> Bool {
+        return self.suppressReadReceipts(peerId: peerId) && self.ghostReadOnInteract
+    }
+
+    public func suppressTyping(peerId: Int64) -> Bool {
+        return self.ghostOverride(peerId) ?? self.ghostHidesTyping
+    }
+
+    public func suppressStoryViews(peerId: Int64) -> Bool {
+        return self.ghostOverride(peerId) ?? self.ghostHidesStoryViews
     }
 
     public var historyMediaLimitBytes: Int64 {

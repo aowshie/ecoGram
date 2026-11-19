@@ -5,6 +5,7 @@ import TelegramPresentationData
 import ComponentFlow
 import GlassBarButtonComponent
 import BundleIconComponent
+import AppBundle
 import AccountContext
 import EcoStrings
 
@@ -87,10 +88,10 @@ final class AyuShotPreviewController: UIViewController {
         self.moreMenuButton.accessibilityLabel = self.strings.get(.shotCopy)
         self.moreMenuButton.showsMenuAsPrimaryAction = true
         self.moreMenuButton.menu = UIMenu(children: [
-            UIAction(title: self.strings.get(.shotCopy), image: UIImage(systemName: "doc.on.doc"), handler: { [weak self] _ in
+            UIAction(title: self.strings.get(.shotCopy), image: UIImage(bundleImageName: "Chat/Context Menu/Copy")?.withRenderingMode(.alwaysTemplate), handler: { [weak self] _ in
                 self?.copyImage()
             }),
-            UIAction(title: self.strings.get(.shotSave), image: UIImage(systemName: "square.and.arrow.down"), handler: { [weak self] _ in
+            UIAction(title: self.strings.get(.shotSave), image: UIImage(bundleImageName: "Chat/Context Menu/Download")?.withRenderingMode(.alwaysTemplate), handler: { [weak self] _ in
                 self?.saveImage()
             })
         ])

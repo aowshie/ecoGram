@@ -22,7 +22,8 @@
 
 ### AyuGram
 
-- Ghost mode
+- Ghost mode with per-chat exceptions
+- Read on interact
 - Deleted message history
 - One-time photos and videos
 - Edit history
@@ -35,6 +36,8 @@
 - Custom selection bar
 - Custom message menu
 - Avatar in the Settings tab
+- Dynamic Island profile effect on any iPhone
+- Custom badge under the Dynamic Island
 - Hidden profile shortcuts
 
 ## Privacy

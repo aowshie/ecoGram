@@ -10,6 +10,7 @@ public final class EcoPreferences {
         case backgroundNotifications
         case avatarInTabBar
         case hideProfileShortcuts
+        case islandAvatarAnimation
         case selectionOrder
         case selectionEnabled
         case contextOrder
@@ -29,7 +30,8 @@ public final class EcoPreferences {
         self.defaults.register(defaults: [
             Key.backgroundNotifications.name: true,
             Key.avatarInTabBar.name: false,
-            Key.hideProfileShortcuts.name: false
+            Key.hideProfileShortcuts.name: false,
+            Key.islandAvatarAnimation.name: true
         ])
         self.avatarInTabBarValue = ValuePromise(self.defaults.bool(forKey: Key.avatarInTabBar.name), ignoreRepeated: true)
         self.applySwiftgramDefaults()
@@ -53,6 +55,11 @@ public final class EcoPreferences {
         set { self.store(newValue, .hideProfileShortcuts) }
     }
 
+    public var islandAvatarAnimation: Bool {
+        get { return self.defaults.bool(forKey: Key.islandAvatarAnimation.name) }
+        set { self.store(newValue, .islandAvatarAnimation) }
+    }
+
     public var avatarInTabBarSignal: Signal<Bool, NoError> {
         return self.avatarInTabBarValue.get()
     }
@@ -62,7 +69,7 @@ public final class EcoPreferences {
     }
 
     public var enabledSelectionActions: [EcoSelectionAction] {
-        return self.selectionOrder.filter { self.isEnabled($0) }
+        return Array(self.selectionOrder.filter { self.isEnabled($0) }.prefix(EcoSelectionAction.maximumEnabled))
     }
 
     public func isEnabled(_ action: EcoSelectionAction) -> Bool {
