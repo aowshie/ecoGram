@@ -19,7 +19,6 @@ swift_library(
         "//submodules/ItemListPeerItem:ItemListPeerItem",
         "//submodules/ItemListPeerActionItem:ItemListPeerActionItem",
         "//submodules/SettingsUI:SettingsUI",
-        "//submodules/Postbox:Postbox",
         "//submodules/PresentationDataUtils:PresentationDataUtils",
         "//submodules/AccountContext:AccountContext",
         "//submodules/ContextUI:ContextUI",
