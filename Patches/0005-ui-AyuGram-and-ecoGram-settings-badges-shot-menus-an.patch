@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 19:09:03 +0200
+Date: Thu, 19 Nov 2026 19:18:22 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -555,7 +555,7 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..713b8c53ffcc041e723ece2e20e7bd10
  #
  # MARK: Swiftgram
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
-index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..4735e32ba3fdb138037addfeb68f232f973f1812 100644
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..522fd8ab3b568e7d2f6065ab40dfff0e975ef5b5 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 @@ -1,5 +1,7 @@
@@ -718,8 +718,8 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..4735e32ba3fdb138037addfeb68f232f
 +        if deviceMetrics.hasDynamicIsland {
 +            return 0.0
 +        }
-+        let progress = max(0.0, min(1.0, contentOffset / 120.0))
-+        return (15.0 - 29.5) * progress
++        let progress = max(0.0, min(1.0, contentOffset / (120.0 * 75.0 / 540.0)))
++        return (15.0 - 29.5) * progress * progress * (3.0 - 2.0 * progress)
 +    }
 +    
      private func updateAvatarMask(transition: ContainedViewLayoutTransition) {
