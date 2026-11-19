@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: ecoGram <build@ecogram.app>
-Date: Wed, 18 Nov 2026 20:08:47 +0200
+From: aowshie <anekq@icloud.com>
+Date: Thu, 19 Nov 2026 03:44:30 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -26,14 +26,15 @@ index 9ed712747025dea831f4112ad0c1ffd5c1c503cf..7f2edd3b3d0f89145bab430a0c7df97e
  ]
  
 diff --git a/submodules/TelegramCore/Sources/Account/AccountManager.swift b/submodules/TelegramCore/Sources/Account/AccountManager.swift
-index 63f588c163287c041ec868fc0df50256e3092dff..15cbf3e1c176047f27bbab59ee6a78e05cba824d 100644
+index 63f588c163287c041ec868fc0df50256e3092dff..85dfce55cd3c7902a53ed8d20d76ca8b098335fd 100644
 --- a/submodules/TelegramCore/Sources/Account/AccountManager.swift
 +++ b/submodules/TelegramCore/Sources/Account/AccountManager.swift
-@@ -140,6 +140,7 @@ private var declaredEncodables: Void = {
+@@ -140,6 +140,8 @@ private var declaredEncodables: Void = {
      declareEncodable(SourceReferenceMessageAttribute.self, f: { SourceReferenceMessageAttribute(decoder: $0) })
      declareEncodable(SourceAuthorInfoMessageAttribute.self, f: { SourceAuthorInfoMessageAttribute(decoder: $0) })
      declareEncodable(EditedMessageAttribute.self, f: { EditedMessageAttribute(decoder: $0) })
 +    declareEncodable(AyuDeletedMessageAttribute.self, f: { AyuDeletedMessageAttribute(decoder: $0) })
++    declareEncodable(AyuExpiredMediaAttribute.self, f: { AyuExpiredMediaAttribute(decoder: $0) })
      declareEncodable(ReplyMarkupMessageAttribute.self, f: { ReplyMarkupMessageAttribute(decoder: $0) })
      declareEncodable(OutgoingChatContextResultMessageAttribute.self, f: { OutgoingChatContextResultMessageAttribute(decoder: $0) })
      declareEncodable(HttpReferenceMediaResource.self, f: { HttpReferenceMediaResource(decoder: $0) })
@@ -248,7 +249,7 @@ index 49d68a3791e25e97ce82d98076fc54ae4d50aca6..cc1cb210b80887a7d8b84865b12e5680
      var channelIds: [MessageId] = []
      for id in ids {
 diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
-index cf1ab15d9cfae956abcb53bf5060db525b32448d..11db104edf1d4538c73000ac20f4116ec7ca515d 100644
+index cf1ab15d9cfae956abcb53bf5060db525b32448d..f1ae50b90ac657b573a2a5fdabf421b932317c14 100644
 --- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 +++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 @@ -274,21 +274,28 @@ extension ReplayContext {
@@ -284,11 +285,12 @@ index cf1ab15d9cfae956abcb53bf5060db525b32448d..11db104edf1d4538c73000ac20f4116e
      }
      
      func applyUpdateMinAvailableMessage(_ id: MessageId) {
-@@ -305,6 +312,7 @@ extension ReplayContext {
+@@ -305,6 +312,8 @@ extension ReplayContext {
      }
      
      func applyEditMessage(_ id: MessageId, _ message: StoreMessage) {
 +        AyuHistoryCapture.captureEdit(transaction: transaction, mediaBox: mediaBox, id: id, updated: message)
++        let message = AyuHistoryCapture.preserveSelfDestructing(transaction: transaction, id: id, updated: message)
          var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
          transaction.updateMessage(id, update: { previousMessage in
              let peers: [PeerId:Peer] = previousMessage.peers.reduce([:], { current, value in

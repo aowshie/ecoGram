@@ -3,17 +3,11 @@ import UIKit
 import SwiftSignalKit
 import TelegramCore
 import AccountContext
-import TelegramPresentationData
-import EcoStrings
-
-private var activeRenderer: AyuShotRenderer?
 
 public func ayuPresentShot(context: AccountContext, messageIds: [EngineMessage.Id], sourceView: UIView) {
-    guard let window = sourceView.window, !messageIds.isEmpty, activeRenderer == nil else {
+    guard let window = sourceView.window, !messageIds.isEmpty else {
         return
     }
-    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
     let _ = (context.engine.data.get(EngineDataList(messageIds.map(TelegramEngine.EngineData.Item.Messages.Message.init(id:))))
     |> deliverOnMainQueue).startStandalone(next: { [weak window] messages in
         guard let window else {
@@ -24,22 +18,12 @@ public func ayuPresentShot(context: AccountContext, messageIds: [EngineMessage.I
         guard !groups.isEmpty else {
             return
         }
+        var presenter = window.rootViewController
+        while let presented = presenter?.presentedViewController {
+            presenter = presented
+        }
         let renderer = AyuShotRenderer(context: context, groups: groups)
-        activeRenderer = renderer
-        renderer.render(in: window, width: min(window.bounds.width, 430.0), completion: { image in
-            activeRenderer = nil
-            var presenter = window.rootViewController
-            while let presented = presenter?.presentedViewController {
-                presenter = presented
-            }
-            guard let image else {
-                let alert = UIAlertController(title: nil, message: strings.get(.shotFailed), preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: presentationData.strings.Common_OK, style: .default))
-                presenter?.present(alert, animated: true)
-                return
-            }
-            presenter?.present(AyuShotPreviewController(image: image, strings: strings), animated: true)
-        })
+        presenter?.present(AyuShotPreviewController(context: context, renderer: renderer, renderWidth: min(window.bounds.width, 430.0)), animated: false)
     })
 }
 

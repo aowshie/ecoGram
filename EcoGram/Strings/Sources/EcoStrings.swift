@@ -48,12 +48,20 @@ public struct EcoStrings {
         case appearanceHeader
         case avatarInTabBar
         case hideProfileShortcuts
-        case appearanceFooter
+        case avatarFooter
+        case profileSuggestionsFooter
+        case badgeSupporterInfo
+        case badgeOfficialInfo
+        case shotPreferences
+        case shotShowBackground
+        case shotShowDate
+        case shotCopy
+        case shotCopied
+        case labelTimer
         case actionShot
         case actionTag
         case actionSaveToCloud
         case shotSave
-        case shotShare
         case shotSaved
         case shotFailed
         case shotClose
@@ -110,13 +118,21 @@ public struct EcoStrings {
         .contextFooter: ("Items shown when you hold a message. Check the ones you need and drag to reorder. Unchecked items are hidden, and the switches match the Swiftgram section.", "Пункты, которые появляются при удержании сообщения. Отметьте нужные и перетащите, чтобы изменить порядок. Неотмеченные пункты скрыты, переключатели совпадают с разделом Swiftgram.", "メッセージを長押ししたときに表示される項目です。必要なものにチェックを入れ、ドラッグで並べ替えます。チェックしない項目は非表示になり、Swiftgramの設定と連動します。"),
         .appearanceHeader: ("APPEARANCE", "ОФОРМЛЕНИЕ", "外観"),
         .avatarInTabBar: ("Avatar Instead of Settings Icon", "Аватарка вместо шестерёнки", "設定アイコンの代わりにアバター"),
-        .hideProfileShortcuts: ("Hide Profile Shortcuts", "Скрыть кнопки профиля", "プロフィールのショートカットを隠す"),
-        .appearanceFooter: ("Shows your profile photo on the Settings tab. Profile shortcuts are the emoji status, profile color, profile photo and username buttons at the top of Settings.", "Во вкладке «Настройки» показывается ваша аватарка. Кнопки профиля — это «Изменить статус», «Изменить цвет профиля», «Изменить фото» и «Имя пользователя» вверху настроек.", "設定タブにプロフィール写真を表示します。プロフィールのショートカットは、設定上部の絵文字ステータス、プロフィールの色、プロフィール写真、ユーザー名のボタンです。"),
+        .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
+        .avatarFooter: ("Shows your profile photo on the Settings tab.", "Во вкладке «Настройки» показывается ваша аватарка.", "設定タブにプロフィール写真を表示します。"),
+        .profileSuggestionsFooter: ("Hides the suggestions to set an emoji status, profile color, profile photo and username at the top of Settings.", "Скрывает предложения «Изменить статус», «Изменить цвет профиля», «Изменить фото» и «Имя пользователя» вверху настроек.", "設定上部の絵文字ステータス、プロフィールの色、プロフィール写真、ユーザー名の提案を非表示にします。"),
+        .badgeSupporterInfo: ("**%@** supported the development of exteraGram or AyuGram and received a unique badge.", "За поддержку разработки exteraGram или AyuGram **%@** получает уникальный значок.", "**%@**はexteraGramまたはAyuGramの開発を支援し、特別なバッジを受け取りました。"),
+        .badgeOfficialInfo: ("**%@** is the official resource of exteraGram or AyuGram.", "**%@** — официальный ресурс exteraGram или AyuGram.", "**%@**はexteraGramまたはAyuGramの公式リソースです。"),
+        .shotPreferences: ("Preferences", "Настройки", "設定"),
+        .shotShowBackground: ("Show Background", "Показывать фон", "背景を表示"),
+        .shotShowDate: ("Show Date", "Показывать дату", "日付を表示"),
+        .shotCopy: ("Copy", "Скопировать", "コピー"),
+        .shotCopied: ("Copied to clipboard", "Скопировано в буфер обмена", "クリップボードにコピーしました"),
+        .labelTimer: ("timer", "таймер", "タイマー"),
         .actionShot: ("Shot", "Shot", "Shot"),
         .actionTag: ("Tag", "Тег", "タグ"),
         .actionSaveToCloud: ("Save to Saved Messages", "В Избранное", "保存済みメッセージに保存"),
         .shotSave: ("Save", "Сохранить", "保存"),
-        .shotShare: ("Share", "Поделиться", "共有"),
         .shotSaved: ("Saved to Photos", "Сохранено в Фото", "写真に保存しました"),
         .shotFailed: ("Couldn't create the shot", "Не удалось сделать снимок", "スクリーンショットを作成できませんでした"),
         .shotClose: ("Close", "Закрыть", "閉じる"),
@@ -151,6 +167,25 @@ public struct EcoStrings {
         default:
             return entry.en
         }
+    }
+
+    public func format(_ key: Key, _ value: String) -> String {
+        return self.get(key).replacingOccurrences(of: "%@", with: value)
+    }
+
+    public func selfDestructLabel(timeout: Int32) -> String {
+        let units: (second: String, minute: String)
+        switch self.languageCode {
+        case "ru":
+            units = ("с", "м")
+        case "ja":
+            units = ("秒", "分")
+        default:
+            units = ("s", "m")
+        }
+        let value = timeout >= 60 && timeout % 60 == 0 ? "\(timeout / 60)\(units.minute)" : "\(timeout)\(units.second)"
+        let separator = self.languageCode == "ja" ? "" : " "
+        return "\(self.get(.labelTimer))\(separator)\(value)"
     }
 
     public func mediaLimit(_ megabytes: Int) -> String {

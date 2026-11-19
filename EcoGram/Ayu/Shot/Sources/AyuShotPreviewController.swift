@@ -1,20 +1,55 @@
 import Foundation
 import UIKit
+import Photos
+import TelegramPresentationData
+import AccountContext
 import EcoStrings
 
 final class AyuShotPreviewController: UIViewController {
-    private let image: UIImage
+    private static let backgroundKey = "ecogram.shot.showBackground"
+    private static let dateKey = "ecogram.shot.showDate"
+    private static let rowHeight: CGFloat = 44.0
+    private static let headerHeight: CGFloat = 56.0
+
+    private let renderer: AyuShotRenderer
+    private let renderWidth: CGFloat
+    private let theme: PresentationTheme
     private let strings: EcoStrings
+
+    private var options: AyuShotOptions
+    private var images: [AyuShotOptions: UIImage] = [:]
+    private var isRendering = false
+    private var image: UIImage?
+
+    private let dimView = UIView()
+    private let sheetView = UIView()
+    private let titleLabel = UILabel()
+    private let closeButton = UIButton(type: .system)
+    private let moreButton = UIButton(type: .system)
     private let scrollView = UIScrollView()
     private let imageView = UIImageView()
+    private let activityView = UIActivityIndicatorView(style: .medium)
+    private let preferencesLabel = UILabel()
+    private let preferencesCard = UIView()
+    private let backgroundSwitch = UISwitch()
+    private let dateSwitch = UISwitch()
     private let toastLabel = UILabel()
+    private var didAppear = false
 
-    init(image: UIImage, strings: EcoStrings) {
-        self.image = image
-        self.strings = strings
+    init(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat) {
+        self.renderer = renderer
+        self.renderWidth = renderWidth
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        self.theme = presentationData.theme
+        self.strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
+        let defaults = UserDefaults.standard
+        self.options = AyuShotOptions(
+            showBackground: defaults.object(forKey: AyuShotPreviewController.backgroundKey) as? Bool ?? true,
+            showDate: defaults.object(forKey: AyuShotPreviewController.dateKey) as? Bool ?? false
+        )
         super.init(nibName: nil, bundle: nil)
         self.modalPresentationStyle = .overFullScreen
-        self.modalTransitionStyle = .crossDissolve
+        self.modalPresentationCapturesStatusBarAppearance = true
     }
 
     required init?(coder: NSCoder) {
@@ -23,119 +58,312 @@ final class AyuShotPreviewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        let list = self.theme.list
         self.view.backgroundColor = .clear
 
-        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThickMaterialDark))
-        blur.frame = self.view.bounds
-        blur.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        self.view.addSubview(blur)
+        self.dimView.backgroundColor = UIColor(white: 0.0, alpha: 0.4)
+        self.dimView.alpha = 0.0
+        self.dimView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.closePressed)))
+        self.view.addSubview(self.dimView)
+
+        self.sheetView.backgroundColor = list.blocksBackgroundColor
+        self.sheetView.layer.cornerRadius = 16.0
+        self.sheetView.layer.cornerCurve = .continuous
+        self.sheetView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        self.sheetView.clipsToBounds = true
+        self.view.addSubview(self.sheetView)
+
+        self.titleLabel.text = self.strings.get(.actionShot)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 17.0, weight: .semibold)
+        self.titleLabel.textColor = list.itemPrimaryTextColor
+        self.titleLabel.textAlignment = .center
+        self.sheetView.addSubview(self.titleLabel)
+
+        self.configureCircleButton(self.closeButton, systemImage: "xmark")
+        self.closeButton.accessibilityLabel = self.strings.get(.shotClose)
+        self.closeButton.addTarget(self, action: #selector(self.closePressed), for: .touchUpInside)
+        self.sheetView.addSubview(self.closeButton)
+
+        self.configureCircleButton(self.moreButton, systemImage: "ellipsis")
+        self.moreButton.showsMenuAsPrimaryAction = true
+        self.moreButton.menu = UIMenu(children: [
+            UIAction(title: self.strings.get(.shotCopy), image: UIImage(systemName: "doc.on.doc"), handler: { [weak self] _ in
+                self?.copyImage()
+            }),
+            UIAction(title: self.strings.get(.shotSave), image: UIImage(systemName: "square.and.arrow.down"), handler: { [weak self] _ in
+                self?.saveImage()
+            })
+        ])
+        self.sheetView.addSubview(self.moreButton)
 
         self.scrollView.showsVerticalScrollIndicator = false
         self.scrollView.alwaysBounceVertical = true
-        self.scrollView.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(self.scrollView)
+        self.sheetView.addSubview(self.scrollView)
 
-        self.imageView.image = self.image
         self.imageView.contentMode = .scaleAspectFit
-        self.imageView.layer.cornerRadius = 22.0
+        self.imageView.layer.cornerRadius = 12.0
         self.imageView.layer.cornerCurve = .continuous
         self.imageView.clipsToBounds = true
-        self.imageView.translatesAutoresizingMaskIntoConstraints = false
         self.scrollView.addSubview(self.imageView)
 
-        let closeButton = UIButton(type: .system)
-        closeButton.setImage(UIImage(systemName: "xmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15.0, weight: .semibold)), for: .normal)
-        closeButton.tintColor = .white
-        closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.16)
-        closeButton.layer.cornerRadius = 18.0
-        closeButton.accessibilityLabel = self.strings.get(.shotClose)
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.addTarget(self, action: #selector(self.closePressed), for: .touchUpInside)
-        self.view.addSubview(closeButton)
+        self.activityView.color = list.itemSecondaryTextColor
+        self.activityView.hidesWhenStopped = true
+        self.sheetView.addSubview(self.activityView)
 
-        let saveButton = self.makeButton(title: self.strings.get(.shotSave), systemImage: "square.and.arrow.down", filled: true, action: #selector(self.savePressed))
-        let shareButton = self.makeButton(title: self.strings.get(.shotShare), systemImage: "square.and.arrow.up", filled: false, action: #selector(self.sharePressed))
-        let buttons = UIStackView(arrangedSubviews: [saveButton, shareButton])
-        buttons.axis = .horizontal
-        buttons.spacing = 12.0
-        buttons.distribution = .fillEqually
-        buttons.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(buttons)
+        self.preferencesLabel.text = self.strings.get(.shotPreferences).uppercased()
+        self.preferencesLabel.font = UIFont.systemFont(ofSize: 13.0)
+        self.preferencesLabel.textColor = list.sectionHeaderTextColor
+        self.sheetView.addSubview(self.preferencesLabel)
 
-        self.toastLabel.text = self.strings.get(.shotSaved)
-        self.toastLabel.font = UIFont.systemFont(ofSize: 15.0, weight: .semibold)
+        self.preferencesCard.backgroundColor = list.itemBlocksBackgroundColor
+        self.preferencesCard.layer.cornerRadius = 12.0
+        self.preferencesCard.layer.cornerCurve = .continuous
+        self.preferencesCard.clipsToBounds = true
+        self.sheetView.addSubview(self.preferencesCard)
+
+        self.addRow(title: self.strings.get(.shotShowBackground), toggle: self.backgroundSwitch, index: 0, isOn: self.options.showBackground)
+        self.addRow(title: self.strings.get(.shotShowDate), toggle: self.dateSwitch, index: 1, isOn: self.options.showDate)
+        let separator = UIView()
+        separator.backgroundColor = list.itemBlocksSeparatorColor
+        separator.tag = 100
+        self.preferencesCard.addSubview(separator)
+
+        self.toastLabel.font = UIFont.systemFont(ofSize: 14.0, weight: .medium)
         self.toastLabel.textColor = .white
         self.toastLabel.textAlignment = .center
-        self.toastLabel.backgroundColor = UIColor(white: 0.0, alpha: 0.6)
-        self.toastLabel.layer.cornerRadius = 16.0
+        self.toastLabel.backgroundColor = UIColor(white: 0.0, alpha: 0.75)
+        self.toastLabel.layer.cornerRadius = 12.0
+        self.toastLabel.layer.cornerCurve = .continuous
         self.toastLabel.clipsToBounds = true
         self.toastLabel.alpha = 0.0
-        self.toastLabel.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(self.toastLabel)
 
-        let guide = self.view.safeAreaLayoutGuide
-        let aspect = self.image.size.height / max(self.image.size.width, 1.0)
-        NSLayoutConstraint.activate([
-            closeButton.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8.0),
-            closeButton.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16.0),
-            closeButton.widthAnchor.constraint(equalToConstant: 36.0),
-            closeButton.heightAnchor.constraint(equalToConstant: 36.0),
-
-            buttons.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16.0),
-            buttons.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16.0),
-            buttons.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -12.0),
-            buttons.heightAnchor.constraint(equalToConstant: 50.0),
-
-            self.scrollView.topAnchor.constraint(equalTo: closeButton.bottomAnchor, constant: 12.0),
-            self.scrollView.leadingAnchor.constraint(equalTo: guide.leadingAnchor),
-            self.scrollView.trailingAnchor.constraint(equalTo: guide.trailingAnchor),
-            self.scrollView.bottomAnchor.constraint(equalTo: buttons.topAnchor, constant: -12.0),
-
-            self.imageView.topAnchor.constraint(equalTo: self.scrollView.contentLayoutGuide.topAnchor, constant: 8.0),
-            self.imageView.bottomAnchor.constraint(equalTo: self.scrollView.contentLayoutGuide.bottomAnchor, constant: -8.0),
-            self.imageView.leadingAnchor.constraint(equalTo: self.scrollView.frameLayoutGuide.leadingAnchor, constant: 16.0),
-            self.imageView.trailingAnchor.constraint(equalTo: self.scrollView.frameLayoutGuide.trailingAnchor, constant: -16.0),
-            self.imageView.heightAnchor.constraint(equalTo: self.imageView.widthAnchor, multiplier: aspect),
-
-            self.toastLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
-            self.toastLabel.bottomAnchor.constraint(equalTo: buttons.topAnchor, constant: -16.0),
-            self.toastLabel.heightAnchor.constraint(equalToConstant: 32.0),
-            self.toastLabel.widthAnchor.constraint(equalToConstant: 220.0)
-        ])
+        self.updateButtons()
     }
 
-    private func makeButton(title: String, systemImage: String, filled: Bool, action: Selector) -> UIButton {
-        var configuration: UIButton.Configuration = filled ? .filled() : .tinted()
-        configuration.title = title
-        configuration.image = UIImage(systemName: systemImage)
-        configuration.imagePadding = 8.0
-        configuration.cornerStyle = .large
-        configuration.baseBackgroundColor = filled ? .white : UIColor(white: 1.0, alpha: 0.18)
-        configuration.baseForegroundColor = filled ? .black : .white
-        let button = UIButton(configuration: configuration)
-        button.addTarget(self, action: action, for: .touchUpInside)
-        return button
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let bounds = self.view.bounds
+        let insets = self.view.safeAreaInsets
+        self.dimView.frame = bounds
+
+        let side: CGFloat = 16.0
+        let cardHeight = AyuShotPreviewController.rowHeight * 2.0
+        let preferencesHeight: CGFloat = 32.0 + cardHeight
+        let bottomInset = max(insets.bottom, 16.0)
+        let maxSheetHeight = bounds.height - insets.top - 12.0
+        let imageWidth = bounds.width - side * 2.0
+        var imageHeight: CGFloat = 220.0
+        if let image = self.image, image.size.width > 0.0 {
+            imageHeight = ceil(imageWidth * image.size.height / image.size.width)
+        }
+        let fixedHeight = AyuShotPreviewController.headerHeight + 8.0 + preferencesHeight + 16.0 + bottomInset
+        let scrollHeight = min(imageHeight, max(120.0, maxSheetHeight - fixedHeight))
+        let sheetHeight = fixedHeight + scrollHeight
+        let sheetOrigin = self.didAppear ? bounds.height - sheetHeight : bounds.height
+        self.sheetView.frame = CGRect(x: 0.0, y: sheetOrigin, width: bounds.width, height: sheetHeight)
+
+        let buttonSize: CGFloat = 32.0
+        let headerCenter = AyuShotPreviewController.headerHeight / 2.0
+        self.closeButton.frame = CGRect(x: side, y: headerCenter - buttonSize / 2.0, width: buttonSize, height: buttonSize)
+        self.moreButton.frame = CGRect(x: bounds.width - side - buttonSize, y: headerCenter - buttonSize / 2.0, width: buttonSize, height: buttonSize)
+        self.titleLabel.frame = CGRect(x: side + buttonSize + 8.0, y: 0.0, width: bounds.width - (side + buttonSize + 8.0) * 2.0, height: AyuShotPreviewController.headerHeight)
+
+        self.scrollView.frame = CGRect(x: 0.0, y: AyuShotPreviewController.headerHeight, width: bounds.width, height: scrollHeight)
+        self.imageView.frame = CGRect(x: side, y: 0.0, width: imageWidth, height: imageHeight)
+        self.scrollView.contentSize = CGSize(width: bounds.width, height: imageHeight)
+        self.activityView.center = CGPoint(x: self.scrollView.frame.midX, y: self.scrollView.frame.midY)
+
+        let preferencesTop = self.scrollView.frame.maxY + 8.0
+        self.preferencesLabel.frame = CGRect(x: side * 2.0, y: preferencesTop + 8.0, width: bounds.width - side * 4.0, height: 18.0)
+        self.preferencesCard.frame = CGRect(x: side, y: preferencesTop + 32.0, width: bounds.width - side * 2.0, height: cardHeight)
+        for subview in self.preferencesCard.subviews {
+            if subview.tag == 100 {
+                subview.frame = CGRect(x: side, y: AyuShotPreviewController.rowHeight - 0.33, width: self.preferencesCard.bounds.width - side, height: 0.33)
+            } else if let row = subview as? AyuShotPreferenceRow {
+                row.frame = CGRect(x: 0.0, y: CGFloat(row.index) * AyuShotPreviewController.rowHeight, width: self.preferencesCard.bounds.width, height: AyuShotPreviewController.rowHeight)
+            }
+        }
+
+        self.toastLabel.sizeToFit()
+        let toastSize = CGSize(width: self.toastLabel.bounds.width + 32.0, height: 40.0)
+        self.toastLabel.frame = CGRect(x: floor((bounds.width - toastSize.width) / 2.0), y: max(insets.top, 20.0) + 8.0, width: toastSize.width, height: toastSize.height)
     }
 
-    @objc private func closePressed() {
-        self.dismiss(animated: true)
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !self.didAppear else {
+            return
+        }
+        self.didAppear = true
+        UIView.animate(withDuration: 0.4, delay: 0.0, usingSpringWithDamping: 1.0, initialSpringVelocity: 0.0, options: [], animations: {
+            self.dimView.alpha = 1.0
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+        })
+        self.renderCurrent()
     }
 
-    @objc private func savePressed() {
-        UIImageWriteToSavedPhotosAlbum(self.image, nil, nil, nil)
+    private func configureCircleButton(_ button: UIButton, systemImage: String) {
+        button.setImage(UIImage(systemName: systemImage, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14.0, weight: .semibold)), for: .normal)
+        button.tintColor = self.theme.list.itemPrimaryTextColor
+        button.backgroundColor = self.theme.list.itemPrimaryTextColor.withAlphaComponent(0.08)
+        button.layer.cornerRadius = 16.0
+    }
+
+    private func addRow(title: String, toggle: UISwitch, index: Int, isOn: Bool) {
+        let row = AyuShotPreferenceRow(index: index)
+        row.label.text = title
+        row.label.font = UIFont.systemFont(ofSize: 17.0)
+        row.label.textColor = self.theme.list.itemPrimaryTextColor
+        toggle.isOn = isOn
+        toggle.onTintColor = self.theme.list.itemSwitchColors.contentColor
+        toggle.addTarget(self, action: #selector(self.optionsChanged), for: .valueChanged)
+        row.toggle = toggle
+        row.addSubview(row.label)
+        row.addSubview(toggle)
+        self.preferencesCard.addSubview(row)
+    }
+
+    @objc private func optionsChanged() {
+        self.options = AyuShotOptions(showBackground: self.backgroundSwitch.isOn, showDate: self.dateSwitch.isOn)
+        UserDefaults.standard.set(self.options.showBackground, forKey: AyuShotPreviewController.backgroundKey)
+        UserDefaults.standard.set(self.options.showDate, forKey: AyuShotPreviewController.dateKey)
+        self.renderCurrent()
+    }
+
+    private func renderCurrent() {
+        let options = self.options
+        if let image = self.images[options] {
+            self.show(image)
+            return
+        }
+        guard !self.isRendering else {
+            return
+        }
+        self.isRendering = true
+        self.activityView.startAnimating()
+        self.imageView.alpha = 0.4
+        self.updateButtons()
+        self.renderer.render(in: self.view, width: self.renderWidth, options: options, completion: { [weak self] image in
+            guard let self else {
+                return
+            }
+            self.isRendering = false
+            self.activityView.stopAnimating()
+            if let image {
+                self.images[options] = image
+            }
+            if options != self.options {
+                self.renderCurrent()
+                return
+            }
+            if let image {
+                self.show(image)
+            } else {
+                self.imageView.alpha = 1.0
+                self.updateButtons()
+                self.showToast(self.strings.get(.shotFailed))
+            }
+        })
+    }
+
+    private func show(_ image: UIImage) {
+        self.image = image
+        self.imageView.image = image
+        self.imageView.alpha = 1.0
+        self.updateButtons()
+        UIView.animate(withDuration: 0.25, animations: {
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+        })
+    }
+
+    private func updateButtons() {
+        let isEnabled = self.image != nil && !self.isRendering
+        self.moreButton.isEnabled = isEnabled
+        self.moreButton.alpha = isEnabled ? 1.0 : 0.5
+    }
+
+    private func copyImage() {
+        guard let image = self.image, let data = image.pngData() else {
+            return
+        }
+        UIPasteboard.general.setData(data, forPasteboardType: "public.png")
+        self.showToast(self.strings.get(.shotCopied))
+    }
+
+    private func saveImage() {
+        guard let image = self.image, let data = image.pngData() else {
+            return
+        }
+        PHPhotoLibrary.requestAuthorization(for: .addOnly, handler: { [weak self] status in
+            guard status == .authorized || status == .limited else {
+                DispatchQueue.main.async {
+                    self?.showToast(self?.strings.get(.shotFailed) ?? "")
+                }
+                return
+            }
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil)
+            }, completionHandler: { success, _ in
+                DispatchQueue.main.async {
+                    guard let self else {
+                        return
+                    }
+                    self.showToast(self.strings.get(success ? .shotSaved : .shotFailed))
+                }
+            })
+        })
+    }
+
+    private func showToast(_ text: String) {
+        self.toastLabel.text = text
+        self.view.setNeedsLayout()
+        self.view.layoutIfNeeded()
+        self.toastLabel.layer.removeAllAnimations()
         UIView.animate(withDuration: 0.2, animations: {
             self.toastLabel.alpha = 1.0
         }, completion: { _ in
-            UIView.animate(withDuration: 0.3, delay: 1.4, options: [], animations: {
+            UIView.animate(withDuration: 0.3, delay: 1.6, options: [.beginFromCurrentState], animations: {
                 self.toastLabel.alpha = 0.0
             })
         })
     }
 
-    @objc private func sharePressed(_ sender: UIButton) {
-        let activityController = UIActivityViewController(activityItems: [self.image], applicationActivities: nil)
-        activityController.popoverPresentationController?.sourceView = sender
-        activityController.popoverPresentationController?.sourceRect = sender.bounds
-        self.present(activityController, animated: true)
+    @objc private func closePressed() {
+        UIView.animate(withDuration: 0.25, delay: 0.0, options: [.curveEaseIn], animations: {
+            self.dimView.alpha = 0.0
+            self.sheetView.frame.origin.y = self.view.bounds.height
+        }, completion: { _ in
+            self.dismiss(animated: false)
+        })
+    }
+}
+
+private final class AyuShotPreferenceRow: UIView {
+    let index: Int
+    let label = UILabel()
+    var toggle: UISwitch?
+
+    init(index: Int) {
+        self.index = index
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let side: CGFloat = 16.0
+        if let toggle = self.toggle {
+            let toggleSize = toggle.intrinsicContentSize
+            toggle.frame = CGRect(x: self.bounds.width - side - toggleSize.width, y: floor((self.bounds.height - toggleSize.height) / 2.0), width: toggleSize.width, height: toggleSize.height)
+            self.label.frame = CGRect(x: side, y: 0.0, width: toggle.frame.minX - side * 2.0, height: self.bounds.height)
+        } else {
+            self.label.frame = CGRect(x: side, y: 0.0, width: self.bounds.width - side * 2.0, height: self.bounds.height)
+        }
     }
 }

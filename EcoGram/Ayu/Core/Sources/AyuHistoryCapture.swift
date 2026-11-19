@@ -111,28 +111,8 @@ enum AyuHistoryCapture {
             retention.restore(transaction: transaction)
             return true
         }
-        transaction.updateMessage(message.id, update: { currentMessage in
-            let attributes = currentMessage.attributes.filter { attribute in
-                return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute)
-            }
-            return .update(StoreMessage(
-                id: currentMessage.id,
-                customStableId: nil,
-                globallyUniqueId: currentMessage.globallyUniqueId,
-                groupingKey: currentMessage.groupingKey,
-                threadId: currentMessage.threadId,
-                timestamp: currentMessage.timestamp,
-                flags: StoreMessageFlags(currentMessage.flags),
-                tags: currentMessage.tags,
-                globalTags: currentMessage.globalTags,
-                localTags: currentMessage.localTags,
-                forwardInfo: currentMessage.forwardInfo.map(StoreMessageForwardInfo.init),
-                authorId: currentMessage.author?.id,
-                text: currentMessage.text,
-                attributes: attributes,
-                media: currentMessage.media
-            ))
-        })
+        let timeout = message.attributes.compactMap({ ($0 as? AutoclearTimeoutMessageAttribute)?.timeout ?? ($0 as? AutoremoveTimeoutMessageAttribute)?.timeout }).first ?? 0
+        self.expireSelfDestructing(transaction: transaction, message: message, timeout: timeout)
         return true
     }
 

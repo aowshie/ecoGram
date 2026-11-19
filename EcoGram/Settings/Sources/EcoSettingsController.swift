@@ -16,6 +16,7 @@ private enum EcoSettingsSection: Int32, SGItemListSection {
     case notifications
     case chat
     case appearance
+    case profile
 }
 
 private enum EcoToggle: Hashable {
@@ -49,8 +50,10 @@ private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
 
     entries.append(.header(id: id.count, section: .appearance, text: strings.get(.appearanceHeader), badge: nil))
     entries.append(.toggle(id: id.count, section: .appearance, settingName: .avatarInTabBar, value: preferences.avatarInTabBar, text: strings.get(.avatarInTabBar), enabled: true))
-    entries.append(.toggle(id: id.count, section: .appearance, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
-    entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.appearanceFooter)))
+    entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.avatarFooter)))
+
+    entries.append(.toggle(id: id.count, section: .profile, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
+    entries.append(.notice(id: id.count, section: .profile, text: strings.get(.profileSuggestionsFooter)))
 
     return entries
 }

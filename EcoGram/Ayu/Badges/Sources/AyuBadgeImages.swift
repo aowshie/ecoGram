@@ -2,11 +2,11 @@ import Foundation
 import UIKit
 
 public enum AyuBadgeImages {
-    private static let canvasSize = CGSize(width: 20.0, height: 20.0)
+    private static let baseSide: CGFloat = 20.0
     private static let lock = NSLock()
     private static var cache: [String: UIImage] = [:]
 
-    public static func image(_ kind: AyuBadgeKind) -> UIImage? {
+    public static func image(_ kind: AyuBadgeKind, side: CGFloat = 20.0) -> UIImage? {
         let name: String
         switch kind {
         case .official:
@@ -18,18 +18,21 @@ public enum AyuBadgeImages {
         defer {
             self.lock.unlock()
         }
-        if let cached = self.cache[name] {
+        let key = "\(name)-\(side)"
+        if let cached = self.cache[key] {
             return cached
         }
         guard let glyph = UIImage(named: name), let mask = self.luminanceMask(glyph) else {
             return nil
         }
-        let canvasSize = self.canvasSize
+        let canvasSize = CGSize(width: side, height: side)
+        let factor = side / self.baseSide
+        let glyphSize = CGSize(width: glyph.size.width * factor, height: glyph.size.height * factor)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         let image = UIGraphicsImageRenderer(size: canvasSize, format: format).image { rendererContext in
             let context = rendererContext.cgContext
-            let rect = CGRect(x: floor((canvasSize.width - glyph.size.width) / 2.0), y: floor((canvasSize.height - glyph.size.height) / 2.0), width: glyph.size.width, height: glyph.size.height)
+            let rect = CGRect(x: (canvasSize.width - glyphSize.width) / 2.0, y: (canvasSize.height - glyphSize.height) / 2.0, width: glyphSize.width, height: glyphSize.height)
             context.translateBy(x: 0.0, y: canvasSize.height)
             context.scaleBy(x: 1.0, y: -1.0)
             let flippedRect = CGRect(x: rect.minX, y: canvasSize.height - rect.maxY, width: rect.width, height: rect.height)
@@ -37,7 +40,7 @@ public enum AyuBadgeImages {
             context.setFillColor(UIColor.white.cgColor)
             context.fill(flippedRect)
         }
-        self.cache[name] = image
+        self.cache[key] = image
         return image
     }
 

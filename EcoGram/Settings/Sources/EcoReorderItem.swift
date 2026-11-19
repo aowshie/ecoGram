@@ -104,6 +104,7 @@ final class EcoReorderItemNode: ListViewItemNode, ItemListItemNode {
         self.iconNode = ASImageNode()
         self.iconNode.displaysAsynchronously = false
         self.iconNode.isLayerBacked = true
+        self.iconNode.contentMode = .center
         self.titleNode = TextNode()
         self.titleNode.isUserInteractionEnabled = false
 
