@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 03:44:32 +0200
+Date: Thu, 19 Nov 2026 05:28:52 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -276,7 +276,7 @@ index 5982451d80fab9d8d232b24358b0b61ac73ace25..fff6d3f464781903da45d20d01b34a30
  
  swift_library(
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
-index bf71cb207328261b644bc13dda3f3563bdb761f8..62610acde2ffdbcc2a1db25f8360d76756e62622 100644
+index bf71cb207328261b644bc13dda3f3563bdb761f8..f23e24d542e5f3992af614162fb0886a57b4e35a 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageDateAndStatusNode/Sources/StringForMessageTimestampStatus.swift
 @@ -1,4 +1,5 @@
@@ -295,10 +295,10 @@ index bf71cb207328261b644bc13dda3f3563bdb761f8..62610acde2ffdbcc2a1db25f8360d767
 +        dateText = "\(ecoStrings.get(deleted.isExpired ? .labelExpired : .labelDeleted)) \(dateText)"
 +    } else if rawMessage.ayuIsMediaExpired {
 +        dateText = "\(ecoStrings.get(.labelExpired)) \(dateText)"
-+    } else if rawMessage.ayuIsViewOnce {
++    } else if rawMessage.ayuIsViewOnce && rawMessage.ayuRevealsSelfDestructingMedia {
 +        dateText = "\(ecoStrings.get(.labelOneView)) \(dateText)"
 +    } else if let timeout = rawMessage.ayuSelfDestructTimeout {
-+        dateText = "\(ecoStrings.selfDestructLabel(timeout: timeout)) \(dateText)"
++        dateText = "\(ecoStrings.selfDestructLabel(timeout: rawMessage.ayuSelfDestructRemaining ?? timeout)) \(dateText)"
 +    }
      return dateText
  }
@@ -353,6 +353,53 @@ index c8cf0659bd1bc1458410400af71e54af1ecda94d..932abd006bc897a73485deb11ca96a0c
      }
      
      open func updateAccessibilityData(_ accessibilityData: ChatMessageAccessibilityData) {
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift
+index beba1a106f17a5e32dfdc6d3ba886100178115ee..57e28eb174de4ba2b1fe9e14e6b8f36825101db2 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift
+@@ -29,6 +29,7 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
+     private var media: EngineRawMedia?
+     private var mediaIndex: Int?
+     private var automaticPlayback: Bool?
++    private var ayuCountdownTimer: SwiftSignalKit.Timer?
+     
+     override public var visibility: ListViewItemNodeVisibility {
+         didSet {
+@@ -36,6 +37,26 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
+         }
+     }
+     
++    deinit {
++        self.ayuCountdownTimer?.invalidate()
++    }
++    
++    private func ayuScheduleCountdownRefresh() {
++        self.ayuCountdownTimer?.invalidate()
++        self.ayuCountdownTimer = nil
++        guard let item = self.item, let remaining = item.message.ayuSelfDestructRemaining, remaining > 0 else {
++            return
++        }
++        let timer = SwiftSignalKit.Timer(timeout: 1.0, repeat: false, completion: { [weak self] in
++            guard let self, let item = self.item else {
++                return
++            }
++            item.controllerInteraction.requestMessageUpdate(item.message.id, false, nil)
++        }, queue: Queue.mainQueue())
++        self.ayuCountdownTimer = timer
++        timer.start()
++    }
++    
+     required public init() {
+         self.interactiveImageNode = ChatMessageInteractiveMediaNode()
+         
+@@ -472,6 +493,7 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
+                             strongSelf.media = selectedMedia
+                             strongSelf.mediaIndex = selectedMediaIndex
+                             strongSelf.automaticPlayback = automaticPlayback
++                            strongSelf.ayuScheduleCountdownRefresh()
+                             
+                             let imageFrame = CGRect(origin: CGPoint(x: bubbleInsets.left, y: bubbleInsets.top), size: imageSize)
+                             
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
 index f05b8b8b4e8a411133d8fa1fb4470def9c369b82..1e963af9840a00e0a10845c243128d8eca500e4d 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD

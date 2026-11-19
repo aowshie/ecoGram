@@ -2,14 +2,18 @@ import Foundation
 import UIKit
 import Photos
 import TelegramPresentationData
+import ComponentFlow
+import GlassBarButtonComponent
+import BundleIconComponent
 import AccountContext
 import EcoStrings
 
 final class AyuShotPreviewController: UIViewController {
     private static let backgroundKey = "ecogram.shot.showBackground"
     private static let dateKey = "ecogram.shot.showDate"
-    private static let rowHeight: CGFloat = 44.0
-    private static let headerHeight: CGFloat = 56.0
+    private static let rowHeight: CGFloat = 52.0
+    private static let headerHeight: CGFloat = 68.0
+    private static let buttonSize: CGFloat = 44.0
 
     private let renderer: AyuShotRenderer
     private let renderWidth: CGFloat
@@ -24,8 +28,9 @@ final class AyuShotPreviewController: UIViewController {
     private let dimView = UIView()
     private let sheetView = UIView()
     private let titleLabel = UILabel()
-    private let closeButton = UIButton(type: .system)
-    private let moreButton = UIButton(type: .system)
+    private let closeButton = ComponentView<Empty>()
+    private let moreButton = ComponentView<Empty>()
+    private let moreMenuButton = UIButton(type: .custom)
     private let scrollView = UIScrollView()
     private let imageView = UIImageView()
     private let activityView = UIActivityIndicatorView(style: .medium)
@@ -67,7 +72,7 @@ final class AyuShotPreviewController: UIViewController {
         self.view.addSubview(self.dimView)
 
         self.sheetView.backgroundColor = list.blocksBackgroundColor
-        self.sheetView.layer.cornerRadius = 16.0
+        self.sheetView.layer.cornerRadius = 38.0
         self.sheetView.layer.cornerCurve = .continuous
         self.sheetView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         self.sheetView.clipsToBounds = true
@@ -79,14 +84,9 @@ final class AyuShotPreviewController: UIViewController {
         self.titleLabel.textAlignment = .center
         self.sheetView.addSubview(self.titleLabel)
 
-        self.configureCircleButton(self.closeButton, systemImage: "xmark")
-        self.closeButton.accessibilityLabel = self.strings.get(.shotClose)
-        self.closeButton.addTarget(self, action: #selector(self.closePressed), for: .touchUpInside)
-        self.sheetView.addSubview(self.closeButton)
-
-        self.configureCircleButton(self.moreButton, systemImage: "ellipsis")
-        self.moreButton.showsMenuAsPrimaryAction = true
-        self.moreButton.menu = UIMenu(children: [
+        self.moreMenuButton.accessibilityLabel = self.strings.get(.shotCopy)
+        self.moreMenuButton.showsMenuAsPrimaryAction = true
+        self.moreMenuButton.menu = UIMenu(children: [
             UIAction(title: self.strings.get(.shotCopy), image: UIImage(systemName: "doc.on.doc"), handler: { [weak self] _ in
                 self?.copyImage()
             }),
@@ -94,14 +94,13 @@ final class AyuShotPreviewController: UIViewController {
                 self?.saveImage()
             })
         ])
-        self.sheetView.addSubview(self.moreButton)
 
         self.scrollView.showsVerticalScrollIndicator = false
         self.scrollView.alwaysBounceVertical = true
         self.sheetView.addSubview(self.scrollView)
 
         self.imageView.contentMode = .scaleAspectFit
-        self.imageView.layer.cornerRadius = 12.0
+        self.imageView.layer.cornerRadius = 26.0
         self.imageView.layer.cornerCurve = .continuous
         self.imageView.clipsToBounds = true
         self.scrollView.addSubview(self.imageView)
@@ -116,7 +115,7 @@ final class AyuShotPreviewController: UIViewController {
         self.sheetView.addSubview(self.preferencesLabel)
 
         self.preferencesCard.backgroundColor = list.itemBlocksBackgroundColor
-        self.preferencesCard.layer.cornerRadius = 12.0
+        self.preferencesCard.layer.cornerRadius = 26.0
         self.preferencesCard.layer.cornerCurve = .continuous
         self.preferencesCard.clipsToBounds = true
         self.sheetView.addSubview(self.preferencesCard)
@@ -132,7 +131,7 @@ final class AyuShotPreviewController: UIViewController {
         self.toastLabel.textColor = .white
         self.toastLabel.textAlignment = .center
         self.toastLabel.backgroundColor = UIColor(white: 0.0, alpha: 0.75)
-        self.toastLabel.layer.cornerRadius = 12.0
+        self.toastLabel.layer.cornerRadius = 20.0
         self.toastLabel.layer.cornerCurve = .continuous
         self.toastLabel.clipsToBounds = true
         self.toastLabel.alpha = 0.0
@@ -163,10 +162,13 @@ final class AyuShotPreviewController: UIViewController {
         let sheetOrigin = self.didAppear ? bounds.height - sheetHeight : bounds.height
         self.sheetView.frame = CGRect(x: 0.0, y: sheetOrigin, width: bounds.width, height: sheetHeight)
 
-        let buttonSize: CGFloat = 32.0
-        let headerCenter = AyuShotPreviewController.headerHeight / 2.0
-        self.closeButton.frame = CGRect(x: side, y: headerCenter - buttonSize / 2.0, width: buttonSize, height: buttonSize)
-        self.moreButton.frame = CGRect(x: bounds.width - side - buttonSize, y: headerCenter - buttonSize / 2.0, width: buttonSize, height: buttonSize)
+        let buttonSize = AyuShotPreviewController.buttonSize
+        let buttonY = floor((AyuShotPreviewController.headerHeight - buttonSize) / 2.0)
+        self.updateHeaderButtons()
+        self.closeButton.view?.frame = CGRect(x: side, y: buttonY, width: buttonSize, height: buttonSize)
+        let moreFrame = CGRect(x: bounds.width - side - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
+        self.moreButton.view?.frame = moreFrame
+        self.moreMenuButton.frame = moreFrame
         self.titleLabel.frame = CGRect(x: side + buttonSize + 8.0, y: 0.0, width: bounds.width - (side + buttonSize + 8.0) * 2.0, height: AyuShotPreviewController.headerHeight)
 
         self.scrollView.frame = CGRect(x: 0.0, y: AyuShotPreviewController.headerHeight, width: bounds.width, height: scrollHeight)
@@ -204,11 +206,49 @@ final class AyuShotPreviewController: UIViewController {
         self.renderCurrent()
     }
 
-    private func configureCircleButton(_ button: UIButton, systemImage: String) {
-        button.setImage(UIImage(systemName: systemImage, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14.0, weight: .semibold)), for: .normal)
-        button.tintColor = self.theme.list.itemPrimaryTextColor
-        button.backgroundColor = self.theme.list.itemPrimaryTextColor.withAlphaComponent(0.08)
-        button.layer.cornerRadius = 16.0
+    private func updateHeaderButtons() {
+        let size = CGSize(width: AyuShotPreviewController.buttonSize, height: AyuShotPreviewController.buttonSize)
+        let isDark = self.theme.overallDarkAppearance
+        let iconColor = self.theme.chat.inputPanel.panelControlColor
+        let isEnabled = self.image != nil && !self.isRendering
+        let _ = self.closeButton.update(
+            transition: .immediate,
+            component: AnyComponent(GlassBarButtonComponent(
+                size: size,
+                backgroundColor: nil,
+                isDark: isDark,
+                state: .glass,
+                component: AnyComponentWithIdentity(id: "close", component: AnyComponent(BundleIconComponent(name: "Navigation/Close", tintColor: iconColor))),
+                action: { [weak self] _ in
+                    self?.closePressed()
+                },
+                accessibility: ComponentAccessibility(label: self.strings.get(.shotClose))
+            )),
+            environment: {},
+            containerSize: size
+        )
+        let _ = self.moreButton.update(
+            transition: .immediate,
+            component: AnyComponent(GlassBarButtonComponent(
+                size: size,
+                backgroundColor: nil,
+                isDark: isDark,
+                state: .glass,
+                isEnabled: isEnabled,
+                component: AnyComponentWithIdentity(id: "more", component: AnyComponent(BundleIconComponent(name: "Chat/Context Menu/More", tintColor: iconColor))),
+                action: nil
+            )),
+            environment: {},
+            containerSize: size
+        )
+        if let view = self.closeButton.view, view.superview == nil {
+            self.sheetView.addSubview(view)
+        }
+        if let view = self.moreButton.view, view.superview == nil {
+            self.sheetView.addSubview(view)
+            self.sheetView.addSubview(self.moreMenuButton)
+        }
+        self.moreMenuButton.isEnabled = isEnabled
     }
 
     private func addRow(title: String, toggle: UISwitch, index: Int, isOn: Bool) {
@@ -218,6 +258,7 @@ final class AyuShotPreviewController: UIViewController {
         row.label.textColor = self.theme.list.itemPrimaryTextColor
         toggle.isOn = isOn
         toggle.onTintColor = self.theme.list.itemSwitchColors.contentColor
+        toggle.tintColor = self.theme.list.itemSwitchColors.frameColor
         toggle.addTarget(self, action: #selector(self.optionsChanged), for: .valueChanged)
         row.toggle = toggle
         row.addSubview(row.label)
@@ -280,9 +321,9 @@ final class AyuShotPreviewController: UIViewController {
     }
 
     private func updateButtons() {
-        let isEnabled = self.image != nil && !self.isRendering
-        self.moreButton.isEnabled = isEnabled
-        self.moreButton.alpha = isEnabled ? 1.0 : 0.5
+        if self.isViewLoaded {
+            self.updateHeaderButtons()
+        }
     }
 
     private func copyImage() {

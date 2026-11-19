@@ -99,7 +99,7 @@ enum AyuHistoryCapture {
     }
 
     static func keepSelfDestructing(transaction: Transaction, mediaBox: MediaBox, message: Message, isRemove: Bool) -> Bool {
-        guard AyuSettings.shared.saveSelfDestructing, message.id.namespace == Namespaces.Message.Cloud, message.id.peerId.namespace != Namespaces.Peer.SecretChat else {
+        guard message.ayuRevealsSelfDestructingMedia, message.id.namespace == Namespaces.Message.Cloud else {
             return false
         }
         if isRemove {
@@ -116,8 +116,8 @@ enum AyuHistoryCapture {
         return true
     }
 
-    static func addSelfDestructSpoiler(attributes: inout [MessageAttribute], peerId: PeerId) {
-        guard AyuSettings.shared.saveSelfDestructing, peerId.namespace != Namespaces.Peer.SecretChat else {
+    static func addSelfDestructSpoiler(attributes: inout [MessageAttribute], peerId: PeerId, isOutgoing: Bool = false) {
+        guard AyuSettings.shared.saveSelfDestructing, !isOutgoing, peerId.namespace != Namespaces.Peer.SecretChat else {
             return
         }
         if !attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {

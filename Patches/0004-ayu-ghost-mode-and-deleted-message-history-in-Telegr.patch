@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 03:44:30 +0200
+Date: Thu, 19 Nov 2026 05:28:51 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -39,7 +39,7 @@ index 63f588c163287c041ec868fc0df50256e3092dff..85dfce55cd3c7902a53ed8d20d76ca8b
      declareEncodable(OutgoingChatContextResultMessageAttribute.self, f: { OutgoingChatContextResultMessageAttribute(decoder: $0) })
      declareEncodable(HttpReferenceMediaResource.self, f: { HttpReferenceMediaResource(decoder: $0) })
 diff --git a/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift b/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift
-index a38bead0e1910fca3a0dc94b41f0418df2580799..c8734ef9cce9beab4e61ecdbe10031dbe309ac20 100644
+index a38bead0e1910fca3a0dc94b41f0418df2580799..c89f8695b40b3919ab1fa800a1186c6049cf3e60 100644
 --- a/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift
 +++ b/submodules/TelegramCore/Sources/ApiUtils/StoreMessage_Telegram.swift
 @@ -518,6 +518,7 @@ extension StoreMessage {
@@ -54,7 +54,7 @@ index a38bead0e1910fca3a0dc94b41f0418df2580799..c8734ef9cce9beab4e61ecdbe10031db
                      
                          if let expirationTimer = expirationTimer, expirationTimer > 0 {
                              attributes.append(AutoclearTimeoutMessageAttribute(timeout: expirationTimer, countdownBeginTime: nil))
-+                            AyuHistoryCapture.addSelfDestructSpoiler(attributes: &attributes, peerId: peerId)
++                            AyuHistoryCapture.addSelfDestructSpoiler(attributes: &attributes, peerId: peerId, isOutgoing: (flags & (1 << 1)) != 0)
                              consumableContent = (true, false)
                          }
                          

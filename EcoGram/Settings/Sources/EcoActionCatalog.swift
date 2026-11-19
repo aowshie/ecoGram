@@ -45,7 +45,7 @@ struct EcoActionCatalog {
         case .forward:
             return UIImage(bundleImageName: "Chat/Context Menu/Forward")
         case .share:
-            return UIImage(systemName: "square.and.arrow.up", withConfiguration: UIImage.SymbolConfiguration(pointSize: 18.0, weight: .medium))
+            return UIImage(bundleImageName: "Chat/Context Menu/Share")
         case .tag:
             return UIImage(bundleImageName: "Chat/Context Menu/PriceTag")
         case .saveToCloud:

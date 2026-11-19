@@ -16,6 +16,9 @@ swift_library(
         "//submodules/TelegramCore:TelegramCore",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/AccountContext:AccountContext",
+        "//submodules/ComponentFlow:ComponentFlow",
+        "//submodules/TelegramUI/Components/GlassBarButtonComponent:GlassBarButtonComponent",
+        "//submodules/Components/BundleIconComponent:BundleIconComponent",
     ],
     visibility = [
         "//visibility:public",

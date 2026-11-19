@@ -50,7 +50,7 @@ public extension Message {
     }
 
     var ayuRevealsSelfDestructingMedia: Bool {
-        return AyuSettings.shared.saveSelfDestructing && self.id.peerId.namespace != Namespaces.Peer.SecretChat
+        return AyuSettings.shared.saveSelfDestructing && self.flags.contains(.Incoming) && self.id.peerId.namespace != Namespaces.Peer.SecretChat
     }
 }
 
