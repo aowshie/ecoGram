@@ -19,6 +19,7 @@ swift_library(
         "//submodules/ComponentFlow:ComponentFlow",
         "//submodules/TelegramUI/Components/GlassBarButtonComponent:GlassBarButtonComponent",
         "//submodules/Components/BundleIconComponent:BundleIconComponent",
+        "//submodules/TelegramUI/Components/LottieComponent:LottieComponent",
         "//submodules/AppBundle:AppBundle",
         "//submodules/ContextUI:ContextUI",
         "//submodules/UndoUI:UndoUI",

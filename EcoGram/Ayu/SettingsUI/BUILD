@@ -21,6 +21,7 @@ swift_library(
         "//submodules/SettingsUI:SettingsUI",
         "//submodules/PresentationDataUtils:PresentationDataUtils",
         "//submodules/AccountContext:AccountContext",
+        "//submodules/LocalizedPeerData:LocalizedPeerData",
         "//submodules/ContextUI:ContextUI",
         "//submodules/AppBundle:AppBundle",
     ],

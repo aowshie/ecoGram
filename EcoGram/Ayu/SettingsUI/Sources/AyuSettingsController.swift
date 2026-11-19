@@ -21,17 +21,20 @@ private func ayuCountLabel(_ strings: EcoStrings, enabled: Int, total: Int) -> S
     return String(format: strings.get(.ghostEnabledCount), enabled, total)
 }
 
-private func ayuStateLabel(_ strings: EcoStrings, enabled: Int, total: Int) -> String {
+private func ayuStateLabel(_ presentationStrings: PresentationStrings, enabled: Int, total: Int) -> String {
     if enabled == total {
-        return strings.get(.stateOn)
+        return presentationStrings.Notifications_On
     }
     if enabled == 0 {
-        return strings.get(.stateOff)
+        return presentationStrings.Notifications_Off
     }
     return ""
 }
 
-private func ayuMainEntries(strings: EcoStrings) -> [AyuListEntry] {
+private let ayuGhostIcon = renderSettingsIcon(name: "Item List/Icons/LastSeen", backgroundColors: [UIColor(rgb: 0x5E5CE6)])
+private let ayuHistoryIcon = renderSettingsIcon(name: "Item List/Icons/Clock", backgroundColors: [UIColor(rgb: 0xFF9500)])
+
+private func ayuMainEntries(strings: EcoStrings, presentationStrings: PresentationStrings) -> [AyuListEntry] {
     let settings = AyuSettings.shared
     var entries: [AyuListEntry] = []
     var order = 0
@@ -43,12 +46,17 @@ private func ayuMainEntries(strings: EcoStrings) -> [AyuListEntry] {
     let ghostCount = settings.ghostEnabledCount
     let ghostTotal = AyuSettings.ghostOptionCount
     entries.append(.header(section: AyuMainSection.ghost.rawValue, order: next(), text: strings.get(.ghostEssentials)))
-    entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, title: strings.get(.ghostMode), subtitle: ayuCountLabel(strings, enabled: ghostCount, total: ghostTotal), label: ayuStateLabel(strings, enabled: ghostCount, total: ghostTotal)))
+    var ghostSubtitle = ayuCountLabel(strings, enabled: ghostCount, total: ghostTotal)
+    let exceptionCount = settings.ghostExceptions.count
+    if exceptionCount > 0 {
+        ghostSubtitle += ", " + presentationStrings.Notifications_CategoryExceptions(Int32(exceptionCount))
+    }
+    entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, icon: ayuGhostIcon, title: strings.get(.ghostMode), subtitle: ghostSubtitle, label: ayuStateLabel(presentationStrings, enabled: ghostCount, total: ghostTotal)))
 
     let historyOptions = [settings.saveDeletedMessages, settings.saveEditedMessages, settings.saveSelfDestructing]
     let historyCount = historyOptions.filter { $0 }.count
     entries.append(.header(section: AyuMainSection.spy.rawValue, order: next(), text: strings.get(.spyEssentials)))
-    entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, title: strings.get(.historyTitle), subtitle: ayuCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ayuStateLabel(strings, enabled: historyCount, total: historyOptions.count)))
+    entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ayuHistoryIcon, title: strings.get(.historyTitle), subtitle: ayuCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ayuStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))
 
     entries.append(.header(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.badgesHeader)))
     entries.append(.toggle(section: AyuMainSection.badges.rawValue, order: next(), key: "badges", title: strings.get(.badgesShow), value: settings.showAyuBadges, enabled: true))
@@ -81,7 +89,7 @@ public func ayuSettingsController(context: AccountContext) -> ViewController {
     |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.ayuTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ayuMainEntries(strings: strings), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ayuMainEntries(strings: strings, presentationStrings: presentationData.strings), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
         return (controllerState, (listState, arguments))
     }
 

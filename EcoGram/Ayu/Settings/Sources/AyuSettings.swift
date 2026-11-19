@@ -31,10 +31,13 @@ public final class AyuSettings {
     }
 
     private let defaults: UserDefaults
+    private let exceptionsLock = NSLock()
+    private var exceptionsCache: [Int64: AyuGhostOptions]?
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.migrateGhostMode()
+        self.migrateGhostExceptions()
         self.defaults.register(defaults: [
             Key.ghostMode.name: false,
             Key.ghostHidesReadReceipts.name: false,
@@ -66,6 +69,20 @@ public final class AyuSettings {
         self.defaults.set(true, forKey: Key.ghostMigrated.name)
     }
 
+    private func migrateGhostExceptions() {
+        guard let stored = self.defaults.dictionary(forKey: Key.ghostExceptions.name), stored.values.contains(where: { $0 is Bool }) else {
+            return
+        }
+        let fallback = self.ghostOptions
+        var migrated: [String: [String: Bool]] = [:]
+        for (key, value) in stored {
+            if let options = AyuGhostOptions(storage: value, fallback: fallback) {
+                migrated[key] = options.storage
+            }
+        }
+        self.defaults.set(migrated, forKey: Key.ghostExceptions.name)
+    }
+
     public var ghostEnabledCount: Int {
         return [self.ghostHidesReadReceipts, self.ghostHidesStoryViews, self.ghostHidesOnline, self.ghostHidesTyping].filter { $0 }.count
     }
@@ -87,35 +104,53 @@ public final class AyuSettings {
         set { self.set(newValue, .ghostReadOnInteract) }
     }
 
-    public var ghostExceptions: [Int64: Bool] {
+    public var ghostOptions: AyuGhostOptions {
+        return AyuGhostOptions(hideRead: self.ghostHidesReadReceipts, keepUnread: self.ghostKeepsUnread, readOnInteract: self.ghostReadOnInteract, hideStories: self.ghostHidesStoryViews, hideTyping: self.ghostHidesTyping)
+    }
+
+    public var ghostExceptions: [Int64: AyuGhostOptions] {
         get {
-            let stored = self.defaults.dictionary(forKey: Key.ghostExceptions.name) as? [String: Bool] ?? [:]
-            var result: [Int64: Bool] = [:]
+            self.exceptionsLock.lock()
+            defer {
+                self.exceptionsLock.unlock()
+            }
+            if let cached = self.exceptionsCache {
+                return cached
+            }
+            let stored = self.defaults.dictionary(forKey: Key.ghostExceptions.name) ?? [:]
+            var result: [Int64: AyuGhostOptions] = [:]
             for (key, value) in stored {
-                if let peerId = Int64(key) {
-                    result[peerId] = value
+                if let peerId = Int64(key), let options = AyuGhostOptions(storage: value, fallback: AyuGhostOptions.disabled) {
+                    result[peerId] = options
                 }
             }
+            self.exceptionsCache = result
             return result
         }
         set {
-            var stored: [String: Bool] = [:]
+            var stored: [String: [String: Bool]] = [:]
             for (key, value) in newValue {
-                stored[String(key)] = value
+                stored[String(key)] = value.storage
             }
+            self.exceptionsLock.lock()
+            self.exceptionsCache = newValue
+            self.exceptionsLock.unlock()
             self.set(stored, .ghostExceptions)
         }
     }
 
-    public func setGhostException(peerId: Int64, value: Bool?) {
+    public func ghostException(peerId: Int64) -> AyuGhostOptions? {
+        return self.ghostExceptions[peerId]
+    }
+
+    public func setGhostException(peerId: Int64, options: AyuGhostOptions?) {
         var exceptions = self.ghostExceptions
-        exceptions[peerId] = value
+        exceptions[peerId] = options
         self.ghostExceptions = exceptions
     }
 
-    private func ghostOverride(_ peerId: Int64) -> Bool? {
-        let stored = self.defaults.dictionary(forKey: Key.ghostExceptions.name) as? [String: Bool]
-        return stored?[String(peerId)]
+    private func ghostEffective(_ peerId: Int64) -> AyuGhostOptions {
+        return self.ghostException(peerId: peerId) ?? self.ghostOptions
     }
 
     public var ghostHidesReadReceipts: Bool {
@@ -187,23 +222,23 @@ public final class AyuSettings {
     }
 
     public func suppressReadReceipts(peerId: Int64) -> Bool {
-        return self.ghostOverride(peerId) ?? self.ghostHidesReadReceipts
+        return self.ghostEffective(peerId).hideRead
     }
 
     public func keepsMessagesUnread(peerId: Int64) -> Bool {
-        return self.suppressReadReceipts(peerId: peerId) && self.ghostKeepsUnread
+        return self.ghostEffective(peerId).keepsUnread
     }
 
     public func readsOnInteract(peerId: Int64) -> Bool {
-        return self.suppressReadReceipts(peerId: peerId) && self.ghostReadOnInteract
+        return self.ghostEffective(peerId).readsOnInteract
     }
 
     public func suppressTyping(peerId: Int64) -> Bool {
-        return self.ghostOverride(peerId) ?? self.ghostHidesTyping
+        return self.ghostEffective(peerId).hideTyping
     }
 
     public func suppressStoryViews(peerId: Int64) -> Bool {
-        return self.ghostOverride(peerId) ?? self.ghostHidesStoryViews
+        return self.ghostEffective(peerId).hideStories
     }
 
     public var historyMediaLimitBytes: Int64 {

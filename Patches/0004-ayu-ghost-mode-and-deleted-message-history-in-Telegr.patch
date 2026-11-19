@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 08:58:37 +0200
+Date: Thu, 19 Nov 2026 11:15:57 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -248,6 +248,26 @@ index e38c0f96c77041c97293f8cc2c0386ebf62274ed..84c31a060cd56cc7a7d7ef61fc45b397
      guard let inputPeer = apiInputPeer(peer) else {
          return .complete()
      }
+diff --git a/submodules/TelegramCore/Sources/State/MessageReactions.swift b/submodules/TelegramCore/Sources/State/MessageReactions.swift
+index b1a5ae4e3353459d62a09f78ee54b4d8bbe00220..8958b204145009dc8aaf111d78bf8b09b052015c 100644
+--- a/submodules/TelegramCore/Sources/State/MessageReactions.swift
++++ b/submodules/TelegramCore/Sources/State/MessageReactions.swift
+@@ -26,6 +26,7 @@ public func updateMessageReactionsInteractively(account: Account, messageIds: [M
+         guard let chatPeerId = messageIds.first?.peerId else {
+             return
+         }
++        ayuReadOnInteract(account: account, peerId: chatPeerId)
+         
+         var messagesWithoutGroups: [Message] = []
+         var messagesByGroupId: [Int64: [Message]] = [:]
+@@ -174,6 +175,7 @@ public func updateMessageReactionsInteractively(account: Account, messageIds: [M
+ 
+ func _internal_sendStarsReactionsInteractively(account: Account, messageId: MessageId, count: Int, privacy: TelegramPaidReactionPrivacy?) -> Signal<TelegramPaidReactionPrivacy, NoError> {
+     return account.postbox.transaction { transaction -> TelegramPaidReactionPrivacy in
++        ayuReadOnInteract(account: account, peerId: messageId.peerId)
+         transaction.setPendingMessageAction(type: .sendStarsReaction, id: messageId, action: SendStarsReactionsAction(randomId: Int64.random(in: Int64.min ... Int64.max)))
+         var resolvedPrivacyValue: TelegramPaidReactionPrivacy = .default
+         transaction.updateMessage(messageId, update: { currentMessage in
 diff --git a/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift b/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
 index 49d68a3791e25e97ce82d98076fc54ae4d50aca6..cc1cb210b80887a7d8b84865b12e56800395a9a7 100644
 --- a/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift

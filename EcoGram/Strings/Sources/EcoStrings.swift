@@ -16,10 +16,7 @@ public struct EcoStrings {
         case ghostEssentials
         case spyEssentials
         case ghostEnabledCount
-        case stateOn
-        case stateOff
         case historyTitle
-        case exceptionsHeader
         case exceptionsFooter
         case historyHeader
         case historySaveDeleted
@@ -97,11 +94,8 @@ public struct EcoStrings {
         .ghostEssentials: ("GHOST ESSENTIALS", "ПРИЗРАК", "ゴースト"),
         .spyEssentials: ("SPY ESSENTIALS", "ШПИОН", "スパイ"),
         .ghostEnabledCount: ("%d of %d enabled", "Включено %d из %d", "%d / %d 有効"),
-        .stateOn: ("On", "Вкл.", "オン"),
-        .stateOff: ("Off", "Выкл.", "オフ"),
         .historyTitle: ("Message History", "История сообщений", "メッセージ履歴"),
-        .exceptionsHeader: ("EXCEPTIONS", "ИСКЛЮЧЕНИЯ", "例外"),
-        .exceptionsFooter: ("Exceptions turn Ghost Mode on or off for specific chats. Online status is shared by all chats.", "Исключения включают или выключают режим призрака для отдельных чатов. Онлайн-статус общий для всех чатов.", "例外では特定のチャットでゴーストモードをオン・オフできます。オンライン状態はすべてのチャット共通です。"),
+        .exceptionsFooter: ("Online status is shared by all chats and can only be changed in Ghost Mode settings.", "Онлайн-статус общий для всех чатов, он меняется только в настройках режима призрака.", "オンライン状態はすべてのチャット共通で、ゴーストモードの設定でのみ変更できます。"),
         .historyHeader: ("MESSAGE HISTORY", "ИСТОРИЯ СООБЩЕНИЙ", "メッセージ履歴"),
         .historySaveDeleted: ("Save Deleted Messages", "Сохранять удалённые", "削除されたメッセージを保存"),
         .historySaveSelfDestructing: ("Save Self-Destructing Messages", "Сохранять самоудаляющиеся", "自動削除メッセージを保存"),

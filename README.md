@@ -22,8 +22,8 @@
 
 ### AyuGram
 
-- Ghost mode with per-chat exceptions
-- Read on interact
+- Ghost mode with per-chat exceptions for each option
+- Read on interact: replies and reactions
 - Deleted message history
 - One-time photos and videos
 - Edit history

@@ -7,6 +7,7 @@ import TelegramPresentationData
 import ComponentFlow
 import GlassBarButtonComponent
 import BundleIconComponent
+import LottieComponent
 import ContextUI
 import UndoUI
 import AppBundle
@@ -34,6 +35,7 @@ final class AyuShotPreviewController: ViewController {
     private var isDismissing = false
 
     private let dimView = UIView()
+    private let sheetClipView = UIView()
     private let sheetView = UIView()
     private let titleLabel = UILabel()
     private let closeButton = ComponentView<Empty>()
@@ -80,12 +82,17 @@ final class AyuShotPreviewController: ViewController {
         self.dimView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.closePressed)))
         view.addSubview(self.dimView)
 
+        self.sheetClipView.layer.cornerCurve = .continuous
+        self.sheetClipView.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        self.sheetClipView.clipsToBounds = true
+        view.addSubview(self.sheetClipView)
+
         self.sheetView.backgroundColor = list.blocksBackgroundColor
         self.sheetView.layer.cornerRadius = 38.0
         self.sheetView.layer.cornerCurve = .continuous
         self.sheetView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         self.sheetView.clipsToBounds = true
-        view.addSubview(self.sheetView)
+        self.sheetClipView.addSubview(self.sheetView)
 
         self.titleLabel.text = self.strings.get(.actionShot)
         self.titleLabel.font = UIFont.systemFont(ofSize: 17.0, weight: .semibold)
@@ -140,14 +147,16 @@ final class AyuShotPreviewController: ViewController {
         let topInset = layout.statusBarHeight ?? layout.safeInsets.top
         self.dimView.frame = CGRect(origin: .zero, size: size)
 
+        let glassInset: CGFloat = size.width < size.height ? 6.0 : 0.0
+        let sheetWidth = size.width - glassInset * 2.0
         let side: CGFloat = 16.0
         let rowHeight = AyuShotPreviewController.rowHeight
         let headerHeight = AyuShotPreviewController.headerHeight
         let cardHeight = rowHeight * 2.0
         let preferencesHeight: CGFloat = 32.0 + cardHeight
-        let bottomInset = max(layout.intrinsicInsets.bottom, 16.0)
+        let bottomInset = max(layout.intrinsicInsets.bottom - glassInset, 16.0)
         let maxSheetHeight = size.height - topInset - 12.0
-        let imageWidth = size.width - side * 2.0
+        let imageWidth = sheetWidth - side * 2.0
         var imageHeight: CGFloat = 220.0
         if let image = self.image, image.size.width > 0.0 {
             imageHeight = ceil(imageWidth * image.size.height / image.size.width)
@@ -155,23 +164,25 @@ final class AyuShotPreviewController: ViewController {
         let fixedHeight = headerHeight + 8.0 + preferencesHeight + 16.0 + bottomInset
         let scrollHeight = min(imageHeight, max(120.0, maxSheetHeight - fixedHeight))
         let sheetHeight = fixedHeight + scrollHeight
-        let sheetOrigin = self.didAppear ? size.height - sheetHeight : size.height
-        self.sheetView.frame = CGRect(x: 0.0, y: sheetOrigin, width: size.width, height: sheetHeight)
+        let sheetOrigin = self.didAppear && !self.isDismissing ? size.height - glassInset - sheetHeight : size.height
+        self.sheetClipView.layer.cornerRadius = max(24.0, layout.deviceMetrics.screenCornerRadius) - 2.0
+        self.sheetClipView.frame = CGRect(x: glassInset, y: sheetOrigin, width: sheetWidth, height: sheetHeight)
+        self.sheetView.frame = self.sheetClipView.bounds
 
         let buttonSize = AyuShotPreviewController.buttonSize
         let buttonY = floor((headerHeight - buttonSize) / 2.0)
         self.closeButton.view?.frame = CGRect(x: side, y: buttonY, width: buttonSize, height: buttonSize)
-        self.moreButton.view?.frame = CGRect(x: size.width - side - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
-        self.titleLabel.frame = CGRect(x: side + buttonSize + 8.0, y: 0.0, width: size.width - (side + buttonSize + 8.0) * 2.0, height: headerHeight)
+        self.moreButton.view?.frame = CGRect(x: sheetWidth - side - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
+        self.titleLabel.frame = CGRect(x: side + buttonSize + 8.0, y: 0.0, width: sheetWidth - (side + buttonSize + 8.0) * 2.0, height: headerHeight)
 
-        self.scrollView.frame = CGRect(x: 0.0, y: headerHeight, width: size.width, height: scrollHeight)
+        self.scrollView.frame = CGRect(x: 0.0, y: headerHeight, width: sheetWidth, height: scrollHeight)
         self.imageView.frame = CGRect(x: side, y: 0.0, width: imageWidth, height: imageHeight)
-        self.scrollView.contentSize = CGSize(width: size.width, height: imageHeight)
+        self.scrollView.contentSize = CGSize(width: sheetWidth, height: imageHeight)
         self.activityView.center = CGPoint(x: self.scrollView.frame.midX, y: self.scrollView.frame.midY)
 
         let preferencesTop = self.scrollView.frame.maxY + 8.0
-        self.preferencesLabel.frame = CGRect(x: side * 2.0, y: preferencesTop + 8.0, width: size.width - side * 4.0, height: 18.0)
-        self.preferencesCard.frame = CGRect(x: side, y: preferencesTop + 32.0, width: size.width - side * 2.0, height: cardHeight)
+        self.preferencesLabel.frame = CGRect(x: side * 2.0, y: preferencesTop + 8.0, width: sheetWidth - side * 4.0, height: 18.0)
+        self.preferencesCard.frame = CGRect(x: side, y: preferencesTop + 32.0, width: sheetWidth - side * 2.0, height: cardHeight)
         let cardWidth = self.preferencesCard.bounds.width
         for (index, row) in self.rows.enumerated() {
             row.frame = CGRect(x: 0.0, y: CGFloat(index) * rowHeight, width: cardWidth, height: rowHeight)
@@ -223,7 +234,7 @@ final class AyuShotPreviewController: ViewController {
                 isDark: isDark,
                 state: .glass,
                 isEnabled: self.image != nil && !self.isRendering,
-                component: AnyComponentWithIdentity(id: "more", component: AnyComponent(BundleIconComponent(name: "Chat/Context Menu/More", tintColor: iconColor))),
+                component: AnyComponentWithIdentity(id: "more", component: AnyComponent(LottieComponent(content: LottieComponent.AppBundleContent(name: "anim_morewide"), color: iconColor, size: CGSize(width: 34.0, height: 34.0)))),
                 action: { [weak self] view in
                     self?.morePressed(view: view)
                 }
@@ -390,7 +401,7 @@ final class AyuShotPreviewController: ViewController {
         self.isDismissing = true
         UIView.animate(withDuration: 0.25, delay: 0.0, options: [.curveEaseIn], animations: {
             self.dimView.alpha = 0.0
-            self.sheetView.frame.origin.y = self.displayNode.view.bounds.height
+            self.sheetClipView.frame.origin.y = self.displayNode.view.bounds.height
         }, completion: { [weak self] _ in
             self?.dismiss()
         })

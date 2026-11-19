@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 08:58:39 +0200
+Date: Thu, 19 Nov 2026 11:15:59 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -555,7 +555,7 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..713b8c53ffcc041e723ece2e20e7bd10
  #
  # MARK: Swiftgram
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
-index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..2267f05d3d8c1aa3aa287c9777d0c5c0498419cf 100644
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..0db4cc7b47c490f90bd44055b80d0025be382833 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 @@ -1,5 +1,7 @@
@@ -666,7 +666,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..2267f05d3d8c1aa3aa287c9777d0c5c0
          transition.updateFrame(node: self.avatarListNode.listContainerNode, frame: avatarListContainerFrame)
          
 -        let avatarClipOffset: CGFloat = !self.isAvatarExpanded && deviceMetrics.hasDynamicIsland && statusBarHeight > 0.0 && self.avatarClippingNode.clipsToBounds && !isLandscape ? 47.0 : 0.0
-+        let avatarClipOffset: CGFloat = !self.isAvatarExpanded && self.ecoIslandEffect(deviceMetrics) && statusBarHeight > 0.0 && self.avatarClippingNode.clipsToBounds && !isLandscape ? max(0.0, 47.0 + self.ecoIslandShift(deviceMetrics, statusBarHeight: statusBarHeight)) : 0.0
++        let avatarClipOffset: CGFloat = !self.isAvatarExpanded && self.ecoIslandEffect(deviceMetrics) && statusBarHeight > 0.0 && self.avatarClippingNode.clipsToBounds && !isLandscape ? max(0.0, 47.0 + self.ecoIslandShift(deviceMetrics)) : 0.0
          let clippingNodeTransition = ContainedViewLayoutTransition.immediate
          clippingNodeTransition.updateFrame(layer: self.avatarClippingNode.layer, frame: CGRect(origin: CGPoint(x: 0.0, y: avatarClipOffset + avatarListVerticalOffset), size: CGSize(width: width, height: 1000.0)))
          clippingNodeTransition.updateSublayerTransformOffset(layer: self.avatarClippingNode.layer, offset: CGPoint(x: 0.0, y: -avatarClipOffset))
@@ -692,7 +692,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..2267f05d3d8c1aa3aa287c9777d0c5c0
              }
              
 -            self.avatarListNode.maskNode.position = CGPoint(x: 0.0, y: -self.avatarListNode.frame.minY + 48.0 + 85.0 + avatarMaskOffset)
-+            self.avatarListNode.maskNode.position = CGPoint(x: 0.0, y: -self.avatarListNode.frame.minY + 48.0 + 85.0 + avatarMaskOffset + self.ecoIslandShift(deviceMetrics, statusBarHeight: statusBarHeight))
++            self.avatarListNode.maskNode.position = CGPoint(x: 0.0, y: -self.avatarListNode.frame.minY + 48.0 + 85.0 + avatarMaskOffset + self.ecoIslandShift(deviceMetrics))
              self.avatarListNode.maskNode.bounds = CGRect(origin: .zero, size: CGSize(width: 171.0, height: 171.0))
              
              self.avatarListNode.bottomCoverNode.position = self.avatarListNode.maskNode.position
@@ -718,8 +718,8 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..2267f05d3d8c1aa3aa287c9777d0c5c0
 +        return deviceMetrics.hasDynamicIsland || (deviceMetrics.type == .phone && EcoPreferences.shared.islandAvatarAnimation)
 +    }
 +    
-+    private func ecoIslandShift(_ deviceMetrics: DeviceMetrics, statusBarHeight: CGFloat) -> CGFloat {
-+        return deviceMetrics.hasDynamicIsland ? 0.0 : statusBarHeight - 54.0
++    private func ecoIslandShift(_ deviceMetrics: DeviceMetrics) -> CGFloat {
++        return deviceMetrics.hasDynamicIsland ? 0.0 : 15.0 - 29.5
 +    }
 +    
      private func updateAvatarMask(transition: ContainedViewLayoutTransition) {

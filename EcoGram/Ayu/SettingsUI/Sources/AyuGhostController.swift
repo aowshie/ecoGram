@@ -16,7 +16,23 @@ private enum AyuGhostSection: Int32 {
     case exceptions
 }
 
-private func ayuGhostEntries(strings: EcoStrings, presentationStrings: PresentationStrings, exceptions: [(EnginePeer, Bool)]) -> [AyuListEntry] {
+private struct AyuGhostState: Equatable {
+    var editing = false
+    var revealedPeerId: EnginePeer.Id?
+}
+
+func ayuGhostSummary(_ options: AyuGhostOptions, strings: EcoStrings, presentationStrings: PresentationStrings) -> String {
+    let enabled = options.enabledCount
+    if enabled == AyuGhostOptions.optionCount {
+        return presentationStrings.Notification_Exceptions_AlwaysOn
+    }
+    if enabled == 0 {
+        return presentationStrings.Notification_Exceptions_AlwaysOff
+    }
+    return String(format: strings.get(.ghostEnabledCount), enabled, AyuGhostOptions.optionCount)
+}
+
+private func ayuGhostEntries(strings: EcoStrings, presentationStrings: PresentationStrings, state: AyuGhostState, exceptions: [(EnginePeer, AyuGhostOptions)]) -> [AyuListEntry] {
     let settings = AyuSettings.shared
     var entries: [AyuListEntry] = []
     var order = 0
@@ -36,15 +52,14 @@ private func ayuGhostEntries(strings: EcoStrings, presentationStrings: Presentat
     entries.append(.toggle(section: AyuGhostSection.options.rawValue, order: next(), key: "hideTyping", title: strings.get(.ghostHideTyping), value: settings.ghostHidesTyping, enabled: true))
     entries.append(.notice(section: AyuGhostSection.options.rawValue, order: next(), text: strings.get(.ghostFooter)))
 
-    entries.append(.header(section: AyuGhostSection.exceptions.rawValue, order: next(), text: strings.get(.exceptionsHeader)))
-    entries.append(.peerAction(section: AyuGhostSection.exceptions.rawValue, order: next(), action: .addException, title: presentationStrings.Notification_Exceptions_AddException))
-    for (peer, value) in exceptions {
-        entries.append(.peer(section: AyuGhostSection.exceptions.rawValue, order: next(), peer: peer, value: value ? presentationStrings.Notification_Exceptions_AlwaysOn : presentationStrings.Notification_Exceptions_AlwaysOff))
+    entries.append(.header(section: AyuGhostSection.exceptions.rawValue, order: next(), text: presentationStrings.Notifications_MessageNotificationsExceptions))
+    entries.append(.addPeer(section: AyuGhostSection.exceptions.rawValue, order: next(), title: presentationStrings.Notification_Exceptions_AddException))
+    for (peer, options) in exceptions {
+        entries.append(.peer(section: AyuGhostSection.exceptions.rawValue, order: next(), peer: peer, value: ayuGhostSummary(options, strings: strings, presentationStrings: presentationStrings), editing: state.editing, revealed: state.revealedPeerId == peer.id))
     }
     if !exceptions.isEmpty {
-        entries.append(.destructive(section: AyuGhostSection.exceptions.rawValue, order: next(), action: .deleteExceptions, title: presentationStrings.Notification_Exceptions_DeleteAll))
+        entries.append(.deleteAll(section: AyuGhostSection.exceptions.rawValue, order: next(), title: presentationStrings.Notifications_DeleteAllExceptions))
     }
-    entries.append(.notice(section: AyuGhostSection.exceptions.rawValue, order: next(), text: strings.get(.exceptionsFooter)))
 
     return entries
 }
@@ -71,102 +86,136 @@ private func ayuApplyGhostToggle(_ key: String, value: Bool) {
     }
 }
 
-private func ayuExceptionPeers(context: AccountContext, refresh: Signal<Bool, NoError>) -> Signal<[(EnginePeer, Bool)], NoError> {
+private func ayuExceptionPeers(context: AccountContext, refresh: Signal<Bool, NoError>) -> Signal<[(EnginePeer, AyuGhostOptions)], NoError> {
     return refresh
-    |> mapToSignal { _ -> Signal<[(EnginePeer, Bool)], NoError> in
+    |> mapToSignal { _ -> Signal<[(EnginePeer, AyuGhostOptions)], NoError> in
         let exceptions = AyuSettings.shared.ghostExceptions
-        let ids = exceptions.keys.sorted().map { EnginePeer.Id($0) }
+        let ids = exceptions.keys.map { EnginePeer.Id($0) }
         if ids.isEmpty {
             return .single([])
         }
         return context.engine.data.get(EngineDataMap(ids.map(TelegramEngine.EngineData.Item.Peer.Peer.init(id:))))
-        |> map { peers -> [(EnginePeer, Bool)] in
-            var result: [(EnginePeer, Bool)] = []
+        |> map { peers -> [(EnginePeer, AyuGhostOptions)] in
+            var result: [(EnginePeer, AyuGhostOptions)] = []
             for id in ids {
-                if let maybePeer = peers[id], let peer = maybePeer, let value = exceptions[id.toInt64()] {
-                    result.append((peer, value))
+                if let maybePeer = peers[id], let peer = maybePeer, let options = exceptions[id.toInt64()] {
+                    result.append((peer, options))
                 }
             }
-            return result
+            return result.sorted(by: { $0.0.compactDisplayTitle.localizedCompare($1.0.compactDisplayTitle) == .orderedAscending })
         }
     }
 }
 
 func ayuGhostController(context: AccountContext, onChange: @escaping () -> Void) -> ViewController {
     let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
+    let stateValue = Atomic<AyuGhostState>(value: AyuGhostState())
+    let statePromise = ValuePromise<AyuGhostState>(AyuGhostState(), ignoreRepeated: true)
     var pushControllerImpl: ((ViewController) -> Void)?
     var presentControllerImpl: ((ViewController) -> Void)?
+
+    let updateState: ((inout AyuGhostState) -> Void) -> Void = { f in
+        statePromise.set(stateValue.modify { current in
+            var current = current
+            f(&current)
+            return current
+        })
+    }
 
     let changed: () -> Void = {
         refresh.set(true)
         onChange()
     }
 
-    let presentChoice: (EnginePeer.Id, Bool, @escaping () -> Void) -> Void = { peerId, allowsRemove, completion in
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        let strings = presentationData.strings
-        var actions: [TextAlertAction] = [
-            TextAlertAction(type: .genericAction, title: strings.Notification_Exceptions_AlwaysOn, action: {
-                AyuSettings.shared.setGhostException(peerId: peerId.toInt64(), value: true)
-                changed()
-                completion()
-            }),
-            TextAlertAction(type: .genericAction, title: strings.Notification_Exceptions_AlwaysOff, action: {
-                AyuSettings.shared.setGhostException(peerId: peerId.toInt64(), value: false)
-                changed()
-                completion()
-            })
-        ]
-        if allowsRemove {
-            actions.append(TextAlertAction(type: .destructiveAction, title: strings.Common_Delete, action: {
-                AyuSettings.shared.setGhostException(peerId: peerId.toInt64(), value: nil)
-                changed()
-                completion()
-            }))
+    let removeException: (EnginePeer.Id) -> Void = { peerId in
+        AyuSettings.shared.setGhostException(peerId: peerId.toInt64(), options: nil)
+        let isEmpty = AyuSettings.shared.ghostExceptions.isEmpty
+        updateState {
+            $0.revealedPeerId = nil
+            if isEmpty {
+                $0.editing = false
+            }
         }
-        actions.append(TextAlertAction(type: .genericAction, title: strings.Common_Cancel, action: {}))
-        let ecoStrings = EcoStrings(languageCode: strings.baseLanguageCode)
-        presentControllerImpl?(textAlertController(context: context, title: nil, text: ecoStrings.get(.ghostMode), actions: actions, actionLayout: .vertical))
+        changed()
+    }
+
+    let presentPeerSettings: (EnginePeer, @escaping () -> Void) -> Void = { peer, completion in
+        completion()
+        let existing = AyuSettings.shared.ghostException(peerId: peer.id.toInt64())
+        pushControllerImpl?(ayuGhostExceptionController(context: context, peer: peer, existing: existing, apply: { options in
+            AyuSettings.shared.setGhostException(peerId: peer.id.toInt64(), options: options)
+            changed()
+        }))
     }
 
     let arguments = AyuListArguments(context: context, toggle: { key, value in
         ayuApplyGhostToggle(key, value: value)
         changed()
     }, perform: { action in
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         switch action {
         case .addException:
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
             let controller = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.excludeRecent, .doNotSearchMessages, .removeSearchHeader, .excludeSavedMessages, .excludeSecretChats], hasContactSelector: false, title: presentationData.strings.Notifications_AddExceptionTitle))
             controller.peerSelected = { [weak controller] peer, _ in
-                presentChoice(peer.id, false, {
+                presentPeerSettings(peer, {
                     controller?.dismiss()
                 })
             }
             pushControllerImpl?(controller)
         case .deleteExceptions:
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            presentControllerImpl?(textAlertController(context: context, title: nil, text: presentationData.strings.Notification_Exceptions_DeleteAllConfirmation, actions: [
-                TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
-                TextAlertAction(type: .destructiveAction, title: presentationData.strings.Common_Delete, action: {
+            let actionSheet = ActionSheetController(presentationData: presentationData)
+            actionSheet.setItemGroups([ActionSheetItemGroup(items: [
+                ActionSheetTextItem(title: presentationData.strings.Notification_Exceptions_DeleteAllConfirmation),
+                ActionSheetButtonItem(title: presentationData.strings.Notification_Exceptions_DeleteAll, color: .destructive, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
                     AyuSettings.shared.ghostExceptions = [:]
+                    updateState {
+                        $0.editing = false
+                        $0.revealedPeerId = nil
+                    }
                     changed()
                 })
-            ]))
+            ]), ActionSheetItemGroup(items: [
+                ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                })
+            ])])
+            presentControllerImpl?(actionSheet)
         default:
             break
         }
     }, openPeer: { peer in
-        presentChoice(peer.id, true, {})
+        presentPeerSettings(peer, {})
     }, removePeer: { peerId in
-        AyuSettings.shared.setGhostException(peerId: peerId.toInt64(), value: nil)
-        changed()
+        removeException(peerId)
+    }, revealPeer: { peerId, fromPeerId in
+        updateState { state in
+            if (peerId == nil && fromPeerId == state.revealedPeerId) || (peerId != nil && fromPeerId == nil) {
+                state.revealedPeerId = peerId
+            }
+        }
     })
 
-    let signal = combineLatest(refresh.get(), context.sharedContext.presentationData, ayuExceptionPeers(context: context, refresh: refresh.get()))
-    |> map { _, presentationData, exceptions -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    let signal = combineLatest(statePromise.get(), context.sharedContext.presentationData, ayuExceptionPeers(context: context, refresh: refresh.get()))
+    |> map { state, presentationData, exceptions -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
-        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.ghostMode)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ayuGhostEntries(strings: strings, presentationStrings: presentationData.strings, exceptions: exceptions), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
+        let rightNavigationButton: ItemListNavigationButton?
+        if exceptions.isEmpty {
+            rightNavigationButton = nil
+        } else if state.editing {
+            rightNavigationButton = ItemListNavigationButton(content: .icon(.done), style: .bold, enabled: true, staysInRow: true, action: {
+                updateState { $0.editing = false }
+            })
+        } else {
+            rightNavigationButton = ItemListNavigationButton(content: .text(presentationData.strings.Common_Edit), style: .regular, enabled: true, action: {
+                updateState {
+                    $0.editing = true
+                    $0.revealedPeerId = nil
+                }
+            })
+        }
+        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.ghostMode)), leftNavigationButton: nil, rightNavigationButton: rightNavigationButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: true)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ayuGhostEntries(strings: strings, presentationStrings: presentationData.strings, state: state, exceptions: exceptions), style: .blocks, animateChanges: true)
         return (controllerState, (listState, arguments))
     }
 
