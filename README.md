@@ -37,7 +37,6 @@
 - Custom message menu
 - Avatar in the Settings tab
 - Dynamic Island profile effect on any iPhone
-- Custom badge under the Dynamic Island
 - Hidden profile shortcuts
 
 ## Privacy
