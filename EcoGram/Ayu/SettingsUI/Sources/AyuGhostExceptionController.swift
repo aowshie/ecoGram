@@ -13,11 +13,7 @@ import EcoStrings
 
 private enum AyuGhostExceptionSection: Int32 {
     case remove
-    case hideRead
-    case keepUnread
-    case readOnInteract
-    case hideStories
-    case hideTyping
+    case options
 }
 
 private func ayuGhostExceptionEntries(strings: EcoStrings, presentationStrings: PresentationStrings, options: AyuGhostOptions, canRemove: Bool) -> [AyuListEntry] {
@@ -32,20 +28,13 @@ private func ayuGhostExceptionEntries(strings: EcoStrings, presentationStrings: 
         entries.append(.centered(section: AyuGhostExceptionSection.remove.rawValue, order: next(), action: .removeException, title: presentationStrings.Notification_Exceptions_RemoveFromExceptions))
     }
 
-    func appendOption(_ section: AyuGhostExceptionSection, key: String, title: String, value: Bool) {
-        entries.append(.header(section: section.rawValue, order: next(), text: title.uppercased()))
-        entries.append(.choice(section: section.rawValue, order: next(), key: key, value: true, title: presentationStrings.Notification_Exceptions_AlwaysOn, checked: value))
-        entries.append(.choice(section: section.rawValue, order: next(), key: key, value: false, title: presentationStrings.Notification_Exceptions_AlwaysOff, checked: !value))
-    }
-
-    appendOption(.hideRead, key: "hideRead", title: strings.get(.ghostHideRead), value: options.hideRead)
-    if options.hideRead {
-        appendOption(.keepUnread, key: "keepUnread", title: strings.get(.ghostKeepUnread), value: options.keepUnread)
-        appendOption(.readOnInteract, key: "readOnInteract", title: strings.get(.ghostReadOnInteract), value: options.readOnInteract)
-    }
-    appendOption(.hideStories, key: "hideStories", title: strings.get(.ghostHideStoryViews), value: options.hideStories)
-    appendOption(.hideTyping, key: "hideTyping", title: strings.get(.ghostHideTyping), value: options.hideTyping)
-    entries.append(.notice(section: AyuGhostExceptionSection.hideTyping.rawValue, order: next(), text: strings.get(.exceptionsFooter)))
+    let section = AyuGhostExceptionSection.options.rawValue
+    entries.append(.toggle(section: section, order: next(), key: "hideRead", title: strings.get(.ghostHideRead), value: options.hideRead, enabled: true))
+    entries.append(.toggle(section: section, order: next(), key: "keepUnread", title: strings.get(.ghostKeepUnread), value: options.keepUnread, enabled: options.hideRead))
+    entries.append(.toggle(section: section, order: next(), key: "readOnInteract", title: strings.get(.ghostReadOnInteract), value: options.readOnInteract, enabled: options.hideRead))
+    entries.append(.toggle(section: section, order: next(), key: "hideStories", title: strings.get(.ghostHideStoryViews), value: options.hideStories, enabled: true))
+    entries.append(.toggle(section: section, order: next(), key: "hideTyping", title: strings.get(.ghostHideTyping), value: options.hideTyping, enabled: true))
+    entries.append(.notice(section: section, order: next(), text: strings.get(.exceptionsFooter)))
 
     return entries
 }
@@ -76,14 +65,13 @@ func ayuGhostExceptionController(context: AccountContext, peer: EnginePeer, exis
     let canRemove = existing != nil
     var dismissImpl: (() -> Void)?
 
-    let arguments = AyuListArguments(context: context, toggle: { _, _ in
+    let arguments = AyuListArguments(context: context, toggle: { key, value in
+        optionsPromise.set(optionsValue.modify { ayuUpdatedGhostOptions($0, key: key, value: value) })
     }, perform: { action in
         if case .removeException = action {
             apply(nil)
             dismissImpl?()
         }
-    }, select: { key, value in
-        optionsPromise.set(optionsValue.modify { ayuUpdatedGhostOptions($0, key: key, value: value) })
     })
 
     let signal = combineLatest(context.sharedContext.presentationData, optionsPromise.get())

@@ -21,16 +21,14 @@ final class AyuListArguments {
     let context: AccountContext
     let toggle: (String, Bool) -> Void
     let perform: (AyuListAction) -> Void
-    let select: (String, Bool) -> Void
     let openPeer: (EnginePeer) -> Void
     let removePeer: (EnginePeer.Id) -> Void
     let revealPeer: (EnginePeer.Id?, EnginePeer.Id?) -> Void
 
-    init(context: AccountContext, toggle: @escaping (String, Bool) -> Void, perform: @escaping (AyuListAction) -> Void, select: @escaping (String, Bool) -> Void = { _, _ in }, openPeer: @escaping (EnginePeer) -> Void = { _ in }, removePeer: @escaping (EnginePeer.Id) -> Void = { _ in }, revealPeer: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void = { _, _ in }) {
+    init(context: AccountContext, toggle: @escaping (String, Bool) -> Void, perform: @escaping (AyuListAction) -> Void, openPeer: @escaping (EnginePeer) -> Void = { _ in }, removePeer: @escaping (EnginePeer.Id) -> Void = { _ in }, revealPeer: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void = { _, _ in }) {
         self.context = context
         self.toggle = toggle
         self.perform = perform
-        self.select = select
         self.openPeer = openPeer
         self.removePeer = removePeer
         self.revealPeer = revealPeer
@@ -46,18 +44,17 @@ enum AyuListEntry: ItemListNodeEntry {
     case peer(section: Int32, order: Int, peer: EnginePeer, value: String, editing: Bool, revealed: Bool)
     case deleteAll(section: Int32, order: Int, title: String)
     case centered(section: Int32, order: Int, action: AyuListAction, title: String)
-    case choice(section: Int32, order: Int, key: String, value: Bool, title: String, checked: Bool)
 
     var section: ItemListSectionId {
         switch self {
-        case let .header(section, _, _), let .category(section, _, _, _, _, _, _), let .toggle(section, _, _, _, _, _), let .notice(section, _, _), let .addPeer(section, _, _), let .peer(section, _, _, _, _, _), let .deleteAll(section, _, _), let .centered(section, _, _, _), let .choice(section, _, _, _, _, _):
+        case let .header(section, _, _), let .category(section, _, _, _, _, _, _), let .toggle(section, _, _, _, _, _), let .notice(section, _, _), let .addPeer(section, _, _), let .peer(section, _, _, _, _, _), let .deleteAll(section, _, _), let .centered(section, _, _, _):
             return section
         }
     }
 
     var order: Int {
         switch self {
-        case let .header(_, order, _), let .category(_, order, _, _, _, _, _), let .toggle(_, order, _, _, _, _), let .notice(_, order, _), let .addPeer(_, order, _), let .peer(_, order, _, _, _, _), let .deleteAll(_, order, _), let .centered(_, order, _, _), let .choice(_, order, _, _, _, _):
+        case let .header(_, order, _), let .category(_, order, _, _, _, _, _), let .toggle(_, order, _, _, _, _), let .notice(_, order, _), let .addPeer(_, order, _), let .peer(_, order, _, _, _, _), let .deleteAll(_, order, _), let .centered(_, order, _, _):
             return order
         }
     }
@@ -80,8 +77,6 @@ enum AyuListEntry: ItemListNodeEntry {
             return "deleteAll"
         case let .centered(_, _, action, _):
             return "centered.\(action)"
-        case let .choice(_, _, key, value, _, _):
-            return "choice.\(key).\(value)"
         }
     }
 
@@ -107,8 +102,6 @@ enum AyuListEntry: ItemListNodeEntry {
             return a1 == b1 && a2 == b2 && a3 == b3
         case let (.centered(a1, a2, a3, a4), .centered(b1, b2, b3, b4)):
             return a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4
-        case let (.choice(a1, a2, a3, a4, a5, a6), .choice(b1, b2, b3, b4, b5, b6)):
-            return a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4 && a5 == b5 && a6 == b6
         default:
             return false
         }
@@ -149,10 +142,6 @@ enum AyuListEntry: ItemListNodeEntry {
         case let .centered(_, _, action, title):
             return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: title, kind: .generic, alignment: .center, sectionId: self.section, style: .blocks, action: {
                 arguments.perform(action)
-            })
-        case let .choice(_, _, key, value, title, checked):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.select(key, value)
             })
         }
     }

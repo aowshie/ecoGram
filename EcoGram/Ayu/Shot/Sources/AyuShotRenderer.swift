@@ -43,6 +43,11 @@ final class AyuShotRenderer {
         })
     }
 
+    func cancel() {
+        self.pass?.cancel()
+        self.pass = nil
+    }
+
     private static func ownAlias(context: AccountContext, groups: [[EngineMessage]]) -> TelegramUser? {
         let accountPeerId = context.account.peerId
         for messages in groups {
@@ -143,15 +148,22 @@ private final class AyuShotRenderPass {
                 return
             }
             let format = UIGraphicsImageRendererFormat()
-            format.scale = 3.0
+            format.scale = UIScreen.main.scale
             format.opaque = opaque
             let bounds = CGRect(origin: .zero, size: size)
+            var drawn = false
             let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-                self.containerNode.view.drawHierarchy(in: bounds, afterScreenUpdates: true)
+                drawn = self.containerNode.view.drawHierarchy(in: bounds, afterScreenUpdates: true)
             }
             self.containerNode.view.removeFromSuperview()
-            completion(image)
+            completion(drawn ? image : nil)
         })
+    }
+
+    func cancel() {
+        self.readyDisposable?.dispose()
+        self.readyDisposable = nil
+        self.containerNode.view.removeFromSuperview()
     }
 
     private func layout(presentationData: PresentationData, theme: PresentationTheme, width: CGFloat) -> CGSize {

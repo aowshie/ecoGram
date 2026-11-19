@@ -23,6 +23,10 @@ swift_library(
         "//submodules/AppBundle:AppBundle",
         "//submodules/ContextUI:ContextUI",
         "//submodules/UndoUI:UndoUI",
+        "//submodules/ItemListUI:ItemListUI",
+        "//submodules/PresentationDataUtils:PresentationDataUtils",
+        "//submodules/AttachmentUI:AttachmentUI",
+        "//submodules/ActivityIndicator:ActivityIndicator",
     ],
     visibility = [
         "//visibility:public",

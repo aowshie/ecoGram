@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 11:15:59 +0200
+Date: Thu, 19 Nov 2026 13:28:27 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -190,7 +190,7 @@ index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..fd25bb20e189e2c60187ed348112838a
  
  sgsrc = [
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
-index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..39be740fc678dcb2a6b86958c57f4b502f7182bb 100644
+index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..65bdc26431723d586cb0f0e6534a940f53f89f37 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 @@ -2,6 +2,7 @@ import SGStrings // MARK: Swiftgram
@@ -213,7 +213,7 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..39be740fc678dcb2a6b86958c57f4b50
                          credibilityIconWidth += 20.0
                      }
                  }
-+                if item.message.author.flatMap { author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil } != nil {
++                if item.message.author.flatMap({ author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }) != nil {
 +                    credibilityIconWidth += 21.0
 +                }
                  
@@ -231,7 +231,7 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..39be740fc678dcb2a6b86958c57f4b50
              var nameNodeFrame = CGRect(origin: CGPoint(x: contentOrigin.x + (bubblelessCardTopInset != nil ? 0.0 : layoutConstants.text.bubbleInsets.left), y: layoutConstants.bubble.contentInsets.top + nameNodeOriginY), size: nameNodeSizeApply.0)
              
              var nameNavigateButtonOffset: CGFloat = currentCredibilityIcon == nil ? 4.0 : 28.0
-+            if item.message.author.flatMap { author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil } != nil {
++            if item.message.author.flatMap({ author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }) != nil {
 +                nameNavigateButtonOffset += 21.0
 +            }
              nameNavigateButtonOffset += 34.0
@@ -241,7 +241,7 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..39be740fc678dcb2a6b86958c57f4b50
                  strongSelf.credibilityHighlightNode?.removeFromSupernode()
                  strongSelf.credibilityHighlightNode = nil
              }
-+            if let ayuBadge = item.message.author.flatMap { author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }, let ayuBadgeImage = AyuBadgeImages.image(ayuBadge) {
++            if let ayuBadge = item.message.author.flatMap({ author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }), let ayuBadgeImage = AyuBadgeImages.image(ayuBadge) {
 +                let ayuBadgeView: UIImageView
 +                if let current = strongSelf.ayuBadgeView {
 +                    ayuBadgeView = current
@@ -555,7 +555,7 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..713b8c53ffcc041e723ece2e20e7bd10
  #
  # MARK: Swiftgram
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
-index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..0db4cc7b47c490f90bd44055b80d0025be382833 100644
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..44615c6165944e10fbaa3513a3309d9d5dd34144 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 @@ -1,5 +1,7 @@
@@ -666,7 +666,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..0db4cc7b47c490f90bd44055b80d0025
          transition.updateFrame(node: self.avatarListNode.listContainerNode, frame: avatarListContainerFrame)
          
 -        let avatarClipOffset: CGFloat = !self.isAvatarExpanded && deviceMetrics.hasDynamicIsland && statusBarHeight > 0.0 && self.avatarClippingNode.clipsToBounds && !isLandscape ? 47.0 : 0.0
-+        let avatarClipOffset: CGFloat = !self.isAvatarExpanded && self.ecoIslandEffect(deviceMetrics) && statusBarHeight > 0.0 && self.avatarClippingNode.clipsToBounds && !isLandscape ? max(0.0, 47.0 + self.ecoIslandShift(deviceMetrics)) : 0.0
++        let avatarClipOffset: CGFloat = !self.isAvatarExpanded && self.ecoIslandEffect(deviceMetrics) && statusBarHeight > 0.0 && self.avatarClippingNode.clipsToBounds && !isLandscape ? max(0.0, 47.0 + self.ecoIslandShift(deviceMetrics, contentOffset: contentOffset)) : 0.0
          let clippingNodeTransition = ContainedViewLayoutTransition.immediate
          clippingNodeTransition.updateFrame(layer: self.avatarClippingNode.layer, frame: CGRect(origin: CGPoint(x: 0.0, y: avatarClipOffset + avatarListVerticalOffset), size: CGSize(width: width, height: 1000.0)))
          clippingNodeTransition.updateSublayerTransformOffset(layer: self.avatarClippingNode.layer, offset: CGPoint(x: 0.0, y: -avatarClipOffset))
@@ -692,7 +692,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..0db4cc7b47c490f90bd44055b80d0025
              }
              
 -            self.avatarListNode.maskNode.position = CGPoint(x: 0.0, y: -self.avatarListNode.frame.minY + 48.0 + 85.0 + avatarMaskOffset)
-+            self.avatarListNode.maskNode.position = CGPoint(x: 0.0, y: -self.avatarListNode.frame.minY + 48.0 + 85.0 + avatarMaskOffset + self.ecoIslandShift(deviceMetrics))
++            self.avatarListNode.maskNode.position = CGPoint(x: 0.0, y: -self.avatarListNode.frame.minY + 48.0 + 85.0 + avatarMaskOffset + self.ecoIslandShift(deviceMetrics, contentOffset: contentOffset))
              self.avatarListNode.maskNode.bounds = CGRect(origin: .zero, size: CGSize(width: 171.0, height: 171.0))
              
              self.avatarListNode.bottomCoverNode.position = self.avatarListNode.maskNode.position
@@ -710,7 +710,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..0db4cc7b47c490f90bd44055b80d0025
          if !(self.state?.isEditing ?? false) {
              switch self.currentCredibilityIcon {
              case .premium:
-@@ -3009,8 +3072,16 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -3009,8 +3072,20 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          }
      }
      
@@ -718,8 +718,12 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..0db4cc7b47c490f90bd44055b80d0025
 +        return deviceMetrics.hasDynamicIsland || (deviceMetrics.type == .phone && EcoPreferences.shared.islandAvatarAnimation)
 +    }
 +    
-+    private func ecoIslandShift(_ deviceMetrics: DeviceMetrics) -> CGFloat {
-+        return deviceMetrics.hasDynamicIsland ? 0.0 : 15.0 - 29.5
++    private func ecoIslandShift(_ deviceMetrics: DeviceMetrics, contentOffset: CGFloat) -> CGFloat {
++        if deviceMetrics.hasDynamicIsland {
++            return 0.0
++        }
++        let progress = max(0.0, min(1.0, contentOffset / 120.0))
++        return (15.0 - 29.5) * progress
 +    }
 +    
      private func updateAvatarMask(transition: ContainedViewLayoutTransition) {

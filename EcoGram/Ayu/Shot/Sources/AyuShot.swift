@@ -20,7 +20,7 @@ public func ayuPresentShot(context: AccountContext, messageIds: [EngineMessage.I
             return
         }
         let renderer = AyuShotRenderer(context: context, groups: groups)
-        context.sharedContext.mainWindow?.present(AyuShotPreviewController(context: context, renderer: renderer, renderWidth: min(window.bounds.width, 430.0)), on: .root)
+        (context.sharedContext.mainWindow?.viewController as? NavigationController)?.pushViewController(ayuShotScreen(context: context, renderer: renderer, renderWidth: min(window.bounds.width, 430.0)))
     })
 }
 
