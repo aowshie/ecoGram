@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Fri, 20 Nov 2026 15:09:38 +0200
+Date: Fri, 20 Nov 2026 15:57:50 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -31,7 +31,7 @@ index bdec8f4fdf24c51fc14cd8bbf499573c83012109..0633af825b1e58f0f13b998f800fda58
      return items
  }
 diff --git a/submodules/ChatListUI/BUILD b/submodules/ChatListUI/BUILD
-index c0fa1aaef0cfb60635e2e907a8469750f87d6565..43fd9e8caed8cdbf1e9f0a8dbbdd31fcbe3efe1c 100644
+index c0fa1aaef0cfb60635e2e907a8469750f87d6565..e05bdaaf41c9fde44a80fed8c80aeca67e85e46d 100644
 --- a/submodules/ChatListUI/BUILD
 +++ b/submodules/ChatListUI/BUILD
 @@ -5,7 +5,8 @@ load("@build_bazel_rules_apple//apple/testing/default_runner:ios_test_runner.bzl
@@ -40,85 +40,111 @@ index c0fa1aaef0cfb60635e2e907a8469750f87d6565..43fd9e8caed8cdbf1e9f0a8dbbdd31fc
      "//Swiftgram/SGAPIWebSettings:SGAPIWebSettings",
 -    "//Swiftgram/SGAPIToken:SGAPIToken"
 +    "//Swiftgram/SGAPIToken:SGAPIToken",
-+    "//EcoGram/Ayu/Badges:AyuBadges",
++    "//EcoGram/Badges:EcoBadges",
  ]
  sgsrcs = [
      "//Swiftgram/SGChatListSimpleSettingsSignal:SGChatListSimpleSettingsSignal",
 diff --git a/submodules/ChatListUI/Sources/Node/ChatListItem.swift b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
-index 655bed73fbb335838b2279db8ac9d95e68444dd0..f90ae7abef5cbf0b416feb0222f55b903853a340 100644
+index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7cb4eb9f5 100644
 --- a/submodules/ChatListUI/Sources/Node/ChatListItem.swift
 +++ b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
 @@ -1,5 +1,6 @@
  import SGSimpleSettings // MARK: Swiftgram
  import Foundation
-+import AyuBadges
++import EcoBadges
  import UIKit
  import AsyncDisplayKit
  import Display
-@@ -1519,6 +1520,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -1519,6 +1520,8 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
      var credibilityIconView: ComponentHostView<Empty>?
      var credibilityIconComponent: EmojiStatusComponent?
      var statusIconView: ComponentHostView<Empty>?
-+    var ayuBadgeIconView: UIImageView?
++    var ecoLeadingBadgesView: EcoBadgeStripView?
++    var ecoTrailingBadgesView: EcoBadgeStripView?
      var statusIconComponent: EmojiStatusComponent?
      let hiddenPeerIconNode: ASImageNode
      let mutedIconNode: ASImageNode
-@@ -2680,6 +2682,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -2437,6 +2440,23 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+         }
+     }
+     
++    private func ecoUpdateBadgeStrip(_ current: EcoBadgeStripView?, badges: [EcoTitleBadge], tintColor: UIColor, origin: CGPoint, transition: ContainedViewLayoutTransition) -> EcoBadgeStripView? {
++        guard !badges.isEmpty else {
++            current?.removeFromSuperview()
++            return nil
++        }
++        let stripView: EcoBadgeStripView
++        if let current {
++            stripView = current
++        } else {
++            stripView = EcoBadgeStripView()
++            self.mainContentContainerNode.view.addSubview(stripView)
++        }
++        let size = stripView.update(badges: badges, side: 18.0, spacing: 4.0, tintColor: tintColor)
++        transition.updateFrame(view: stripView, frame: CGRect(origin: origin, size: size))
++        return stripView
++    }
++
+     func asyncLayout() -> (_ item: ChatListItem, _ params: ListViewItemLayoutParams, _ first: Bool, _ last: Bool, _ firstWithHeader: Bool, _ nextIsPinned: Bool, _ nextHasActiveRevealControls: Bool) -> (ListViewItemNodeLayout, (Bool, Bool) -> Void) {
+         let dateLayout = TextNode.asyncLayout(self.dateNode)
+         let textLayout = TextNodeWithEntities.asyncLayout(self.textNode)
+@@ -2680,6 +2700,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
              var currentHiddenIconImage: UIImage?
              var currentMutedIconImage: UIImage?
              var currentCredibilityIconContent: EmojiStatusComponent.Content?
-+            var currentAyuBadge: AyuBadgeKind?
++            var currentEcoBadges: EcoTitleBadges = .empty
              var currentVerifiedIconContent: EmojiStatusComponent.Content?
              var currentStatusIconContent: EmojiStatusComponent.Content?
              var currentStatusIconParticleColor: UIColor?
-@@ -3845,12 +3848,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -3845,12 +3866,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                      if let verificationIconFileId = peer.verificationIconFileId {
                          currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
                      }
-+                    currentAyuBadge = AyuBadges.shared.badge(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
++                    currentEcoBadges = EcoTitleBadges.resolve(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
                  }
              }
              if case let .peer(peerData) = item.content, peerData.isSideListAllThreadsItem {
                  // "All Messages" is not the peer's own title: no status or verification marks.
                  currentCredibilityIconContent = nil
                  currentVerifiedIconContent = nil
-+                currentAyuBadge = nil
++                currentEcoBadges = .empty
                  currentStatusIconContent = nil
              }
              if let currentSecretIconImage = currentSecretIconImage {
-@@ -3910,6 +3915,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -3910,6 +3933,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                  }
              }
              
-+            if currentAyuBadge != nil {
++            if !currentEcoBadges.isEmpty {
 +                titleIconsWidth += titleIconsWidth.isZero ? 4.0 : 2.0
-+                titleIconsWidth += 18.0
++                titleIconsWidth += currentEcoBadges.totalWidth(side: 18.0, spacing: 4.0)
 +            }
 +            
              let layoutOffset: CGFloat = 0.0
              
              let rawContentWidth = params.width - leftInset - params.rightInset - 18.0 - editingOffset - (item.interaction.isSideListMode ? ChatListItem.sideListContentInset - 12.0 : 0.0)
-@@ -5578,6 +5588,25 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -5501,7 +5529,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+                     } else {
+                         lastLineRect = CGRect(origin: CGPoint(), size: titleLayout.size)
+                     }
+-                                        
++
++                    let ecoBadgeOriginY = floorToScreenPixels(titleFrame.maxY - lastLineRect.height * 0.5 - 18.0 / 2.0) - UIScreenPixel
++                    strongSelf.ecoLeadingBadgesView = strongSelf.ecoUpdateBadgeStrip(strongSelf.ecoLeadingBadgesView, badges: currentEcoBadges.leading, tintColor: item.presentationData.theme.list.itemAccentColor, origin: CGPoint(x: nextTitleIconOrigin, y: ecoBadgeOriginY), transition: transition)
++                    if let ecoLeadingBadgesView = strongSelf.ecoLeadingBadgesView {
++                        nextTitleIconOrigin += ecoLeadingBadgesView.bounds.width + 4.0
++                    }
++
+                     if let currentStatusIconContent {
+                         let statusIconView: ComponentHostView<Empty>
+                         if let current = strongSelf.statusIconView {
+@@ -5578,6 +5612,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                          credibilityIconView.removeFromSuperview()
                      }
                      
-+                    if let currentAyuBadge, let ayuBadgeImage = AyuBadgeImages.image(currentAyuBadge) {
-+                        let ayuBadgeIconView: UIImageView
-+                        if let current = strongSelf.ayuBadgeIconView {
-+                            ayuBadgeIconView = current
-+                        } else {
-+                            ayuBadgeIconView = UIImageView()
-+                            strongSelf.ayuBadgeIconView = ayuBadgeIconView
-+                            strongSelf.mainContentContainerNode.view.addSubview(ayuBadgeIconView)
-+                        }
-+                        ayuBadgeIconView.image = ayuBadgeImage.withRenderingMode(.alwaysTemplate)
-+                        ayuBadgeIconView.tintColor = item.presentationData.theme.list.itemAccentColor
-+                        let ayuBadgeSize = CGSize(width: 18.0, height: 18.0)
-+                        transition.updateFrame(view: ayuBadgeIconView, frame: CGRect(origin: CGPoint(x: nextTitleIconOrigin, y: floorToScreenPixels(titleFrame.maxY - lastLineRect.height * 0.5 - ayuBadgeSize.height / 2.0) - UIScreenPixel), size: ayuBadgeSize))
-+                        nextTitleIconOrigin += ayuBadgeSize.width + 4.0
-+                    } else if let ayuBadgeIconView = strongSelf.ayuBadgeIconView {
-+                        strongSelf.ayuBadgeIconView = nil
-+                        ayuBadgeIconView.removeFromSuperview()
++                    strongSelf.ecoTrailingBadgesView = strongSelf.ecoUpdateBadgeStrip(strongSelf.ecoTrailingBadgesView, badges: currentEcoBadges.trailing, tintColor: item.presentationData.theme.list.itemAccentColor, origin: CGPoint(x: nextTitleIconOrigin, y: ecoBadgeOriginY), transition: transition)
++                    if let ecoTrailingBadgesView = strongSelf.ecoTrailingBadgesView {
++                        nextTitleIconOrigin += ecoTrailingBadgesView.bounds.width + 4.0
 +                    }
 +                    
                      if let currentVerifiedIconContent {
@@ -161,10 +187,10 @@ index 72b8ebf6619a36282fd148370806e06b789f804c..0328a97e7dfc2834d7919fd7e3f1c219
                  content = NativeVideoContent(id: .message(message.stableId, file.fileId), userLocation: .peer(message.id.peerId), fileReference: .message(message: MessageReference(message), media: file), imageReference: mediaImage.flatMap({ ImageMediaReference.message(message: MessageReference(message), media: $0) }), loopVideo: true, enableSound: false, tempFilePath: tempFilePath, captureProtected: captureProtected, storeAfterDownload: generateStoreAfterDownload?(message, file))
              } else {
 diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
-index 767fd2867d058071b438b11b0d64b9bb4e096ed2..f2758c7ddc717732ee6e8d077847378be78ac50f 100644
+index 767fd2867d058071b438b11b0d64b9bb4e096ed2..7255711f555d8570add7bb5544475a984bacd95e 100644
 --- a/submodules/TelegramUI/BUILD
 +++ b/submodules/TelegramUI/BUILD
-@@ -25,6 +25,10 @@ sgdeps = [
+@@ -25,6 +25,11 @@ sgdeps = [
      "//Swiftgram/SGProUI:SGProUI",
      "//Swiftgram/SGKeychainBackupManager:SGKeychainBackupManager",
      "//Swiftgram/SGGHSettings:SGGHSettings",
@@ -172,11 +198,12 @@ index 767fd2867d058071b438b11b0d64b9bb4e096ed2..f2758c7ddc717732ee6e8d077847378b
 +    "//EcoGram/ContextMenu:EcoContextMenu",
 +    "//EcoGram/Ayu/SettingsUI:AyuSettingsUI",
 +    "//EcoGram/Strings:EcoStrings",
++    "//EcoGram/Settings:EcoSettingsUI",
      # "//Swiftgram/SGContentAnalysis:SGContentAnalysis"
  ]
  
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
-index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..fd25bb20e189e2c60187ed348112838ae9988156 100644
+index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..10df042ae53957bcf0df5413b7829e1bb6b8996c 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
 @@ -3,7 +3,8 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
@@ -185,78 +212,125 @@ index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..fd25bb20e189e2c60187ed348112838a
      "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
 -    "//submodules/TranslateUI:TranslateUI"
 +    "//submodules/TranslateUI:TranslateUI",
-+    "//EcoGram/Ayu/Badges:AyuBadges",
++    "//EcoGram/Badges:EcoBadges",
  ]
  
  sgsrc = [
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
-index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..65bdc26431723d586cb0f0e6534a940f53f89f37 100644
+index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..ed45b1f45673f925937b0334f9057b5edcec4408 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 @@ -2,6 +2,7 @@ import SGStrings // MARK: Swiftgram
  import SGSimpleSettings // MARK: Swiftgram
  import TranslateUI // MARK: Swiftgram
  import Foundation
-+import AyuBadges
++import EcoBadges
  import UIKit
  import AsyncDisplayKit
  import Display
-@@ -861,6 +862,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -624,6 +625,13 @@ private func mapVisibility(_ visibility: ListViewItemNodeVisibility, boundsSize:
+     }
+ }
+ 
++private func ecoAuthorBadges(_ message: Message) -> EcoTitleBadges {
++    guard let author = message.author, author.id.namespace == Namespaces.Peer.CloudUser else {
++        return .empty
++    }
++    return EcoTitleBadges.resolve(id: author.id.id._internalGetInt64Value(), isChannel: false)
++}
++
+ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewItemNode {
+     public class ContentContainer {
+         public let contentMessageStableId: UInt32
+@@ -861,6 +869,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
      private var ephemeralBadgeIconNode: UIImageView?
  
      private var credibilityIconView: ComponentHostView<Empty>?
-+    private var ayuBadgeView: UIImageView?
++    private var ecoLeadingBadgesView: EcoBadgeStripView?
++    private var ecoTrailingBadgesView: EcoBadgeStripView?
      private var credibilityIconComponent: EmojiStatusComponent?
      private var credibilityIconContent: EmojiStatusComponent.Content?
      private var credibilityButtonNode: HighlightTrackingButtonNode?
-@@ -3227,6 +3229,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -1709,6 +1719,22 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         }
+     }
+     
++    private func ecoUpdateBadgeStrip(_ current: EcoBadgeStripView?, badges: [EcoTitleBadge], tintColor: UIColor) -> EcoBadgeStripView? {
++        guard !badges.isEmpty else {
++            current?.removeFromSuperview()
++            return nil
++        }
++        let stripView: EcoBadgeStripView
++        if let current {
++            stripView = current
++        } else {
++            stripView = EcoBadgeStripView()
++            self.clippingNode.view.addSubview(stripView)
++        }
++        stripView.update(badges: badges, side: 18.0, spacing: 3.0, tintColor: tintColor)
++        return stripView
++    }
++    
+     override public func asyncLayout() -> (_ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: ChatMessageHeaderSpec) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
+         var currentContentClassesPropertiesAndLayouts: [(Message, AnyClass, Bool, Int?, (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize, _ avatarInset: CGFloat) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))))] = []
+         for contentNode in self.contentNodes {
+@@ -3227,6 +3253,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                          credibilityIconWidth += 20.0
                      }
                  }
-+                if item.message.author.flatMap({ author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }) != nil {
-+                    credibilityIconWidth += 21.0
++                let ecoBadges = ecoAuthorBadges(item.message)
++                if !ecoBadges.isEmpty {
++                    credibilityIconWidth += ecoBadges.totalWidth(side: 18.0, spacing: 3.0) + 3.0
 +                }
                  
                  let rankBadgeSizeAndApply = rankBadgeLayout(TextNodeLayoutArguments(attributedString: rankBadgeString, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: max(0, maximumNodeWidth - layoutConstants.text.bubbleInsets.left - layoutConstants.text.bubbleInsets.right), height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
                  if rankBadgeSizeAndApply.0.size.width > 0.0 {
-@@ -4666,6 +4671,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -4666,6 +4696,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
          var bubblelessLiftHeaderParts: [ChatMessageBubblelessLiftPart] = []
          var bubblelessLiftParts: [ChatMessageBubblelessLiftPart] = []
          var bubblelessLiftPartsByStableId: [UInt32: [ChatMessageBubblelessLiftPart]] = [:]
-+        strongSelf.ayuBadgeView?.isHidden = true
++        strongSelf.ecoLeadingBadgesView?.isHidden = true
++        strongSelf.ecoTrailingBadgesView?.isHidden = true
++        let ecoBadges = ecoAuthorBadges(item.message)
++        let ecoLeadingWidth = EcoTitleBadges.width(count: ecoBadges.leading.count, side: 18.0, spacing: 3.0)
++        let ecoLeadingShift: CGFloat = ecoLeadingWidth > 0.0 ? ecoLeadingWidth + 3.0 : 0.0
          if let nameNode = nameNodeSizeApply.1() {
              strongSelf.nameNode = nameNode
              nameNode.displaysAsynchronously = !item.presentationData.isPreview && !item.presentationData.theme.theme.forceSync
-@@ -4676,6 +4682,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -4676,6 +4711,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
              var nameNodeFrame = CGRect(origin: CGPoint(x: contentOrigin.x + (bubblelessCardTopInset != nil ? 0.0 : layoutConstants.text.bubbleInsets.left), y: layoutConstants.bubble.contentInsets.top + nameNodeOriginY), size: nameNodeSizeApply.0)
              
              var nameNavigateButtonOffset: CGFloat = currentCredibilityIcon == nil ? 4.0 : 28.0
-+            if item.message.author.flatMap({ author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }) != nil {
-+                nameNavigateButtonOffset += 21.0
++            if !ecoBadges.isEmpty {
++                nameNavigateButtonOffset += ecoBadges.totalWidth(side: 18.0, spacing: 3.0) + 3.0
 +            }
              nameNavigateButtonOffset += 34.0
              
              if hasTitleAvatar {
-@@ -5021,6 +5030,23 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -4970,9 +5008,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                     containerSize: CGSize(width: 20.0, height: 20.0)
+                 )
+                 
+-                let credibilityIconFrame = CGRect(origin: CGPoint(x: nameNode.frame.maxX + 3.0, y: nameNode.frame.minY + floor((nameNode.bounds.height - credibilityIconSize.height) / 2.0)), size: credibilityIconSize)
++                let credibilityIconFrame = CGRect(origin: CGPoint(x: nameNode.frame.maxX + 3.0 + ecoLeadingShift, y: nameNode.frame.minY + floor((nameNode.bounds.height - credibilityIconSize.height) / 2.0)), size: credibilityIconSize)
+                 if !animateCredibilityIconFrame {
+-                    credibilityIconView.frame = CGRect(origin: CGPoint(x: previousNameNodeFrame.maxX + 3.0, y: previousNameNodeFrame.minY + floor((previousNameNodeFrame.height - credibilityIconSize.height) / 2.0)), size: credibilityIconSize)
++                    credibilityIconView.frame = CGRect(origin: CGPoint(x: previousNameNodeFrame.maxX + 3.0 + ecoLeadingShift, y: previousNameNodeFrame.minY + floor((previousNameNodeFrame.height - credibilityIconSize.height) / 2.0)), size: credibilityIconSize)
+                 }
+                 animation.animator.updateFrame(layer: credibilityIconView.layer, frame: credibilityIconFrame, completion: nil)
+                 
+@@ -5021,6 +5059,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                  strongSelf.credibilityHighlightNode?.removeFromSupernode()
                  strongSelf.credibilityHighlightNode = nil
              }
-+            if let ayuBadge = item.message.author.flatMap({ author in author.id.namespace == Namespaces.Peer.CloudUser ? AyuBadges.shared.badge(id: author.id.id._internalGetInt64Value(), isChannel: false) : nil }), let ayuBadgeImage = AyuBadgeImages.image(ayuBadge) {
-+                let ayuBadgeView: UIImageView
-+                if let current = strongSelf.ayuBadgeView {
-+                    ayuBadgeView = current
-+                } else {
-+                    ayuBadgeView = UIImageView()
-+                    ayuBadgeView.isUserInteractionEnabled = false
-+                    strongSelf.ayuBadgeView = ayuBadgeView
-+                    strongSelf.clippingNode.view.addSubview(ayuBadgeView)
-+                }
-+                ayuBadgeView.isHidden = false
-+                ayuBadgeView.image = ayuBadgeImage.withRenderingMode(.alwaysTemplate)
-+                ayuBadgeView.tintColor = nameColor
-+                let ayuBadgeSize = CGSize(width: 18.0, height: 18.0)
-+                let ayuBadgeOriginX = (strongSelf.credibilityIconView?.frame.maxX ?? nameNode.frame.maxX) + 3.0
-+                animation.animator.updateFrame(layer: ayuBadgeView.layer, frame: CGRect(origin: CGPoint(x: ayuBadgeOriginX, y: nameNode.frame.minY + floor((nameNode.bounds.height - ayuBadgeSize.height) / 2.0)), size: ayuBadgeSize), completion: nil)
++            strongSelf.ecoLeadingBadgesView = strongSelf.ecoUpdateBadgeStrip(strongSelf.ecoLeadingBadgesView, badges: ecoBadges.leading, tintColor: nameColor)
++            if let ecoLeadingBadgesView = strongSelf.ecoLeadingBadgesView {
++                animation.animator.updateFrame(layer: ecoLeadingBadgesView.layer, frame: CGRect(origin: CGPoint(x: nameNode.frame.maxX + 3.0, y: nameNode.frame.minY + floor((nameNode.bounds.height - 18.0) / 2.0)), size: CGSize(width: ecoLeadingWidth, height: 18.0)), completion: nil)
++            }
++            strongSelf.ecoTrailingBadgesView = strongSelf.ecoUpdateBadgeStrip(strongSelf.ecoTrailingBadgesView, badges: ecoBadges.trailing, tintColor: nameColor)
++            if let ecoTrailingBadgesView = strongSelf.ecoTrailingBadgesView {
++                let ecoTrailingOriginX = (strongSelf.credibilityIconView?.frame.maxX ?? nameNode.frame.maxX + ecoLeadingShift) + 3.0
++                animation.animator.updateFrame(layer: ecoTrailingBadgesView.layer, frame: CGRect(origin: CGPoint(x: ecoTrailingOriginX, y: nameNode.frame.minY + floor((nameNode.bounds.height - 18.0) / 2.0)), size: CGSize(width: EcoTitleBadges.width(count: ecoBadges.trailing.count, side: 18.0, spacing: 3.0), height: 18.0)), completion: nil)
 +            }
              
              var boostCount: Int = 0
@@ -539,7 +613,7 @@ index a5412dc0d1d590c6c196d74c057382a76028f5ea..703b05f577a18f2dfc986519f40b26e6
              } else {
                  buttonFrame = CGRect(origin: CGPoint(x: offset, y: 0.0), size: buttonSize)
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
-index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..713b8c53ffcc041e723ece2e20e7bd1091bab77c 100644
+index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..997c03284b3f47174ec74a8872e982f0774608b1 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
 @@ -9,6 +9,11 @@ sgdeps = [
@@ -548,120 +622,132 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..713b8c53ffcc041e723ece2e20e7bd10
      "//Swiftgram/SGDebugUI:SGDebugUI",
 +    "//EcoGram/Settings:EcoSettingsUI",
 +    "//EcoGram/Ayu/SettingsUI:AyuSettingsUI",
-+    "//EcoGram/Ayu/Badges:AyuBadges",
++    "//EcoGram/Badges:EcoBadges",
 +    "//EcoGram/Preferences:EcoPreferences",
 +    "//EcoGram/Strings:EcoStrings",
  ]
  #
  # MARK: Swiftgram
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
-index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..46f83ce30d0352984c2fb80e9e7644ab651176c9 100644
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..3f348fdfcc828be9b92152ee1c21bfde3c92143a 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 @@ -1,5 +1,7 @@
  import SGSimpleSettings // MARK: Swiftgram
  import Foundation
 +import EcoPreferences
-+import AyuBadges
++import EcoBadges
  import UIKit
  import AsyncDisplayKit
  import Display
-@@ -149,6 +151,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -149,6 +151,14 @@ final class PeerInfoHeaderNode: ASDisplayNode {
      let titleExpandedStatusIconView: ComponentHostView<Empty>
      var titleExpandedStatusIconSize: CGSize?
      
-+    let titleAyuBadgeView: UIImageView
-+    let titleExpandedAyuBadgeView: UIImageView
-+    private var ayuBadge: AyuBadgeKind?
-+    private var ayuBadgeTapInstalled = false
-+    var displayAyuBadgeInfo: ((AyuBadgeKind) -> Void)?
++    let titleLeadingBadgesView = EcoBadgeStripView()
++    let titleTrailingBadgesView = EcoBadgeStripView()
++    let titleExpandedLeadingBadgesView = EcoBadgeStripView()
++    let titleExpandedTrailingBadgesView = EcoBadgeStripView()
++    private var ecoBadges: EcoTitleBadges = .empty
++    private var ecoBadgeTapInstalled = false
++    var displayEcoBadgeInfo: ((EcoTitleBadge) -> Void)?
 +    
      var subtitleRating: ComponentView<Empty>?
      
      let subtitleNodeContainer: ASDisplayNode
-@@ -328,6 +336,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -328,6 +338,11 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          self.titleStatusIconView = ComponentHostView<Empty>()
          self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleStatusIconView)
          
-+        self.titleAyuBadgeView = UIImageView()
-+        self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleAyuBadgeView)
-+        
-+        self.titleExpandedAyuBadgeView = UIImageView()
-+        self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedAyuBadgeView)
++        self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleLeadingBadgesView)
++        self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleTrailingBadgesView)
++        self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedLeadingBadgesView)
++        self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedTrailingBadgesView)
 +        
          self.titleExpandedStatusIconView = ComponentHostView<Empty>()
          self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedStatusIconView)
          
-@@ -506,6 +520,23 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -506,6 +521,38 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          self.navigateToForum?()
      }
      
-+    private func installAyuBadgeTapIfNeeded() {
-+        guard !self.ayuBadgeTapInstalled else {
++    private func installEcoBadgeTapIfNeeded() {
++        guard !self.ecoBadgeTapInstalled else {
 +            return
 +        }
-+        self.ayuBadgeTapInstalled = true
-+        for badgeView in [self.titleAyuBadgeView, self.titleExpandedAyuBadgeView] {
-+            badgeView.isUserInteractionEnabled = true
-+            badgeView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.ayuBadgeTapped)))
++        self.ecoBadgeTapInstalled = true
++        for stripView in [self.titleLeadingBadgesView, self.titleTrailingBadgesView, self.titleExpandedLeadingBadgesView, self.titleExpandedTrailingBadgesView] {
++            stripView.isUserInteractionEnabled = true
++            stripView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.ecoBadgeTapped(_:))))
 +        }
 +    }
-+    
-+    @objc private func ayuBadgeTapped() {
-+        if let ayuBadge = self.ayuBadge {
-+            self.displayAyuBadgeInfo?(ayuBadge)
++
++    @objc private func ecoBadgeTapped(_ recognizer: UITapGestureRecognizer) {
++        guard let stripView = recognizer.view as? EcoBadgeStripView, let badge = stripView.badge(at: recognizer.location(in: stripView), slop: 6.0) else {
++            return
 +        }
++        self.displayEcoBadgeInfo?(badge)
++    }
++
++    private func ecoLayoutBadgeStrips(regular: EcoBadgeStripView, expanded: EcoBadgeStripView, count: Int, titleSize: CGSize, titleExpandedSize: CGSize, nextIconX: inout CGFloat, nextExpandedIconX: inout CGFloat, titleHorizontalOffset: inout CGFloat, transition: ContainedViewLayoutTransition) {
++        guard count > 0 else {
++            return
++        }
++        let size = CGSize(width: EcoTitleBadges.width(count: count, side: 22.0, spacing: 4.0), height: 22.0)
++        let expandedSize = CGSize(width: EcoTitleBadges.width(count: count, side: 20.0, spacing: 4.0), height: 20.0)
++        titleHorizontalOffset -= (size.width + 4.0) / 2.0
++        transition.updateFrame(view: regular, frame: CGRect(origin: CGPoint(x: nextIconX + 4.0, y: floor((titleSize.height - size.height) / 2.0)), size: size))
++        transition.updateFrame(view: expanded, frame: CGRect(origin: CGPoint(x: nextExpandedIconX + 4.0, y: floor((titleExpandedSize.height - expandedSize.height) / 2.0) + 1.0), size: expandedSize))
++        nextIconX += 4.0 + size.width
++        nextExpandedIconX += 4.0 + expandedSize.width
++        self.installEcoBadgeTapIfNeeded()
 +    }
 +    
      func invokeDisplayPremiumIntro() {
          self.displayPremiumIntro?(self.isAvatarExpanded ? self.titleExpandedCredibilityIconView : self.titleCredibilityIconView, nil, .never(), self.isAvatarExpanded)
      }
-@@ -710,6 +741,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -710,6 +757,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          var credibilityIcon: CredibilityIcon = .none
          var verifiedIcon: CredibilityIcon = .none
          var statusIcon: CredibilityIcon = .none
-+        self.ayuBadge = peer.flatMap { peer in
-+            return AyuBadges.shared.badge(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
-+        }
++        self.ecoBadges = peer.flatMap { peer in
++            return EcoTitleBadges.resolve(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
++        } ?? .empty
          if let peer {
              if peer.id == self.context.account.peerId && !self.isSettings && !self.isMyProfile {
                  credibilityIcon = .none
-@@ -1001,6 +1035,11 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -1001,6 +1051,10 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          
          do {
              self.currentCredibilityIcon = credibilityIcon
-+            let ayuBadgeImage = self.ayuBadge.flatMap { AyuBadgeImages.image($0)?.withRenderingMode(.alwaysTemplate) }
-+            self.titleAyuBadgeView.image = ayuBadgeImage
-+            self.titleAyuBadgeView.tintColor = navigationContentsAccentColor
-+            self.titleExpandedAyuBadgeView.image = ayuBadgeImage
-+            self.titleExpandedAyuBadgeView.tintColor = navigationContentsAccentColor
++            self.titleLeadingBadgesView.update(badges: self.ecoBadges.leading, side: 22.0, spacing: 4.0, tintColor: navigationContentsAccentColor)
++            self.titleTrailingBadgesView.update(badges: self.ecoBadges.trailing, side: 22.0, spacing: 4.0, tintColor: navigationContentsAccentColor)
++            self.titleExpandedLeadingBadgesView.update(badges: self.ecoBadges.leading, side: 20.0, spacing: 4.0, tintColor: navigationContentsAccentColor)
++            self.titleExpandedTrailingBadgesView.update(badges: self.ecoBadges.trailing, side: 20.0, spacing: 4.0, tintColor: navigationContentsAccentColor)
              
              var emojiStatusSize: CGSize?
              var currentEmojiStatus: PeerEmojiStatus?
-@@ -1742,6 +1781,22 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -1713,7 +1767,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+         var titleExpandedHorizontalOffset: CGFloat = 0.0
+         var nextIconX: CGFloat = titleSize.width
+         var nextExpandedIconX: CGFloat = titleExpandedSize.width
+-        
++
++        self.ecoLayoutBadgeStrips(regular: self.titleLeadingBadgesView, expanded: self.titleExpandedLeadingBadgesView, count: self.ecoBadges.leading.count, titleSize: titleSize, titleExpandedSize: titleExpandedSize, nextIconX: &nextIconX, nextExpandedIconX: &nextExpandedIconX, titleHorizontalOffset: &titleHorizontalOffset, transition: transition)
++
+         if let statusIconSize = self.statusIconSize, let titleExpandedStatusIconSize = self.titleExpandedStatusIconSize, statusIconSize.width > 0.0 {
+             let offset = (statusIconSize.width + 4.0) / 2.0
+            
+@@ -1742,6 +1798,8 @@ final class PeerInfoHeaderNode: ASDisplayNode {
              nextExpandedIconX += 4.0 + titleExpandedCredibilityIconSize.width
          }
                  
-+        if self.titleAyuBadgeView.image != nil {
-+            let badgeSize = CGSize(width: 22.0, height: 22.0)
-+            let expandedBadgeSize = CGSize(width: 20.0, height: 20.0)
-+            titleHorizontalOffset -= (badgeSize.width + 4.0) / 2.0
-+            self.titleAyuBadgeView.isHidden = false
-+            self.installAyuBadgeTapIfNeeded()
-+            self.titleExpandedAyuBadgeView.isHidden = false
-+            transition.updateFrame(view: self.titleAyuBadgeView, frame: CGRect(origin: CGPoint(x: nextIconX + 4.0, y: floor((titleSize.height - badgeSize.height) / 2.0)), size: badgeSize))
-+            transition.updateFrame(view: self.titleExpandedAyuBadgeView, frame: CGRect(origin: CGPoint(x: nextExpandedIconX + 4.0, y: floor((titleExpandedSize.height - expandedBadgeSize.height) / 2.0) + 1.0), size: expandedBadgeSize))
-+            nextIconX += 4.0 + badgeSize.width
-+            nextExpandedIconX += 4.0 + expandedBadgeSize.width
-+        } else {
-+            self.titleAyuBadgeView.isHidden = true
-+            self.titleExpandedAyuBadgeView.isHidden = true
-+        }
++        self.ecoLayoutBadgeStrips(regular: self.titleTrailingBadgesView, expanded: self.titleExpandedTrailingBadgesView, count: self.ecoBadges.trailing.count, titleSize: titleSize, titleExpandedSize: titleExpandedSize, nextIconX: &nextIconX, nextExpandedIconX: &nextExpandedIconX, titleHorizontalOffset: &titleHorizontalOffset, transition: transition)
 +        
          if let verifiedIconSize = self.verifiedIconSize, let titleExpandedVerifiedIconSize = self.titleExpandedVerifiedIconSize, verifiedIconSize.width > 0.0 {
              let leftOffset: CGFloat
              let leftExpandedOffset: CGFloat
-@@ -2018,10 +2073,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -2018,10 +2076,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          }
          transition.updateFrame(node: self.avatarListNode.listContainerNode, frame: avatarListContainerFrame)
          
@@ -676,7 +762,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..46f83ce30d0352984c2fb80e9e7644ab
          let clippingNodeRadiusTransition = ContainedViewLayoutTransition.animated(duration: 0.15, curve: .easeInOut)
          clippingNodeRadiusTransition.updateCornerRadius(node: self.avatarClippingNode, cornerRadius: avatarClipOffset > 0.0 ? width / 2.5 : 0.0)
          
-@@ -2050,7 +2107,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -2050,7 +2110,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
              transition.updateSublayerTransformScale(node: self.avatarListNode.listContainerTransformNode, scale: avatarListContainerScale)
          }
          
@@ -685,7 +771,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..46f83ce30d0352984c2fb80e9e7644ab
              let maskValue = max(0.0, min(1.0, contentOffset / 120.0))
              self.avatarListNode.containerNode.view.mask = self.avatarListNode.maskNode.view
              if maskValue > 0.03 {
-@@ -2073,7 +2130,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -2073,7 +2133,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                  avatarMaskOffset -= contentOffset
              }
              
@@ -694,21 +780,23 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..46f83ce30d0352984c2fb80e9e7644ab
              self.avatarListNode.maskNode.bounds = CGRect(origin: .zero, size: CGSize(width: 171.0, height: 171.0))
              
              self.avatarListNode.bottomCoverNode.position = self.avatarListNode.maskNode.position
-@@ -2925,6 +2982,13 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -2925,6 +2985,15 @@ final class PeerInfoHeaderNode: ASDisplayNode {
              return self.avatarListNode.listContainerNode.setByYouNode.view
          }
          
-+        if self.ayuBadge != nil, !(self.state?.isEditing ?? false) {
-+            let badgeView = self.isAvatarExpanded ? self.titleExpandedAyuBadgeView : self.titleAyuBadgeView
-+            if !badgeView.isHidden, badgeView.convert(badgeView.bounds.insetBy(dx: -6.0, dy: -6.0), to: self.view).contains(point) {
-+                return badgeView
++        if !(self.state?.isEditing ?? false) {
++            let stripViews = self.isAvatarExpanded ? [self.titleExpandedLeadingBadgesView, self.titleExpandedTrailingBadgesView] : [self.titleLeadingBadgesView, self.titleTrailingBadgesView]
++            for stripView in stripViews where !stripView.isHidden {
++                if stripView.convert(stripView.bounds.insetBy(dx: -6.0, dy: -6.0), to: self.view).contains(point) {
++                    return stripView
++                }
 +            }
 +        }
 +        
          if !(self.state?.isEditing ?? false) {
              switch self.currentCredibilityIcon {
              case .premium:
-@@ -3009,8 +3073,35 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -3009,8 +3078,35 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          }
      }
      
@@ -746,7 +834,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..46f83ce30d0352984c2fb80e9e7644ab
          }
          let maskScale: CGFloat = isAvatarExpanded ? width / 100.0 : 1.0
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
-index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..0844edcf992823df0c55a3b75903146bf6c3e324 100644
+index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..bea03f5b00f5b8e15fdc512661521d926e009d68 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
 @@ -6,6 +6,9 @@ import SGStrings
@@ -754,7 +842,7 @@ index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..0844edcf992823df0c55a3b75903146b
  //
  import Foundation
 +import EcoStrings
-+import AyuBadges
++import EcoBadges
 +import EcoPreferences
  import UIKit
  import Display
@@ -772,12 +860,12 @@ index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..0844edcf992823df0c55a3b75903146b
                  }
              }
              
-+            self.headerNode.displayAyuBadgeInfo = { [weak self] kind in
-+                guard let self, let peer = self.data?.peer, let image = AyuBadgeImages.image(kind, side: 32.0)?.withTintColor(.white, renderingMode: .alwaysOriginal) else {
++            self.headerNode.displayEcoBadgeInfo = { [weak self] badge in
++                guard let self, let peer = self.data?.peer, let image = badge.image(side: 32.0)?.withTintColor(.white, renderingMode: .alwaysOriginal) else {
 +                    return
 +                }
 +                let ecoStrings = EcoStrings(languageCode: self.presentationData.strings.baseLanguageCode)
-+                let text = ecoStrings.format(kind == .official ? .badgeOfficialInfo : .badgeSupporterInfo, peer.compactDisplayTitle)
++                let text = ecoStrings.format(badge.infoKey, peer.compactDisplayTitle)
 +                self.controller?.present(UndoOverlayController(presentationData: self.presentationData, content: .image(image: image, title: nil, text: text, round: false, undoText: nil), elevatedLayout: false, action: { _ in
 +                    return false
 +                }), in: .current)
@@ -975,3 +1063,28 @@ index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..8594f6e6ce3daa55cbc5b26d4dbeedbc
                      account.shouldBeServiceTaskMaster.set(.single(.always))
                  } else {
                      account.shouldBeServiceTaskMaster.set(.single(.never))
+diff --git a/submodules/TelegramUI/Sources/TelegramRootController.swift b/submodules/TelegramUI/Sources/TelegramRootController.swift
+index d38102d4c13d755997d9c131756ef1f89dd8ecd4..edb0c1fa322a5971ff1dc2b557bcaf303abbcd40 100644
+--- a/submodules/TelegramUI/Sources/TelegramRootController.swift
++++ b/submodules/TelegramUI/Sources/TelegramRootController.swift
+@@ -2,6 +2,7 @@
+ import SGSimpleSettings
+ //
+ import Foundation
++import EcoSettingsUI
+ import UIKit
+ import Display
+ import AsyncDisplayKit
+@@ -270,6 +271,12 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
+         self.accountSettingsController = accountSettingsController
+         self.rootTabController = tabBarController
+         self.pushViewController(tabBarController, animated: false)
++        
++        ecoClaimEarlyBadge(context: self.context, present: { [weak self] controller in
++            self?.present(controller, in: .window(.root))
++        }, push: { [weak self] controller in
++            self?.pushViewController(controller)
++        })
+     }
+         
+     public func updateRootControllers(showCallsTab: Bool, showContactsTab: Bool, /* MARK: Swiftgram */ showNewsTab: Bool) {

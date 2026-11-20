@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases">Download</a> · <a href="#install">Install</a> · <a href="#build">Build</a>
+  <a href="../../releases">Download</a> · <a href="https://t.me/ecoGramiOS">Channel</a> · <a href="#install">Install</a> · <a href="#build">Build</a>
 </p>
 
 ---
@@ -38,10 +38,12 @@
 - Avatar in the Settings tab
 - Dynamic Island profile effect on any iPhone
 - Hidden profile shortcuts
+- ecoGram badges: developer, official channel and the first 30 users
+- Badge order and visibility for Telegram, AyuGram and ecoGram badges
 
 ## Privacy
 
-No own servers, no analytics. History stays on the device.
+No analytics. History stays on the device. The only ecoGram server is `api.ecogram.cc`: it serves the public badge list, and the app sends it your Telegram ID once to hand out the early user badge. Turning off ecoGram badges stops both.
 
 ## Install
 

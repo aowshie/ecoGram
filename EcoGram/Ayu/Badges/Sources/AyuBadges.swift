@@ -32,7 +32,6 @@ public final class AyuBadges {
     private var snapshot: Snapshot
     private var isRefreshing = false
     private var lastAttempt: TimeInterval = 0.0
-    private var aliases: [Int64: Int64] = [:]
     private let cacheUrl: URL
     private let session: URLSession
 
@@ -58,7 +57,6 @@ public final class AyuBadges {
         self.refreshIfNeeded()
         self.lock.lock()
         let snapshot = self.snapshot
-        let id = self.aliases[id] ?? id
         self.lock.unlock()
         if isChannel {
             if snapshot.officialChannels.contains(id) {
@@ -76,12 +74,6 @@ public final class AyuBadges {
             }
         }
         return nil
-    }
-
-    public func registerAlias(_ alias: Int64, for id: Int64) {
-        self.lock.lock()
-        self.aliases[alias] = id
-        self.lock.unlock()
     }
 
     public func refreshIfNeeded() {

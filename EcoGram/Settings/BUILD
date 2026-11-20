@@ -9,6 +9,9 @@ swift_library(
     deps = [
         "//EcoGram/Preferences:EcoPreferences",
         "//EcoGram/Strings:EcoStrings",
+        "//EcoGram/Badges:EcoBadges",
+        "//EcoGram/Ayu/Badges:AyuBadges",
+        "//EcoGram/Ayu/Settings:AyuSettings",
         "//Swiftgram/SGItemListUI:SGItemListUI",
         "//Swiftgram/SGStrings:SGStrings",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
@@ -22,6 +25,9 @@ swift_library(
         "//submodules/AccountContext:AccountContext",
         "//submodules/SettingsUI:SettingsUI",
         "//submodules/UndoUI:UndoUI",
+        "//submodules/ComponentFlow:ComponentFlow",
+        "//submodules/TelegramUI/Components/AlertComponent:AlertComponent",
+        "//submodules/TelegramUI/Components/AlertComponent/AlertHeaderComponent:AlertHeaderComponent",
     ],
     visibility = [
         "//visibility:public",

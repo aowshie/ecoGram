@@ -7,7 +7,7 @@ import TelegramCore
 import TelegramPresentationData
 import AccountContext
 import WallpaperBackgroundNode
-import AyuBadges
+import EcoBadges
 
 struct AyuShotOptions: Hashable {
     var showBackground: Bool
@@ -55,7 +55,7 @@ final class AyuShotRenderer {
                 if let author = message._asMessage().author as? TelegramUser, author.id == accountPeerId {
                     let rawId = accountPeerId.id._internalGetInt64Value()
                     let aliasRawId = rawId + AyuShotRenderer.ownAliasOffset
-                    AyuBadges.shared.registerAlias(aliasRawId, for: rawId)
+                    EcoTitleBadges.registerAlias(aliasRawId, for: rawId)
                     let aliasId = EnginePeer.Id(namespace: accountPeerId.namespace, id: EnginePeer.Id.Id._internalFromInt64Value(aliasRawId))
                     return TelegramUser(id: aliasId, accessHash: author.accessHash, firstName: author.firstName, lastName: author.lastName, username: author.username, phone: nil, photo: author.photo, botInfo: nil, restrictionInfo: nil, flags: author.flags, emojiStatus: author.emojiStatus, usernames: author.usernames, storiesHidden: author.storiesHidden, nameColor: author.nameColor, backgroundEmojiId: author.backgroundEmojiId, profileColor: author.profileColor, profileBackgroundEmojiId: author.profileBackgroundEmojiId, subscriberCount: nil, verificationIconFileId: author.verificationIconFileId)
                 }

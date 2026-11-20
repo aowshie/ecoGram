@@ -31,7 +31,9 @@ public struct EcoStrings {
         case historyClearDeletedConfirm
         case historyFooter
         case badgesHeader
-        case badgesShow
+        case badgesTitle
+        case badgesTelegram
+        case badgesTelegramLocked
         case badgesFooter
         case editHistory
         case editOriginal
@@ -59,6 +61,12 @@ public struct EcoStrings {
         case profileSuggestionsFooter
         case badgeSupporterInfo
         case badgeOfficialInfo
+        case badgeDeveloperInfo
+        case badgeEarlyInfo
+        case badgeChannelInfo
+        case earlyBadgeTitle
+        case earlyBadgeText
+        case earlyBadgeOpen
         case shotPreferences
         case shotShowBackground
         case shotShowDate
@@ -109,8 +117,10 @@ public struct EcoStrings {
         .historyClearDeletedConfirm: ("Remove all saved deleted messages from your chats?", "Убрать все сохранённые удалённые сообщения из чатов?", "保存された削除済みメッセージをすべてチャットから消去しますか？"),
         .historyFooter: ("Deleted and self-destructing messages stay in the chat, slightly faded and marked as deleted or expired. One-time media arrives under a spoiler and can be opened any number of times. Hold an edited message to see its previous versions. Everything is kept only on this device.", "Удалённые и самоудаляющиеся сообщения остаются в чате: они полупрозрачные и подписаны «удалено» или «истекло». Одноразовые фото и видео приходят под спойлером и открываются сколько угодно раз. Прошлые версии изменённого сообщения видны в его меню. Всё хранится только на этом устройстве.", "削除・自動削除されたメッセージは半透明で「削除済み」「期限切れ」と表示されたままチャットに残ります。1回表示のメディアはスポイラー付きで届き、何度でも開けます。編集されたメッセージを長押しすると以前の版を確認できます。すべてこの端末にのみ保存されます。"),
         .badgesHeader: ("BADGES", "ЗНАЧКИ", "バッジ"),
-        .badgesShow: ("AyuGram Badges", "Значки AyuGram", "AyuGramバッジ"),
-        .badgesFooter: ("Shows the badges of AyuGram developers and supporters next to their names. The public list is downloaded from the AyuGram server, nothing is sent.", "Показывает значки разработчиков и поддержавших AyuGram рядом с именем. Публичный список загружается с сервера AyuGram, от вас ничего не отправляется.", "AyuGramの開発者と支援者のバッジを名前の横に表示します。公開リストをAyuGramのサーバーから取得し、こちらからは何も送信しません。"),
+        .badgesTitle: ("Badges", "Значки", "バッジ"),
+        .badgesTelegram: ("Telegram", "Telegram", "Telegram"),
+        .badgesTelegramLocked: ("Telegram badges can't be hidden, but you can move them.", "Значки Telegram нельзя скрыть, но их можно передвинуть.", "Telegramのバッジは非表示にできませんが、移動はできます。"),
+        .badgesFooter: ("Choose whose badges to show and drag them to set their order next to names. The public lists come from the AyuGram server and api.ecogram.cc. To give out the early user badge, ecoGram sends your Telegram ID to api.ecogram.cc once.", "Отметьте, чьи значки показывать, и перетащите их, чтобы задать порядок рядом с именем. Публичные списки загружаются с сервера AyuGram и api.ecogram.cc. Чтобы выдать значок раннего пользователя, ecoGram один раз отправляет ваш Telegram ID на api.ecogram.cc.", "表示するバッジを選び、ドラッグして名前の横の順番を決めます。公開リストはAyuGramのサーバーとapi.ecogram.ccから取得します。初期ユーザーバッジを付与するため、ecoGramはTelegram IDを一度だけapi.ecogram.ccに送信します。"),
         .editHistory: ("Edit History", "История изменений", "編集履歴"),
         .editOriginal: ("Original", "Исходное", "元の内容"),
         .editEdited: ("Edited", "Изменено", "編集"),
@@ -137,6 +147,12 @@ public struct EcoStrings {
         .profileSuggestionsFooter: ("Hides the suggestions to set an emoji status, profile color, profile photo and username at the top of Settings.", "Скрывает предложения «Изменить статус», «Изменить цвет профиля», «Изменить фото» и «Имя пользователя» вверху настроек.", "設定上部の絵文字ステータス、プロフィールの色、プロフィール写真、ユーザー名の提案を非表示にします。"),
         .badgeSupporterInfo: ("**%@** supported the development of exteraGram or AyuGram and received a unique badge.", "За поддержку разработки exteraGram или AyuGram **%@** получает уникальный значок.", "**%@**はexteraGramまたはAyuGramの開発を支援し、特別なバッジを受け取りました。"),
         .badgeOfficialInfo: ("**%@** is the official resource of exteraGram or AyuGram.", "**%@** — официальный ресурс exteraGram или AyuGram.", "**%@**はexteraGramまたはAyuGramの公式リソースです。"),
+        .badgeDeveloperInfo: ("**%@** is the developer of ecoGram.", "**%@** — разработчик ecoGram.", "**%@**はecoGramの開発者です。"),
+        .badgeEarlyInfo: ("**%@** is one of the first ecoGram users.", "**%@** — один из первых пользователей ecoGram.", "**%@**はecoGramの初期ユーザーの一人です。"),
+        .badgeChannelInfo: ("**%@** is the official ecoGram channel.", "**%@** — официальный канал ecoGram.", "**%@**はecoGramの公式チャンネルです。"),
+        .earlyBadgeTitle: ("Early User Badge", "Значок раннего пользователя", "初期ユーザーバッジ"),
+        .earlyBadgeText: ("You are one of the first ecoGram users. The badge is now next to your name, and everyone with ecoGram can see it.", "Вы один из первых пользователей ecoGram. Значок уже стоит рядом с вашим именем, его видят все, у кого установлен ecoGram.", "あなたはecoGramの初期ユーザーの一人です。バッジが名前の横に表示され、ecoGramを使っている全員に見えます。"),
+        .earlyBadgeOpen: ("Badge Settings", "Перейти", "バッジ設定"),
         .shotPreferences: ("Preferences", "Настройки", "設定"),
         .shotShowBackground: ("Show Background", "Показывать фон", "背景を表示"),
         .shotShowDate: ("Show Date", "Показывать дату", "日付を表示"),

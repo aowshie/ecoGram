@@ -8,7 +8,7 @@ swift_library(
     ]),
     deps = [
         "//EcoGram/Strings:EcoStrings",
-        "//EcoGram/Ayu/Badges:AyuBadges",
+        "//EcoGram/Badges:EcoBadges",
         "//submodules/WallpaperBackgroundNode:WallpaperBackgroundNode",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/AsyncDisplayKit:AsyncDisplayKit",

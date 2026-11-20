@@ -25,7 +25,7 @@ final class AyuListArguments {
     let removePeer: (EnginePeer.Id) -> Void
     let revealPeer: (EnginePeer.Id?, EnginePeer.Id?) -> Void
 
-    init(context: AccountContext, toggle: @escaping (String, Bool) -> Void, perform: @escaping (AyuListAction) -> Void, openPeer: @escaping (EnginePeer) -> Void = { _ in }, removePeer: @escaping (EnginePeer.Id) -> Void = { _ in }, revealPeer: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void = { _, _ in }) {
+    init(context: AccountContext, toggle: @escaping (String, Bool) -> Void = { _, _ in }, perform: @escaping (AyuListAction) -> Void, openPeer: @escaping (EnginePeer) -> Void = { _ in }, removePeer: @escaping (EnginePeer.Id) -> Void = { _ in }, revealPeer: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void = { _, _ in }) {
         self.context = context
         self.toggle = toggle
         self.perform = perform

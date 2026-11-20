@@ -15,7 +15,6 @@ import EcoStrings
 private enum AyuMainSection: Int32 {
     case ghost
     case spy
-    case badges
 }
 
 private func ayuCountLabel(_ strings: EcoStrings, enabled: Int, total: Int) -> String {
@@ -83,10 +82,6 @@ private func ayuMainEntries(strings: EcoStrings, presentationStrings: Presentati
     entries.append(.header(section: AyuMainSection.spy.rawValue, order: next(), text: strings.get(.spyEssentials)))
     entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ayuOutlineIcon("Chat/Context Menu/Message", color: iconColor), title: strings.get(.historyTitle), subtitle: ayuCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ayuStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))
 
-    entries.append(.header(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.badgesHeader)))
-    entries.append(.toggle(section: AyuMainSection.badges.rawValue, order: next(), key: "badges", title: strings.get(.badgesShow), value: settings.showAyuBadges, enabled: true))
-    entries.append(.notice(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.badgesFooter)))
-
     return entries
 }
 
@@ -94,12 +89,7 @@ public func ayuSettingsController(context: AccountContext) -> ViewController {
     let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     var pushControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = AyuListArguments(context: context, toggle: { key, value in
-        if key == "badges" {
-            AyuSettings.shared.showAyuBadges = value
-        }
-        refresh.set(true)
-    }, perform: { action in
+    let arguments = AyuListArguments(context: context, perform: { action in
         switch action {
         case .openGhost:
             pushControllerImpl?(ayuGhostController(context: context, onChange: { refresh.set(true) }))

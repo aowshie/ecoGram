@@ -18,6 +18,7 @@ private enum EcoSettingsSection: Int32, SGItemListSection {
     case notifications
     case chat
     case appearance
+    case badges
     case profile
 }
 
@@ -32,6 +33,7 @@ private enum EcoLink: Hashable {
     case notificationSettings
     case selectionPanel
     case contextMenu
+    case badges
 }
 
 private typealias EcoEntry = SGItemListUIEntry<EcoSettingsSection, EcoToggle, Int, Int, EcoLink, Int>
@@ -57,6 +59,9 @@ private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
         entries.append(.toggle(id: id.count, section: .appearance, settingName: .islandAvatarAnimation, value: preferences.islandAvatarAnimation, text: strings.get(.islandAvatarAnimation), enabled: true))
         entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.islandAvatarFooter)))
     }
+
+    entries.append(.header(id: id.count, section: .badges, text: strings.get(.badgesHeader), badge: nil))
+    entries.append(.disclosure(id: id.count, section: .badges, link: .badges, text: strings.get(.badgesTitle)))
 
     entries.append(.toggle(id: id.count, section: .profile, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
     entries.append(.notice(id: id.count, section: .profile, text: strings.get(.profileSuggestionsFooter)))
@@ -88,6 +93,8 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
             pushControllerImpl?(ecoSelectionPanelController(context: context))
         case .contextMenu:
             pushControllerImpl?(ecoContextMenuController(context: context))
+        case .badges:
+            pushControllerImpl?(ecoBadgesController(context: context))
         }
     })
 

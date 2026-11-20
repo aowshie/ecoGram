@@ -15,6 +15,8 @@ public final class EcoPreferences {
         case selectionEnabled
         case contextOrder
         case contextEnabled
+        case badgeOrder
+        case showEcoBadges
         case swiftgramDefaultsApplied = "swiftgramDefaultsApplied.v2"
 
         var name: String {
@@ -31,7 +33,8 @@ public final class EcoPreferences {
             Key.backgroundNotifications.name: true,
             Key.avatarInTabBar.name: false,
             Key.hideProfileShortcuts.name: false,
-            Key.islandAvatarAnimation.name: true
+            Key.islandAvatarAnimation.name: true,
+            Key.showEcoBadges.name: true
         ])
         self.avatarInTabBarValue = ValuePromise(self.defaults.bool(forKey: Key.avatarInTabBar.name), ignoreRepeated: true)
         self.applySwiftgramDefaults()
@@ -58,6 +61,19 @@ public final class EcoPreferences {
     public var islandAvatarAnimation: Bool {
         get { return self.defaults.bool(forKey: Key.islandAvatarAnimation.name) }
         set { self.store(newValue, .islandAvatarAnimation) }
+    }
+
+    public var showEcoBadges: Bool {
+        get { return self.defaults.bool(forKey: Key.showEcoBadges.name) }
+        set { self.store(newValue, .showEcoBadges) }
+    }
+
+    public var badgeOrder: [EcoBadgeSource] {
+        return self.ordered(key: .badgeOrder, all: EcoBadgeSource.allCases)
+    }
+
+    public func setBadgeOrder(_ order: [EcoBadgeSource]) {
+        self.store(order.map { $0.rawValue }, .badgeOrder)
     }
 
     public var avatarInTabBarSignal: Signal<Bool, NoError> {
