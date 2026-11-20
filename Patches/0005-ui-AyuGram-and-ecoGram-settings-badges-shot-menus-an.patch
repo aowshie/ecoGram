@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Fri, 20 Nov 2026 15:57:50 +0200
+Date: Fri, 20 Nov 2026 17:01:37 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -1064,7 +1064,7 @@ index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..8594f6e6ce3daa55cbc5b26d4dbeedbc
                  } else {
                      account.shouldBeServiceTaskMaster.set(.single(.never))
 diff --git a/submodules/TelegramUI/Sources/TelegramRootController.swift b/submodules/TelegramUI/Sources/TelegramRootController.swift
-index d38102d4c13d755997d9c131756ef1f89dd8ecd4..edb0c1fa322a5971ff1dc2b557bcaf303abbcd40 100644
+index d38102d4c13d755997d9c131756ef1f89dd8ecd4..5b72eba42abbe53cf435c2a75816681566e4a4bc 100644
 --- a/submodules/TelegramUI/Sources/TelegramRootController.swift
 +++ b/submodules/TelegramUI/Sources/TelegramRootController.swift
 @@ -2,6 +2,7 @@
@@ -1081,7 +1081,7 @@ index d38102d4c13d755997d9c131756ef1f89dd8ecd4..edb0c1fa322a5971ff1dc2b557bcaf30
          self.pushViewController(tabBarController, animated: false)
 +        
 +        ecoClaimEarlyBadge(context: self.context, present: { [weak self] controller in
-+            self?.present(controller, in: .window(.root))
++            self?.chatListController?.present(controller, in: .window(.root))
 +        }, push: { [weak self] controller in
 +            self?.pushViewController(controller)
 +        })
