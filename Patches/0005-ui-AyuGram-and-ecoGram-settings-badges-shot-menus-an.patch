@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Fri, 20 Nov 2026 09:32:41 +0200
+Date: Fri, 20 Nov 2026 15:09:38 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -555,7 +555,7 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..713b8c53ffcc041e723ece2e20e7bd10
  #
  # MARK: Swiftgram
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
-index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..8bc4e7948e4bb6927b6cdc09f1780d340c6b3b63 100644
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..46f83ce30d0352984c2fb80e9e7644ab651176c9 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 @@ -1,5 +1,7 @@
@@ -685,15 +685,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..8bc4e7948e4bb6927b6cdc09f1780d34
              let maskValue = max(0.0, min(1.0, contentOffset / 120.0))
              self.avatarListNode.containerNode.view.mask = self.avatarListNode.maskNode.view
              if maskValue > 0.03 {
-@@ -2064,6 +2121,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
-             }
-             self.avatarListNode.topCoverNode.update(maskValue)
-             self.avatarListNode.maskNode.update(maskValue)
-+            self.avatarListNode.maskNode.alpha = deviceMetrics.hasDynamicIsland ? 1.0 : max(0.0, min(1.0, (1.0 - maskValue) / 0.3))
-             self.avatarListNode.bottomCoverNode.backgroundColor = UIColor(white: 0.0, alpha: maskValue)
-             
-             self.avatarListNode.listContainerNode.topShadowNode.isHidden = !self.isAvatarExpanded
-@@ -2073,7 +2131,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -2073,7 +2130,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                  avatarMaskOffset -= contentOffset
              }
              
@@ -702,7 +694,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..8bc4e7948e4bb6927b6cdc09f1780d34
              self.avatarListNode.maskNode.bounds = CGRect(origin: .zero, size: CGSize(width: 171.0, height: 171.0))
              
              self.avatarListNode.bottomCoverNode.position = self.avatarListNode.maskNode.position
-@@ -2925,6 +2983,13 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -2925,6 +2982,13 @@ final class PeerInfoHeaderNode: ASDisplayNode {
              return self.avatarListNode.listContainerNode.setByYouNode.view
          }
          
@@ -716,7 +708,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..8bc4e7948e4bb6927b6cdc09f1780d34
          if !(self.state?.isEditing ?? false) {
              switch self.currentCredibilityIcon {
              case .premium:
-@@ -3009,8 +3074,35 @@ final class PeerInfoHeaderNode: ASDisplayNode {
+@@ -3009,8 +3073,35 @@ final class PeerInfoHeaderNode: ASDisplayNode {
          }
      }
      
