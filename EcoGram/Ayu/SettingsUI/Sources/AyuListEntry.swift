@@ -12,6 +12,7 @@ import SettingsUI
 enum AyuListAction: Hashable {
     case openGhost
     case openHistory
+    case openBadges
     case addException
     case deleteExceptions
     case removeException
@@ -40,6 +41,7 @@ enum AyuListEntry: ItemListNodeEntry {
     case category(section: Int32, order: Int, action: AyuListAction, icon: UIImage?, title: String, subtitle: String, label: String)
     case toggle(section: Int32, order: Int, key: String, title: String, value: Bool, enabled: Bool)
     case notice(section: Int32, order: Int, text: String)
+    case linkNotice(section: Int32, order: Int, text: String, action: AyuListAction)
     case addPeer(section: Int32, order: Int, title: String)
     case peer(section: Int32, order: Int, peer: EnginePeer, value: String, editing: Bool, revealed: Bool)
     case deleteAll(section: Int32, order: Int, title: String)
@@ -47,14 +49,14 @@ enum AyuListEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case let .header(section, _, _), let .category(section, _, _, _, _, _, _), let .toggle(section, _, _, _, _, _), let .notice(section, _, _), let .addPeer(section, _, _), let .peer(section, _, _, _, _, _), let .deleteAll(section, _, _), let .centered(section, _, _, _):
+        case let .header(section, _, _), let .category(section, _, _, _, _, _, _), let .toggle(section, _, _, _, _, _), let .notice(section, _, _), let .linkNotice(section, _, _, _), let .addPeer(section, _, _), let .peer(section, _, _, _, _, _), let .deleteAll(section, _, _), let .centered(section, _, _, _):
             return section
         }
     }
 
     var order: Int {
         switch self {
-        case let .header(_, order, _), let .category(_, order, _, _, _, _, _), let .toggle(_, order, _, _, _, _), let .notice(_, order, _), let .addPeer(_, order, _), let .peer(_, order, _, _, _, _), let .deleteAll(_, order, _), let .centered(_, order, _, _):
+        case let .header(_, order, _), let .category(_, order, _, _, _, _, _), let .toggle(_, order, _, _, _, _), let .notice(_, order, _), let .linkNotice(_, order, _, _), let .addPeer(_, order, _), let .peer(_, order, _, _, _, _), let .deleteAll(_, order, _), let .centered(_, order, _, _):
             return order
         }
     }
@@ -67,7 +69,7 @@ enum AyuListEntry: ItemListNodeEntry {
             return "category.\(action)"
         case let .toggle(_, _, key, _, _, _):
             return "toggle." + key
-        case let .notice(section, _, _):
+        case let .notice(section, _, _), let .linkNotice(section, _, _, _):
             return "notice.\(section)"
         case .addPeer:
             return "addPeer"
@@ -94,6 +96,8 @@ enum AyuListEntry: ItemListNodeEntry {
             return a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4 && a5 == b5 && a6 == b6
         case let (.notice(a1, a2, a3), .notice(b1, b2, b3)):
             return a1 == b1 && a2 == b2 && a3 == b3
+        case let (.linkNotice(a1, a2, a3, a4), .linkNotice(b1, b2, b3, b4)):
+            return a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4
         case let (.addPeer(a1, a2, a3), .addPeer(b1, b2, b3)):
             return a1 == b1 && a2 == b2 && a3 == b3
         case let (.peer(a1, a2, a3, a4, a5, a6), .peer(b1, b2, b3, b4, b5, b6)):
@@ -122,6 +126,10 @@ enum AyuListEntry: ItemListNodeEntry {
             })
         case let .notice(_, _, text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
+        case let .linkNotice(_, _, text, action):
+            return ItemListTextItem(presentationData: presentationData, text: .markdown(text.replacingOccurrences(of: "]", with: "]()")), sectionId: self.section, linkAction: { _ in
+                arguments.perform(action)
+            })
         case let .addPeer(_, _, title):
             return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: title, sectionId: self.section, height: .peerList, color: .accent, editing: false, action: {
                 arguments.perform(.addException)

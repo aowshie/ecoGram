@@ -31,6 +31,8 @@ public struct EcoStrings {
         case historyClearDeletedConfirm
         case historyFooter
         case badgesHeader
+        case badgesShow
+        case ayuBadgesFooter
         case badgesTitle
         case badgesTelegram
         case badgesTelegramLocked
@@ -117,6 +119,8 @@ public struct EcoStrings {
         .historyClearDeletedConfirm: ("Remove all saved deleted messages from your chats?", "Убрать все сохранённые удалённые сообщения из чатов?", "保存された削除済みメッセージをすべてチャットから消去しますか？"),
         .historyFooter: ("Deleted and self-destructing messages stay in the chat, slightly faded and marked as deleted or expired. One-time media arrives under a spoiler and can be opened any number of times. Hold an edited message to see its previous versions. Everything is kept only on this device.", "Удалённые и самоудаляющиеся сообщения остаются в чате: они полупрозрачные и подписаны «удалено» или «истекло». Одноразовые фото и видео приходят под спойлером и открываются сколько угодно раз. Прошлые версии изменённого сообщения видны в его меню. Всё хранится только на этом устройстве.", "削除・自動削除されたメッセージは半透明で「削除済み」「期限切れ」と表示されたままチャットに残ります。1回表示のメディアはスポイラー付きで届き、何度でも開けます。編集されたメッセージを長押しすると以前の版を確認できます。すべてこの端末にのみ保存されます。"),
         .badgesHeader: ("BADGES", "ЗНАЧКИ", "バッジ"),
+        .badgesShow: ("AyuGram Badges", "Значки AyuGram", "AyuGramバッジ"),
+        .ayuBadgesFooter: ("Shows the badges of AyuGram developers and supporters next to their names. Badge order and ecoGram badges are in [ecoGram Settings].", "Показывает значки разработчиков и поддержавших AyuGram рядом с именем. Порядок значков и значки ecoGram — в [настройках ecoGram].", "AyuGramの開発者と支援者のバッジを名前の横に表示します。バッジの順番とecoGramのバッジは[ecoGramの設定]で変更できます。"),
         .badgesTitle: ("Badges", "Значки", "バッジ"),
         .badgesTelegram: ("Telegram", "Telegram", "Telegram"),
         .badgesTelegramLocked: ("Telegram badges can't be hidden, but you can move them.", "Значки Telegram нельзя скрыть, но их можно передвинуть.", "Telegramのバッジは非表示にできませんが、移動はできます。"),

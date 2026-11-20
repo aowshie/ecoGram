@@ -10,6 +10,7 @@ swift_library(
         "//EcoGram/Ayu/Settings:AyuSettings",
         "//EcoGram/Ayu/History:AyuHistory",
         "//EcoGram/Strings:EcoStrings",
+        "//EcoGram/Settings:EcoSettingsUI",
         "//Swiftgram/SGItemListUI:SGItemListUI",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/Display:Display",

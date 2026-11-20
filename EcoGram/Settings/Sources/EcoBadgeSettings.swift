@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Display
+import SwiftSignalKit
 import ComponentFlow
 import AccountContext
 import AppBundle
@@ -71,14 +72,30 @@ public func ecoBadgesController(context: AccountContext) -> ViewController {
     })
 }
 
-public func ecoClaimEarlyBadge(context: AccountContext, present: @escaping (ViewController) -> Void, push: @escaping (ViewController) -> Void) {
-    EcoBadges.shared.claimEarlyBadge(telegramId: context.account.peerId.id._internalGetInt64Value(), completion: { granted in
-        guard granted else {
-            return
+private let ecoEarlyAlertSettleDelay: Double = 0.6
+
+public func ecoClaimEarlyBadge(context: AccountContext, ready: Signal<Bool, NoError>, present: @escaping (ViewController) -> Void, push: @escaping (ViewController) -> Void) {
+    let presentWhenReady: () -> Void = {
+        let _ = (ready
+        |> filter { $0 }
+        |> take(1)
+        |> delay(ecoEarlyAlertSettleDelay, queue: .mainQueue())).startStandalone(next: { _ in
+            guard EcoBadges.shared.hasPendingEarlyAlert else {
+                return
+            }
+            present(ecoEarlyBadgeAlert(context: context, openSettings: {
+                push(ecoBadgesController(context: context))
+            }))
+        })
+    }
+    if EcoBadges.shared.hasPendingEarlyAlert {
+        presentWhenReady()
+        return
+    }
+    EcoBadges.shared.claimEarlyBadge(telegramId: context.account.peerId.id._internalGetInt64Value(), completion: { isEarlyUser in
+        if isEarlyUser {
+            presentWhenReady()
         }
-        present(ecoEarlyBadgeAlert(context: context, openSettings: {
-            push(ecoBadgesController(context: context))
-        }))
     })
 }
 
@@ -91,8 +108,13 @@ private func ecoEarlyBadgeAlert(context: AccountContext, openSettings: @escaping
         AnyComponentWithIdentity(id: "title", component: AnyComponent(AlertTitleComponent(title: strings.get(.earlyBadgeTitle), alignment: .center))),
         AnyComponentWithIdentity(id: "text", component: AnyComponent(AlertTextComponent(content: .plain(strings.get(.earlyBadgeText)), alignment: .center)))
     ]
-    return AlertScreen(context: context, content: content, actions: [
-        AlertScreen.Action(title: strings.get(.earlyBadgeOpen), type: .generic, action: openSettings),
-        AlertScreen.Action(title: presentationData.strings.Common_OK, type: .default)
+    return AlertScreen(context: context, configuration: AlertScreen.Configuration(dismissOnOutsideTap: false), content: content, actions: [
+        AlertScreen.Action(title: strings.get(.earlyBadgeOpen), type: .generic, action: {
+            EcoBadges.shared.markEarlyAlertShown()
+            openSettings()
+        }),
+        AlertScreen.Action(title: presentationData.strings.Common_OK, type: .default, action: {
+            EcoBadges.shared.markEarlyAlertShown()
+        })
     ])
 }

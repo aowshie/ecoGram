@@ -22,9 +22,10 @@ public final class EcoBadges {
 
     private static let badgesUrl = URL(string: "https://api.ecogram.cc/v1/badges")!
     private static let earlyUrl = URL(string: "https://api.ecogram.cc/v1/early")!
-    private static let refreshInterval: TimeInterval = 60 * 60
-    private static let retryInterval: TimeInterval = 10 * 60
+    private static let refreshInterval: TimeInterval = 5 * 60
+    private static let retryInterval: TimeInterval = 2 * 60
     private static let earlyClaimSettledKey = "ecogram.earlyBadge.settled"
+    private static let earlyAlertPendingKey = "ecogram.earlyBadge.alertPending"
 
     private let lock = NSLock()
     private var snapshot: Snapshot
@@ -134,25 +135,34 @@ public final class EcoBadges {
             }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let claimStatus = status == 200 ? data.flatMap(EcoBadges.parseClaimStatus) : nil
-            let granted = claimStatus == "granted"
+            let isEarlyUser = claimStatus == "granted" || claimStatus == "already"
 
             self.lock.lock()
             self.isClaiming = false
-            if granted {
+            if isEarlyUser {
                 self.snapshot.early.insert(telegramId)
             }
             let snapshot = self.snapshot
             self.lock.unlock()
 
+            if isEarlyUser {
+                self.defaults.set(true, forKey: EcoBadges.earlyAlertPendingKey)
+                self.persist(snapshot)
+            }
             if claimStatus != nil {
                 self.defaults.set(true, forKey: EcoBadges.earlyClaimSettledKey)
             }
-            if granted {
-                self.persist(snapshot)
-            }
-            finish(granted)
+            finish(isEarlyUser)
         })
         task.resume()
+    }
+
+    public var hasPendingEarlyAlert: Bool {
+        return self.defaults.bool(forKey: EcoBadges.earlyAlertPendingKey)
+    }
+
+    public func markEarlyAlertShown() {
+        self.defaults.set(false, forKey: EcoBadges.earlyAlertPendingKey)
     }
 
     private func persist(_ snapshot: Snapshot) {

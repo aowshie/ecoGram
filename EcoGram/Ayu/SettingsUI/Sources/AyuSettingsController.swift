@@ -11,10 +11,12 @@ import SGItemListUI
 import AppBundle
 import AyuSettings
 import EcoStrings
+import EcoSettingsUI
 
 private enum AyuMainSection: Int32 {
     case ghost
     case spy
+    case badges
 }
 
 private func ayuCountLabel(_ strings: EcoStrings, enabled: Int, total: Int) -> String {
@@ -82,26 +84,47 @@ private func ayuMainEntries(strings: EcoStrings, presentationStrings: Presentati
     entries.append(.header(section: AyuMainSection.spy.rawValue, order: next(), text: strings.get(.spyEssentials)))
     entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ayuOutlineIcon("Chat/Context Menu/Message", color: iconColor), title: strings.get(.historyTitle), subtitle: ayuCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ayuStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))
 
+    entries.append(.header(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.badgesHeader)))
+    entries.append(.toggle(section: AyuMainSection.badges.rawValue, order: next(), key: "badges", title: strings.get(.badgesShow), value: settings.showAyuBadges, enabled: true))
+    entries.append(.linkNotice(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.ayuBadgesFooter), action: .openBadges))
+
     return entries
+}
+
+private func ayuSettingsChanges() -> Signal<Void, NoError> {
+    return Signal { subscriber in
+        let observer = NotificationCenter.default.addObserver(forName: AyuSettings.didChange, object: nil, queue: .main, using: { _ in
+            subscriber.putNext(Void())
+        })
+        return ActionDisposable {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 }
 
 public func ayuSettingsController(context: AccountContext) -> ViewController {
     let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     var pushControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = AyuListArguments(context: context, perform: { action in
+    let arguments = AyuListArguments(context: context, toggle: { key, value in
+        if key == "badges" {
+            AyuSettings.shared.showAyuBadges = value
+        }
+    }, perform: { action in
         switch action {
         case .openGhost:
             pushControllerImpl?(ayuGhostController(context: context, onChange: { refresh.set(true) }))
         case .openHistory:
             pushControllerImpl?(ayuHistoryController(context: context, onChange: { refresh.set(true) }))
+        case .openBadges:
+            pushControllerImpl?(ecoBadgesController(context: context))
         default:
             break
         }
     })
 
-    let signal = combineLatest(refresh.get(), context.sharedContext.presentationData)
-    |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    let signal = combineLatest(refresh.get(), Signal<Void, NoError>.single(Void()) |> then(ayuSettingsChanges()), context.sharedContext.presentationData)
+    |> map { _, _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.ayuTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ayuMainEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
