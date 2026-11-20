@@ -12,6 +12,8 @@ import SGItemListUI
 import EcoPreferences
 import EcoStrings
 
+private let ecoHasDynamicIsland = DeviceMetrics(screenSize: UIScreen.main.bounds.size, scale: UIScreen.main.scale, statusBarHeight: 0.0, onScreenNavigationHeight: nil).hasDynamicIsland
+
 private enum EcoSettingsSection: Int32, SGItemListSection {
     case notifications
     case chat
@@ -51,8 +53,10 @@ private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
 
     entries.append(.header(id: id.count, section: .appearance, text: strings.get(.appearanceHeader), badge: nil))
     entries.append(.toggle(id: id.count, section: .appearance, settingName: .avatarInTabBar, value: preferences.avatarInTabBar, text: strings.get(.avatarInTabBar), enabled: true))
-    entries.append(.toggle(id: id.count, section: .appearance, settingName: .islandAvatarAnimation, value: preferences.islandAvatarAnimation, text: strings.get(.islandAvatarAnimation), enabled: true))
-    entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.islandAvatarFooter)))
+    if !ecoHasDynamicIsland {
+        entries.append(.toggle(id: id.count, section: .appearance, settingName: .islandAvatarAnimation, value: preferences.islandAvatarAnimation, text: strings.get(.islandAvatarAnimation), enabled: true))
+        entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.islandAvatarFooter)))
+    }
 
     entries.append(.toggle(id: id.count, section: .profile, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
     entries.append(.notice(id: id.count, section: .profile, text: strings.get(.profileSuggestionsFooter)))
