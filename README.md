@@ -16,41 +16,47 @@
 
 ## Features
 
-### Ghost essentials
+<img src="Branding/Readme/swiftgram.png" width="16" height="16"> Swiftgram &nbsp; <img src="Branding/Readme/ayugram.svg" width="16" height="16"> AyuGram &nbsp; <img src="Branding/Readme/ecogram.svg" width="16" height="16"> ecoGram
+
+### <img src="Branding/Readme/swiftgram.png" width="20" height="20"> Swiftgram
+
+- The base: every Swiftgram feature and setting is kept
+
+### <img src="Branding/Readme/ayugram.svg" width="20" height="20"> Ghost essentials
 
 - Don't send read receipts, online status, typing or story views, each on its own
 - Per-chat exceptions for every option
 - Keep chats unread on this device too
 - Read on interact: replying or reacting marks the chat as read
 
-### Spy essentials
+### <img src="Branding/Readme/ayugram.svg" width="20" height="20"> Spy essentials
 
 - Deleted messages stay in the chat, marked as deleted
 - Edit history of every edited message
 - One-time and self-destructing photos and videos are kept and can be reopened
-- In ghost mode, opening them neither tells the sender nor starts the timer
-- Screenshots in chats that restrict saving content
+- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> In ghost mode, opening them neither tells the sender nor starts the timer
+- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> Screenshots in chats that restrict saving content
 
-### Chat
+### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Chat
 
 - Selection bar: choose and reorder its buttons
 - Message menu: choose and reorder its actions
-- Shot: share messages as an image
+- <img src="Branding/Readme/ayugram.svg" width="14" height="14"> Shot: share messages as an image
 
-### Notifications
+### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Notifications
 
 - Local notifications while ecoGram stays in the background
 - Cleared once the chat is read on another device
 
-### Appearance
+### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Appearance
 
 - Dynamic Island profile animation on any iPhone
 - Hide profile suggestions in Settings
 
-### Badges
+### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Badges
 
 - ecoGram badges: developer, official channel and the first 30 users
-- AyuGram badges
+- <img src="Branding/Readme/ayugram.svg" width="14" height="14"> AyuGram badges
 - Choose whose badges to show and their order next to Telegram's
 
 ## Privacy
