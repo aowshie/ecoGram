@@ -107,7 +107,7 @@ private func ayuExceptionPeers(context: AccountContext, refresh: Signal<Bool, No
     }
 }
 
-func ayuGhostController(context: AccountContext, onChange: @escaping () -> Void) -> ViewController {
+func ayuGhostController(context: AccountContext) -> ViewController {
     let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     let stateValue = Atomic<AyuGhostState>(value: AyuGhostState())
     let statePromise = ValuePromise<AyuGhostState>(AyuGhostState(), ignoreRepeated: true)
@@ -124,7 +124,6 @@ func ayuGhostController(context: AccountContext, onChange: @escaping () -> Void)
 
     let changed: () -> Void = {
         refresh.set(true)
-        onChange()
     }
 
     let removeException: (EnginePeer.Id) -> Void = { peerId in

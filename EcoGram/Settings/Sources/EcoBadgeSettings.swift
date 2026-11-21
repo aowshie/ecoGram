@@ -80,7 +80,7 @@ public func ecoClaimEarlyBadge(context: AccountContext, ready: Signal<Bool, NoEr
         |> filter { $0 }
         |> take(1)
         |> delay(ecoEarlyAlertSettleDelay, queue: .mainQueue())).startStandalone(next: { _ in
-            guard EcoBadges.shared.hasPendingEarlyAlert else {
+            guard EcoBadges.shared.reserveEarlyAlert() else {
                 return
             }
             context.sharedContext.mainWindow?.present(ecoEarlyBadgeAlert(context: context, openSettings: {

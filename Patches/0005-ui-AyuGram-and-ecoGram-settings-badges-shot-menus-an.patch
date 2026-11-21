@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 09:07:35 +0200
+Date: Sat, 21 Nov 2026 13:19:52 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -45,7 +45,7 @@ index c0fa1aaef0cfb60635e2e907a8469750f87d6565..e05bdaaf41c9fde44a80fed8c80aeca6
  sgsrcs = [
      "//Swiftgram/SGChatListSimpleSettingsSignal:SGChatListSimpleSettingsSignal",
 diff --git a/submodules/ChatListUI/Sources/Node/ChatListItem.swift b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
-index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7cb4eb9f5 100644
+index 655bed73fbb335838b2279db8ac9d95e68444dd0..f736eaaf0766c4672faff84c5ccc9319dd24e99a 100644
 --- a/submodules/ChatListUI/Sources/Node/ChatListItem.swift
 +++ b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
 @@ -1,5 +1,6 @@
@@ -64,7 +64,7 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
      var statusIconComponent: EmojiStatusComponent?
      let hiddenPeerIconNode: ASImageNode
      let mutedIconNode: ASImageNode
-@@ -2437,6 +2440,23 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -2437,6 +2440,31 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
          }
      }
      
@@ -85,10 +85,18 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
 +        return stripView
 +    }
 +
++    func ecoRefreshBadges() {
++        guard let (item, first, last, firstWithHeader, nextIsPinned, nextHasActiveRevealControls, params, _) = self.layoutParams else {
++            return
++        }
++        let (_, apply) = self.asyncLayout()(item, params, first, last, firstWithHeader, nextIsPinned, nextHasActiveRevealControls)
++        apply(false, false)
++    }
++
      func asyncLayout() -> (_ item: ChatListItem, _ params: ListViewItemLayoutParams, _ first: Bool, _ last: Bool, _ firstWithHeader: Bool, _ nextIsPinned: Bool, _ nextHasActiveRevealControls: Bool) -> (ListViewItemNodeLayout, (Bool, Bool) -> Void) {
          let dateLayout = TextNode.asyncLayout(self.dateNode)
          let textLayout = TextNodeWithEntities.asyncLayout(self.textNode)
-@@ -2680,6 +2700,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -2680,6 +2708,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
              var currentHiddenIconImage: UIImage?
              var currentMutedIconImage: UIImage?
              var currentCredibilityIconContent: EmojiStatusComponent.Content?
@@ -96,7 +104,7 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
              var currentVerifiedIconContent: EmojiStatusComponent.Content?
              var currentStatusIconContent: EmojiStatusComponent.Content?
              var currentStatusIconParticleColor: UIColor?
-@@ -3845,12 +3866,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -3845,12 +3874,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                      if let verificationIconFileId = peer.verificationIconFileId {
                          currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
                      }
@@ -111,7 +119,7 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
                  currentStatusIconContent = nil
              }
              if let currentSecretIconImage = currentSecretIconImage {
-@@ -3910,6 +3933,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -3910,6 +3941,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                  }
              }
              
@@ -123,7 +131,7 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
              let layoutOffset: CGFloat = 0.0
              
              let rawContentWidth = params.width - leftInset - params.rightInset - 18.0 - editingOffset - (item.interaction.isSideListMode ? ChatListItem.sideListContentInset - 12.0 : 0.0)
-@@ -5501,7 +5529,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -5501,7 +5537,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                      } else {
                          lastLineRect = CGRect(origin: CGPoint(), size: titleLayout.size)
                      }
@@ -138,7 +146,7 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
                      if let currentStatusIconContent {
                          let statusIconView: ComponentHostView<Empty>
                          if let current = strongSelf.statusIconView {
-@@ -5578,6 +5612,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
+@@ -5578,6 +5620,11 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                          credibilityIconView.removeFromSuperview()
                      }
                      
@@ -150,6 +158,47 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..c681bc72a822221c0a068dcbcff448f7
                      if let currentVerifiedIconContent {
                          let verifiedIconView: ComponentHostView<Empty>
                          if let current = strongSelf.verifiedIconView {
+diff --git a/submodules/ChatListUI/Sources/Node/ChatListNode.swift b/submodules/ChatListUI/Sources/Node/ChatListNode.swift
+index 30ede798179121ac9e3bf2995736ef545c258a00..e9c28db84ff32d63f80c731eca93f8f77a79634a 100644
+--- a/submodules/ChatListUI/Sources/Node/ChatListNode.swift
++++ b/submodules/ChatListUI/Sources/Node/ChatListNode.swift
+@@ -3,6 +3,7 @@ import SGAPIToken
+ import SGAPIWebSettings
+ //
+ import Foundation
++import EcoBadges
+ import UIKit
+ import Display
+ import AsyncDisplayKit
+@@ -1348,6 +1349,7 @@ public final class ChatListNode: ListViewImpl {
+     private let chatListLocation = ValuePromise<ChatListNodeLocation>()
+     private let chatListDisposable = MetaDisposable()
+     private var activityStatusesDisposable: Disposable?
++    private var ecoBadgesDisposable: Disposable?
+     
+     private let scrollToTopOptionPromise = Promise<ChatListGlobalScrollOption>(.none)
+     public var scrollToTopOption: Signal<ChatListGlobalScrollOption, NoError> {
+@@ -2845,6 +2847,12 @@ public final class ChatListNode: ListViewImpl {
+         self.setChatListLocation(initialLocation)
+         
+         let engine = context.engine
++        self.ecoBadgesDisposable = (EcoTitleBadges.changes
++        |> deliverOnMainQueue).startStrict(next: { [weak self] _ in
++            self?.forEachItemNode { itemNode in
++                (itemNode as? ChatListItemNode)?.ecoRefreshBadges()
++            }
++        })
+         let previousPeerCache = Atomic<[EnginePeer.Id: EnginePeer]>(value: [:])
+         let previousActivities = Atomic<ChatListNodePeerInputActivities?>(value: nil)
+         self.activityStatusesDisposable = (context.account.allPeerInputActivities()
+@@ -3287,6 +3295,7 @@ public final class ChatListNode: ListViewImpl {
+     deinit {
+         self.chatListDisposable.dispose()
+         self.activityStatusesDisposable?.dispose()
++        self.ecoBadgesDisposable?.dispose()
+         self.updatedFilterDisposable.dispose()
+         self.pollFilterUpdatesDisposable?.dispose()
+         self.chatFilterUpdatesDisposable?.dispose()
 diff --git a/submodules/GalleryData/Sources/GalleryData.swift b/submodules/GalleryData/Sources/GalleryData.swift
 index b9274cc23eae00653ca4378bd41eb9c5086ff02f..3148075ecbf4b625ab20c76807e3b06c37d23269 100644
 --- a/submodules/GalleryData/Sources/GalleryData.swift
@@ -217,7 +266,7 @@ index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..10df042ae53957bcf0df5413b7829e1b
  
  sgsrc = [
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
-index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..ed45b1f45673f925937b0334f9057b5edcec4408 100644
+index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..53e00bb080df31c76a0cd67d3de41d514b5ed671 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 @@ -2,6 +2,7 @@ import SGStrings // MARK: Swiftgram
@@ -274,30 +323,53 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..ed45b1f45673f925937b0334f9057b5e
      override public func asyncLayout() -> (_ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: ChatMessageHeaderSpec) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
          var currentContentClassesPropertiesAndLayouts: [(Message, AnyClass, Bool, Int?, (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize, _ avatarInset: CGFloat) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))))] = []
          for contentNode in self.contentNodes {
-@@ -3227,6 +3253,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -2738,6 +2764,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         }
+         
+         var currentCredibilityIcon: (EmojiStatusComponent.Content, UIColor?)?
++        var ecoBadges: EcoTitleBadges = .empty
+         // The author's third-party verification icon, drawn left of the name. A channel's own posts carry no badges
+         // beside its name (the chat header shows them), so it is the effective author's only.
+         var authorVerificationIconFileId: Int64?
+@@ -3227,6 +3254,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                          credibilityIconWidth += 20.0
                      }
                  }
-+                let ecoBadges = ecoAuthorBadges(item.message)
++                ecoBadges = ecoAuthorBadges(item.message)
 +                if !ecoBadges.isEmpty {
 +                    credibilityIconWidth += ecoBadges.totalWidth(side: 18.0, spacing: 3.0) + 3.0
 +                }
                  
                  let rankBadgeSizeAndApply = rankBadgeLayout(TextNodeLayoutArguments(attributedString: rankBadgeString, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: max(0, maximumNodeWidth - layoutConstants.text.bubbleInsets.left - layoutConstants.text.bubbleInsets.right), height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
                  if rankBadgeSizeAndApply.0.size.width > 0.0 {
-@@ -4666,6 +4696,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -4357,6 +4388,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                 authorNameColor: authorNameColor,
+                 layoutConstants: layoutConstants,
+                 currentCredibilityIcon: currentCredibilityIcon,
++                ecoBadges: ecoBadges,
+                 authorVerificationIcon: authorVerificationIcon,
+                 rankBadgeNodeSizeApply: rankBadgeNodeSizeApply,
+                 ephemeralBadgeNodeSizeApply: ephemeralBadgeNodeSizeApply,
+@@ -4441,6 +4473,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         authorNameColor: UIColor?,
+         layoutConstants: ChatMessageItemLayoutConstants,
+         currentCredibilityIcon: (EmojiStatusComponent.Content, UIColor?)?,
++        ecoBadges: EcoTitleBadges,
+         authorVerificationIcon: EmojiStatusComponent.Content?,
+         rankBadgeNodeSizeApply: (CGSize, () -> TextNode?, UIColor?),
+         ephemeralBadgeNodeSizeApply: (CGSize, CGSize, () -> TextNode?),
+@@ -4666,6 +4699,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
          var bubblelessLiftHeaderParts: [ChatMessageBubblelessLiftPart] = []
          var bubblelessLiftParts: [ChatMessageBubblelessLiftPart] = []
          var bubblelessLiftPartsByStableId: [UInt32: [ChatMessageBubblelessLiftPart]] = [:]
 +        strongSelf.ecoLeadingBadgesView?.isHidden = true
 +        strongSelf.ecoTrailingBadgesView?.isHidden = true
-+        let ecoBadges = ecoAuthorBadges(item.message)
 +        let ecoLeadingWidth = EcoTitleBadges.width(count: ecoBadges.leading.count, side: 18.0, spacing: 3.0)
 +        let ecoLeadingShift: CGFloat = ecoLeadingWidth > 0.0 ? ecoLeadingWidth + 3.0 : 0.0
          if let nameNode = nameNodeSizeApply.1() {
              strongSelf.nameNode = nameNode
              nameNode.displaysAsynchronously = !item.presentationData.isPreview && !item.presentationData.theme.theme.forceSync
-@@ -4676,6 +4711,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -4676,6 +4713,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
              var nameNodeFrame = CGRect(origin: CGPoint(x: contentOrigin.x + (bubblelessCardTopInset != nil ? 0.0 : layoutConstants.text.bubbleInsets.left), y: layoutConstants.bubble.contentInsets.top + nameNodeOriginY), size: nameNodeSizeApply.0)
              
              var nameNavigateButtonOffset: CGFloat = currentCredibilityIcon == nil ? 4.0 : 28.0
@@ -307,7 +379,7 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..ed45b1f45673f925937b0334f9057b5e
              nameNavigateButtonOffset += 34.0
              
              if hasTitleAvatar {
-@@ -4970,9 +5008,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -4970,9 +5010,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                      containerSize: CGSize(width: 20.0, height: 20.0)
                  )
                  
@@ -319,7 +391,7 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..ed45b1f45673f925937b0334f9057b5e
                  }
                  animation.animator.updateFrame(layer: credibilityIconView.layer, frame: credibilityIconFrame, completion: nil)
                  
-@@ -5021,6 +5059,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+@@ -5021,6 +5061,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                  strongSelf.credibilityHighlightNode?.removeFromSupernode()
                  strongSelf.credibilityHighlightNode = nil
              }

@@ -9,6 +9,7 @@ public enum EcoBadgeKind: Equatable {
 
 public final class EcoBadges {
     public static let shared = EcoBadges()
+    public static let didUpdate = Notification.Name("ecogram.badgesDidUpdate")
 
     private struct Snapshot: Codable {
         var developers: Set<Int64>
@@ -16,6 +17,10 @@ public final class EcoBadges {
         var officialChannels: Set<Int64>
         var earlyOpen: Bool
         var fetchedAt: Double
+
+        func hasSameBadges(as other: Snapshot) -> Bool {
+            return self.developers == other.developers && self.early == other.early && self.officialChannels == other.officialChannels
+        }
 
         static let empty = Snapshot(developers: [], early: [], officialChannels: [], earlyOpen: true, fetchedAt: 0.0)
     }
@@ -26,12 +31,15 @@ public final class EcoBadges {
     private static let retryInterval: TimeInterval = 2 * 60
     private static let earlyClaimSettledKey = "ecogram.earlyBadge.settled"
     private static let earlyAlertPendingKey = "ecogram.earlyBadge.alertPending"
+    private static let ownEarlyIdKey = "ecogram.earlyBadge.ownId"
 
     private let lock = NSLock()
     private var snapshot: Snapshot
     private var isRefreshing = false
     private var isClaiming = false
+    private var isEarlyAlertReserved = false
     private var lastAttempt: TimeInterval = 0.0
+    private var ownEarlyId: Int64?
     private let cacheUrl: URL
     private let session: URLSession
     private let defaults: UserDefaults
@@ -45,6 +53,7 @@ public final class EcoBadges {
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
         self.session = URLSession(configuration: configuration)
+        self.ownEarlyId = (defaults.object(forKey: EcoBadges.ownEarlyIdKey) as? NSNumber)?.int64Value
         if let data = try? Data(contentsOf: self.cacheUrl), let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
             self.snapshot = snapshot
         } else {
@@ -59,6 +68,7 @@ public final class EcoBadges {
         self.refreshIfNeeded()
         self.lock.lock()
         let snapshot = self.snapshot
+        let ownEarlyId = self.ownEarlyId
         self.lock.unlock()
         if isChannel {
             return snapshot.officialChannels.contains(id) ? .official : nil
@@ -66,7 +76,7 @@ public final class EcoBadges {
         if snapshot.developers.contains(id) {
             return .developer
         }
-        if snapshot.early.contains(id) {
+        if snapshot.early.contains(id) || id == ownEarlyId {
             return .early
         }
         return nil
@@ -93,12 +103,17 @@ public final class EcoBadges {
             let snapshot = status == 200 ? data.flatMap(EcoBadges.parse) : nil
             self.lock.lock()
             self.isRefreshing = false
+            let previous = self.snapshot
             if let snapshot {
                 self.snapshot = snapshot
             }
             self.lock.unlock()
-            if let snapshot {
-                self.persist(snapshot)
+            guard let snapshot else {
+                return
+            }
+            self.persist(snapshot)
+            if !snapshot.hasSameBadges(as: previous) {
+                EcoBadges.notifyUpdate()
             }
         })
         task.resume()
@@ -140,14 +155,14 @@ public final class EcoBadges {
             self.lock.lock()
             self.isClaiming = false
             if isEarlyUser {
-                self.snapshot.early.insert(telegramId)
+                self.ownEarlyId = telegramId
             }
-            let snapshot = self.snapshot
             self.lock.unlock()
 
             if isEarlyUser {
+                self.defaults.set(NSNumber(value: telegramId), forKey: EcoBadges.ownEarlyIdKey)
                 self.defaults.set(true, forKey: EcoBadges.earlyAlertPendingKey)
-                self.persist(snapshot)
+                EcoBadges.notifyUpdate()
             }
             if claimStatus != nil {
                 self.defaults.set(true, forKey: EcoBadges.earlyClaimSettledKey)
@@ -161,8 +176,26 @@ public final class EcoBadges {
         return self.defaults.bool(forKey: EcoBadges.earlyAlertPendingKey)
     }
 
+    public func reserveEarlyAlert() -> Bool {
+        self.lock.lock()
+        defer {
+            self.lock.unlock()
+        }
+        guard self.hasPendingEarlyAlert, !self.isEarlyAlertReserved else {
+            return false
+        }
+        self.isEarlyAlertReserved = true
+        return true
+    }
+
     public func markEarlyAlertShown() {
         self.defaults.set(false, forKey: EcoBadges.earlyAlertPendingKey)
+    }
+
+    private static func notifyUpdate() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: EcoBadges.didUpdate, object: EcoBadges.shared)
+        }
     }
 
     private func persist(_ snapshot: Snapshot) {

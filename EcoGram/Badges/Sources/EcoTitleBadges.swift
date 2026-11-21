@@ -1,5 +1,7 @@
 import Foundation
 import UIKit
+import SwiftSignalKit
+import AyuSettings
 import AyuBadges
 import EcoPreferences
 import EcoStrings
@@ -48,6 +50,20 @@ public struct EcoTitleBadges: Equatable {
         let trailingWidth = EcoTitleBadges.width(count: self.trailing.count, side: side, spacing: spacing)
         let gap = !self.leading.isEmpty && !self.trailing.isEmpty ? spacing : 0.0
         return leadingWidth + trailingWidth + gap
+    }
+
+    public static let changes: Signal<Void, NoError> = Signal { subscriber in
+        let center = NotificationCenter.default
+        let observers = [EcoPreferences.didChange, AyuSettings.didChange, AyuBadges.didUpdate, EcoBadges.didUpdate].map { name in
+            return center.addObserver(forName: name, object: nil, queue: nil, using: { _ in
+                subscriber.putNext(Void())
+            })
+        }
+        return ActionDisposable {
+            for observer in observers {
+                center.removeObserver(observer)
+            }
+        }
     }
 
     private static let aliasLock = NSLock()

@@ -103,7 +103,6 @@ private func ayuSettingsChanges() -> Signal<Void, NoError> {
 }
 
 public func ayuSettingsController(context: AccountContext) -> ViewController {
-    let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     var pushControllerImpl: ((ViewController) -> Void)?
 
     let arguments = AyuListArguments(context: context, toggle: { key, value in
@@ -113,9 +112,9 @@ public func ayuSettingsController(context: AccountContext) -> ViewController {
     }, perform: { action in
         switch action {
         case .openGhost:
-            pushControllerImpl?(ayuGhostController(context: context, onChange: { refresh.set(true) }))
+            pushControllerImpl?(ayuGhostController(context: context))
         case .openHistory:
-            pushControllerImpl?(ayuHistoryController(context: context, onChange: { refresh.set(true) }))
+            pushControllerImpl?(ayuHistoryController(context: context))
         case .openBadges:
             pushControllerImpl?(ecoBadgesController(context: context))
         default:
@@ -123,8 +122,8 @@ public func ayuSettingsController(context: AccountContext) -> ViewController {
         }
     })
 
-    let signal = combineLatest(refresh.get(), Signal<Void, NoError>.single(Void()) |> then(ayuSettingsChanges()), context.sharedContext.presentationData)
-    |> map { _, _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ayuSettingsChanges()), context.sharedContext.presentationData)
+    |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.ayuTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ayuMainEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
@@ -177,7 +176,7 @@ private func ayuHistoryEntries(strings: EcoStrings) -> [AyuHistoryEntry] {
     return entries
 }
 
-private func ayuHistoryController(context: AccountContext, onChange: @escaping () -> Void) -> ViewController {
+private func ayuHistoryController(context: AccountContext) -> ViewController {
     let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     var presentControllerImpl: ((ViewController) -> Void)?
     var presentSelectorImpl: ((AyuSelector, [SGOneFromManyOption]) -> Void)?
@@ -195,7 +194,6 @@ private func ayuHistoryController(context: AccountContext, onChange: @escaping (
             settings.saveInBots = value
         }
         refresh.set(true)
-        onChange()
     }, setOneFromManyValue: { selector in
         let strings = EcoStrings(languageCode: context.sharedContext.currentPresentationData.with { $0 }.strings.baseLanguageCode)
         let settings = AyuSettings.shared

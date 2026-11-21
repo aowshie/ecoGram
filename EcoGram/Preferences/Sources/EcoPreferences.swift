@@ -26,6 +26,8 @@ public final class EcoPreferences {
 
     private let defaults: UserDefaults
     private let avatarInTabBarValue: ValuePromise<Bool>
+    private let badgeOrderLock = NSLock()
+    private var cachedBadgeOrder: [EcoBadgeSource]?
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -69,11 +71,24 @@ public final class EcoPreferences {
     }
 
     public var badgeOrder: [EcoBadgeSource] {
-        return self.ordered(key: .badgeOrder, all: EcoBadgeSource.allCases)
+        self.badgeOrderLock.lock()
+        defer {
+            self.badgeOrderLock.unlock()
+        }
+        if let cached = self.cachedBadgeOrder {
+            return cached
+        }
+        let order = self.ordered(key: .badgeOrder, all: EcoBadgeSource.allCases)
+        self.cachedBadgeOrder = order
+        return order
     }
 
     public func setBadgeOrder(_ order: [EcoBadgeSource]) {
-        self.store(order.map { $0.rawValue }, .badgeOrder)
+        self.badgeOrderLock.lock()
+        self.defaults.set(order.map { $0.rawValue }, forKey: Key.badgeOrder.name)
+        self.cachedBadgeOrder = nil
+        self.badgeOrderLock.unlock()
+        NotificationCenter.default.post(name: EcoPreferences.didChange, object: self)
     }
 
     public var avatarInTabBarSignal: Signal<Bool, NoError> {

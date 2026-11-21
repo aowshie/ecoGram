@@ -8,6 +8,8 @@ swift_library(
     ]),
     deps = [
         "//EcoGram/Ayu/Badges:AyuBadges",
+        "//EcoGram/Ayu/Settings:AyuSettings",
+        "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//EcoGram/Preferences:EcoPreferences",
         "//EcoGram/Strings:EcoStrings",
     ],
