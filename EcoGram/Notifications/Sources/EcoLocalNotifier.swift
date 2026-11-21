@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import UserNotifications
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramStringFormatting
@@ -45,7 +44,7 @@ public final class EcoLocalNotifier {
                 guard EcoLocalNotifier.isPosting else {
                     return
                 }
-                var coveredIds = Set<MessageId>()
+                var coveredIds = Set<EngineMessage.Id>()
                 for (messages, _, notify, _) in list {
                     guard notify, let first = messages.first, !coveredIds.contains(first.id) else {
                         continue
@@ -62,7 +61,7 @@ public final class EcoLocalNotifier {
                         }
                     }
                     let message = messages.first(where: { !$0.text.isEmpty }) ?? first
-                    self.post(account: account, accountId: id, message: message, count: messages.count)
+                    self.post(account: account, accountId: id, message: EngineMessage(message), count: messages.count)
                 }
             }), forKey: id)
             self.observeReadState(accountId: id, account: account)
@@ -158,7 +157,7 @@ public final class EcoLocalNotifier {
         return AppLockState.isAppLocked(state: state)
     }
 
-    private func post(account: Account, accountId: AccountRecordId, message: Message, count: Int) {
+    private func post(account: Account, accountId: AccountRecordId, message: EngineMessage, count: Int) {
         let rootPath = URL(fileURLWithPath: account.basePath).deletingLastPathComponent().path
         let accountPeerId = account.peerId
         let _ = (account.postbox.transaction { transaction -> (displayContents: Bool, sound: PeerMessageSound) in
@@ -170,7 +169,7 @@ public final class EcoLocalNotifier {
                 return
             }
             let isLocked = EcoLocalNotifier.isAppLocked(rootPath: rootPath)
-            self.post(accountId: accountId, accountPeerId: accountPeerId, message: EngineMessage(message), count: count, displayContents: presentation.displayContents && !isLocked, showsSender: !isLocked, sound: presentation.sound)
+            self.post(accountId: accountId, accountPeerId: accountPeerId, message: message, count: count, displayContents: presentation.displayContents && !isLocked, showsSender: !isLocked, sound: presentation.sound)
         })
     }
 
