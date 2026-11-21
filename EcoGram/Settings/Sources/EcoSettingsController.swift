@@ -8,98 +8,184 @@ import ItemListUI
 import AccountContext
 import PresentationDataUtils
 import SettingsUI
-import SGItemListUI
+import AyuSettings
+import EcoBadges
 import EcoPreferences
 import EcoStrings
 
 private let ecoHasDynamicIsland = DeviceMetrics(screenSize: UIScreen.main.bounds.size, scale: UIScreen.main.scale, statusBarHeight: 0.0, onScreenNavigationHeight: nil).hasDynamicIsland
 
-private enum EcoSettingsSection: Int32, SGItemListSection {
-    case notifications
-    case chat
+enum EcoSettingsAction: Hashable {
+    case notificationSettings
+    case selectionPanel
+    case contextMenu
     case appearance
     case badges
 }
 
-private enum EcoToggle: Hashable {
-    case localNotifications
-    case avatarInTabBar
-    case islandAvatarAnimation
-    case hideProfileShortcuts
-}
-
-private enum EcoLink: Hashable {
-    case notificationSettings
-    case selectionPanel
-    case contextMenu
+private enum EcoSettingsSection: Int32 {
+    case notifications
+    case chat
+    case appearance
+    case spy
     case badges
 }
 
-private typealias EcoEntry = SGItemListUIEntry<EcoSettingsSection, EcoToggle, Int, Int, EcoLink, Int>
+private enum EcoToggle: String {
+    case localNotifications
+    case protectedScreenshots
+    case hideProfileShortcuts
+    case islandAvatarAnimation
+}
 
-private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
-    let preferences = EcoPreferences.shared
-    let id = SGItemListCounter()
-    var entries: [EcoEntry] = []
+private typealias EcoSettingsEntry = EcoListEntry<EcoSettingsAction>
 
-    entries.append(.header(id: id.count, section: .notifications, text: strings.get(.notificationsHeader), badge: nil))
-    entries.append(.toggle(id: id.count, section: .notifications, settingName: .localNotifications, value: preferences.backgroundNotifications, text: strings.get(.notificationsBackground), enabled: true))
-    entries.append(.disclosure(id: id.count, section: .notifications, link: .notificationSettings, text: strings.get(.notificationSettings)))
-    entries.append(.notice(id: id.count, section: .notifications, text: strings.get(.notificationsFooter)))
+private struct EcoAppearanceOptions {
+    let values: [Bool]
 
-    entries.append(.header(id: id.count, section: .chat, text: strings.get(.chatHeader), badge: nil))
-    entries.append(.disclosure(id: id.count, section: .chat, link: .selectionPanel, text: strings.get(.selectionPanel)))
-    entries.append(.disclosure(id: id.count, section: .chat, link: .contextMenu, text: strings.get(.contextMenu)))
-    entries.append(.notice(id: id.count, section: .chat, text: strings.get(.chatFooter)))
-
-    entries.append(.header(id: id.count, section: .appearance, text: strings.get(.appearanceHeader), badge: nil))
-    entries.append(.toggle(id: id.count, section: .appearance, settingName: .avatarInTabBar, value: preferences.avatarInTabBar, text: strings.get(.avatarInTabBar), enabled: true))
-    entries.append(.toggle(id: id.count, section: .appearance, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
-    if !ecoHasDynamicIsland {
-        entries.append(.toggle(id: id.count, section: .appearance, settingName: .islandAvatarAnimation, value: preferences.islandAvatarAnimation, text: strings.get(.islandAvatarAnimation), enabled: true))
-        entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.islandAvatarFooter)))
+    init(preferences: EcoPreferences) {
+        var values = [preferences.hideProfileShortcuts]
+        if !ecoHasDynamicIsland {
+            values.append(preferences.islandAvatarAnimation)
+        }
+        self.values = values
     }
 
-    entries.append(.header(id: id.count, section: .badges, text: strings.get(.badgesHeader), badge: nil))
-    entries.append(.disclosure(id: id.count, section: .badges, link: .badges, text: strings.get(.badgesTitle)))
+    var enabled: Int {
+        return self.values.filter { $0 }.count
+    }
+}
+
+func ecoSettingsChanges() -> Signal<Void, NoError> {
+    return Signal { subscriber in
+        let center = NotificationCenter.default
+        let observers = [EcoPreferences.didChange, AyuSettings.didChange].map { name in
+            return center.addObserver(forName: name, object: nil, queue: .main, using: { _ in
+                subscriber.putNext(Void())
+            })
+        }
+        return ActionDisposable {
+            for observer in observers {
+                center.removeObserver(observer)
+            }
+        }
+    }
+}
+
+private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> [EcoSettingsEntry] {
+    let preferences = EcoPreferences.shared
+    let iconColor = theme.list.itemAccentColor
+    var entries: [EcoSettingsEntry] = []
+    var order = 0
+    func next() -> Int {
+        order += 1
+        return order
+    }
+
+    let notifications = EcoSettingsSection.notifications.rawValue
+    entries.append(.header(section: notifications, order: next(), text: strings.get(.notificationsHeader)))
+    entries.append(.toggle(section: notifications, order: next(), key: EcoToggle.localNotifications.rawValue, title: strings.get(.notificationsBackground), value: preferences.backgroundNotifications, enabled: true))
+    entries.append(.disclosure(section: notifications, order: next(), action: .notificationSettings, title: strings.get(.notificationSettings), label: ""))
+    entries.append(.notice(section: notifications, order: next(), text: strings.get(.notificationsFooter)))
+
+    let chat = EcoSettingsSection.chat.rawValue
+    let selectionEnabled = preferences.enabledSelectionActions.count
+    let selectionTotal = EcoSelectionAction.allCases.count
+    let contextEnabled = EcoContextAction.allCases.filter { preferences.isEnabled($0) }.count
+    let contextTotal = EcoContextAction.allCases.count
+    entries.append(.header(section: chat, order: next(), text: strings.get(.chatHeader)))
+    entries.append(.category(section: chat, order: next(), action: .selectionPanel, icon: ecoOutlineIcon("Chat/Context Menu/Select", color: iconColor), title: strings.get(.selectionPanel), subtitle: ecoCountLabel(strings, enabled: selectionEnabled, total: selectionTotal), label: ecoStateLabel(presentationStrings, enabled: selectionEnabled, total: selectionTotal)))
+    entries.append(.category(section: chat, order: next(), action: .contextMenu, icon: ecoOutlineIcon("Chat/Context Menu/More", color: iconColor), title: strings.get(.contextMenu), subtitle: ecoCountLabel(strings, enabled: contextEnabled, total: contextTotal), label: ecoStateLabel(presentationStrings, enabled: contextEnabled, total: contextTotal)))
+    entries.append(.notice(section: chat, order: next(), text: strings.get(.chatFooter)))
+
+    let appearance = EcoSettingsSection.appearance.rawValue
+    let appearanceOptions = EcoAppearanceOptions(preferences: preferences)
+    entries.append(.header(section: appearance, order: next(), text: strings.get(.appearanceHeader)))
+    entries.append(.category(section: appearance, order: next(), action: .appearance, icon: ecoOutlineIcon("Chat/Context Menu/Palette", color: iconColor), title: strings.get(.appearanceTitle), subtitle: ecoCountLabel(strings, enabled: appearanceOptions.enabled, total: appearanceOptions.values.count), label: ecoStateLabel(presentationStrings, enabled: appearanceOptions.enabled, total: appearanceOptions.values.count)))
+
+    let spy = EcoSettingsSection.spy.rawValue
+    entries.append(.header(section: spy, order: next(), text: strings.get(.spyEssentials)))
+    entries.append(.toggle(section: spy, order: next(), key: EcoToggle.protectedScreenshots.rawValue, title: strings.get(.spyScreenshots), value: preferences.allowsProtectedScreenshots, enabled: true))
+    entries.append(.notice(section: spy, order: next(), text: strings.get(.spyScreenshotsFooter)))
+
+    let badges = EcoSettingsSection.badges.rawValue
+    let badgesEnabled = EcoBadgeSource.allCases.filter(ecoBadgeSourceEnabled).count
+    let badgesTotal = EcoBadgeSource.allCases.count
+    let badgesIcon = ecoCategoryIcon(key: "ecogram.badge.developer", color: iconColor, image: { EcoBadgeImages.image(.developer, side: 24.0) })
+    entries.append(.header(section: badges, order: next(), text: strings.get(.badgesHeader)))
+    entries.append(.category(section: badges, order: next(), action: .badges, icon: badgesIcon, title: strings.get(.badgesTitle), subtitle: ecoCountLabel(strings, enabled: badgesEnabled, total: badgesTotal), label: ecoStateLabel(presentationStrings, enabled: badgesEnabled, total: badgesTotal)))
 
     return entries
 }
 
+private func ecoAppearanceEntries(strings: EcoStrings) -> [EcoSettingsEntry] {
+    let preferences = EcoPreferences.shared
+    let section = EcoSettingsSection.appearance.rawValue
+    var entries: [EcoSettingsEntry] = []
+    var order = 0
+    func next() -> Int {
+        order += 1
+        return order
+    }
+    entries.append(.toggle(section: section, order: next(), key: EcoToggle.hideProfileShortcuts.rawValue, title: strings.get(.hideProfileShortcuts), value: preferences.hideProfileShortcuts, enabled: true))
+    if !ecoHasDynamicIsland {
+        entries.append(.toggle(section: section, order: next(), key: EcoToggle.islandAvatarAnimation.rawValue, title: strings.get(.islandAvatarAnimation), value: preferences.islandAvatarAnimation, enabled: true))
+        entries.append(.notice(section: section, order: next(), text: strings.get(.islandAvatarFooter)))
+    }
+    return entries
+}
+
+private func ecoApplyToggle(_ key: String, _ value: Bool) {
+    let preferences = EcoPreferences.shared
+    switch EcoToggle(rawValue: key) {
+    case .localNotifications:
+        preferences.backgroundNotifications = value
+    case .protectedScreenshots:
+        preferences.allowsProtectedScreenshots = value
+    case .hideProfileShortcuts:
+        preferences.hideProfileShortcuts = value
+    case .islandAvatarAnimation:
+        preferences.islandAvatarAnimation = value
+    case .none:
+        break
+    }
+}
+
+private func ecoAppearanceController(context: AccountContext) -> ViewController {
+    let arguments = EcoListArguments<EcoSettingsAction>(context: context, toggle: ecoApplyToggle, perform: { _ in })
+    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData)
+    |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
+        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.appearanceTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoAppearanceEntries(strings: strings), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
+        return (controllerState, (listState, arguments))
+    }
+    return ItemListController(context: context, state: signal)
+}
+
 public func ecoSettingsController(context: AccountContext) -> ViewController {
-    let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     var pushControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = SGItemListArguments<EcoToggle, Int, Int, EcoLink, Int>(context: context, setBoolValue: { toggle, value in
-        switch toggle {
-        case .localNotifications:
-            EcoPreferences.shared.backgroundNotifications = value
-        case .avatarInTabBar:
-            EcoPreferences.shared.avatarInTabBar = value
-        case .islandAvatarAnimation:
-            EcoPreferences.shared.islandAvatarAnimation = value
-        case .hideProfileShortcuts:
-            EcoPreferences.shared.hideProfileShortcuts = value
-        }
-        refresh.set(true)
-    }, openDisclosureLink: { link in
-        switch link {
+    let arguments = EcoListArguments<EcoSettingsAction>(context: context, toggle: ecoApplyToggle, perform: { action in
+        switch action {
         case .notificationSettings:
             pushControllerImpl?(notificationsAndSoundsController(context: context, exceptionsList: nil))
         case .selectionPanel:
             pushControllerImpl?(ecoSelectionPanelController(context: context))
         case .contextMenu:
             pushControllerImpl?(ecoContextMenuController(context: context))
+        case .appearance:
+            pushControllerImpl?(ecoAppearanceController(context: context))
         case .badges:
             pushControllerImpl?(ecoBadgesController(context: context))
         }
     })
 
-    let signal = combineLatest(refresh.get(), context.sharedContext.presentationData)
+    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData)
     |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.settingsTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSettingsEntries(strings: strings), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSettingsEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
         return (controllerState, (listState, arguments))
     }
 

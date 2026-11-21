@@ -8,7 +8,6 @@ swift_library(
     ]),
     deps = [
         "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
-        "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
     ],
     visibility = [
         "//visibility:public",

@@ -35,9 +35,9 @@
 - Local notifications
 - Custom selection bar
 - Custom message menu
-- Avatar in the Settings tab
 - Dynamic Island profile effect on any iPhone
 - Hidden profile shortcuts
+- Screenshots in chats that restrict saving content
 - ecoGram badges: developer, official channel and the first 30 users
 - Badge order and visibility for Telegram, AyuGram and ecoGram badges
 

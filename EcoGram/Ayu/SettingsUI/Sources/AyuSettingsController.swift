@@ -19,46 +19,6 @@ private enum AyuMainSection: Int32 {
     case badges
 }
 
-private func ayuCountLabel(_ strings: EcoStrings, enabled: Int, total: Int) -> String {
-    return String(format: strings.get(.ghostEnabledCount), enabled, total)
-}
-
-private func ayuStateLabel(_ presentationStrings: PresentationStrings, enabled: Int, total: Int) -> String {
-    if enabled == total {
-        return presentationStrings.Notifications_On
-    }
-    if enabled == 0 {
-        return presentationStrings.Notifications_Off
-    }
-    return ""
-}
-
-private let ayuIconCache = Atomic<[String: UIImage]>(value: [:])
-
-private func ayuOutlineIcon(_ name: String, color: UIColor) -> UIImage? {
-    let key = "\(name).\(color.argb)"
-    if let cached = ayuIconCache.with({ $0[key] }) {
-        return cached
-    }
-    guard let tinted = generateTintedImage(image: UIImage(bundleImageName: name), color: color) else {
-        return nil
-    }
-    let image = generateImage(CGSize(width: 30.0, height: 30.0), rotatedContext: { size, context in
-        context.clear(CGRect(origin: .zero, size: size))
-        UIGraphicsPushContext(context)
-        tinted.draw(at: CGPoint(x: floor((size.width - tinted.size.width) / 2.0), y: floor((size.height - tinted.size.height) / 2.0)))
-        UIGraphicsPopContext()
-    })
-    if let image {
-        let _ = ayuIconCache.modify { cache in
-            var cache = cache
-            cache[key] = image
-            return cache
-        }
-    }
-    return image
-}
-
 private func ayuMainEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> [AyuListEntry] {
     let iconColor = theme.list.itemAccentColor
     let settings = AyuSettings.shared
@@ -72,17 +32,17 @@ private func ayuMainEntries(strings: EcoStrings, presentationStrings: Presentati
     let ghostCount = settings.ghostEnabledCount
     let ghostTotal = AyuSettings.ghostOptionCount
     entries.append(.header(section: AyuMainSection.ghost.rawValue, order: next(), text: strings.get(.ghostEssentials)))
-    var ghostSubtitle = ayuCountLabel(strings, enabled: ghostCount, total: ghostTotal)
+    var ghostSubtitle = ecoCountLabel(strings, enabled: ghostCount, total: ghostTotal)
     let exceptionCount = settings.ghostExceptions.count
     if exceptionCount > 0 {
         ghostSubtitle += ", " + presentationStrings.Notifications_CategoryExceptions(Int32(exceptionCount))
     }
-    entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, icon: ayuOutlineIcon("Premium/Stories/Stealth", color: iconColor), title: strings.get(.ghostMode), subtitle: ghostSubtitle, label: ayuStateLabel(presentationStrings, enabled: ghostCount, total: ghostTotal)))
+    entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, icon: ecoOutlineIcon("Premium/Stories/Stealth", color: iconColor), title: strings.get(.ghostMode), subtitle: ghostSubtitle, label: ecoStateLabel(presentationStrings, enabled: ghostCount, total: ghostTotal)))
 
     let historyOptions = [settings.saveDeletedMessages, settings.saveEditedMessages, settings.keepsSelfDestructingMedia]
     let historyCount = historyOptions.filter { $0 }.count
     entries.append(.header(section: AyuMainSection.spy.rawValue, order: next(), text: strings.get(.spyEssentials)))
-    entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ayuOutlineIcon("Chat/Context Menu/Message", color: iconColor), title: strings.get(.historyTitle), subtitle: ayuCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ayuStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))
+    entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ecoOutlineIcon("Chat/Context Menu/Message", color: iconColor), title: strings.get(.historyTitle), subtitle: ecoCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ecoStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))
 
     entries.append(.header(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.badgesHeader)))
     entries.append(.toggle(section: AyuMainSection.badges.rawValue, order: next(), key: "badges", title: strings.get(.badgesShow), value: settings.showAyuBadges, enabled: true))

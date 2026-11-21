@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 15:14:54 +0200
+Date: Sat, 21 Nov 2026 21:20:39 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -214,7 +214,7 @@ index b9274cc23eae00653ca4378bd41eb9c5086ff02f..3148075ecbf4b625ab20c76807e3b06c
      if case let .richTextMedia(mediaId) = mediaSubject {
          standalone = true
 diff --git a/submodules/GalleryUI/Sources/GalleryController.swift b/submodules/GalleryUI/Sources/GalleryController.swift
-index 72b8ebf6619a36282fd148370806e06b789f804c..0328a97e7dfc2834d7919fd7e3f1c2198e571930 100644
+index 72b8ebf6619a36282fd148370806e06b789f804c..ff54e5455571a51b8a61ca1c33e092cf86a48807 100644
 --- a/submodules/GalleryUI/Sources/GalleryController.swift
 +++ b/submodules/GalleryUI/Sources/GalleryController.swift
 @@ -304,7 +304,7 @@ public func galleryItemForEntry(
@@ -222,7 +222,7 @@ index 72b8ebf6619a36282fd148370806e06b789f804c..0328a97e7dfc2834d7919fd7e3f1c219
      if let image = media as? TelegramMediaImage {
          if let file = image.video {
 -            let captureProtected = message.isCopyProtected() || message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout || message.paidContent != nil || peerIsCopyProtected
-+            let captureProtected = message.isCopyProtected() || message.containsSecretMedia || (message.minAutoremoveOrClearTimeout == viewOnceTimeout && !message.ayuRevealsSelfDestructingMedia) || message.paidContent != nil || peerIsCopyProtected
++            let captureProtected = ecoCaptureProtection(message.isCopyProtected() || peerIsCopyProtected) || message.containsSecretMedia || (message.minAutoremoveOrClearTimeout == viewOnceTimeout && !message.ayuRevealsSelfDestructingMedia) || message.paidContent != nil
              
              var originData = GalleryItemOriginData(title: message.effectiveAuthor.flatMap(EnginePeer.init)?.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder), timestamp: message.timestamp)
              if Namespaces.Message.allNonRegular.contains(message.id.namespace) {
@@ -231,10 +231,37 @@ index 72b8ebf6619a36282fd148370806e06b789f804c..0328a97e7dfc2834d7919fd7e3f1c219
          if file.isVideo {
              let content: UniversalVideoContent
 -            let captureProtected = message.isCopyProtected() || message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout || message.paidContent != nil || peerIsCopyProtected
-+            let captureProtected = message.isCopyProtected() || message.containsSecretMedia || (message.minAutoremoveOrClearTimeout == viewOnceTimeout && !message.ayuRevealsSelfDestructingMedia) || message.paidContent != nil || peerIsCopyProtected
++            let captureProtected = ecoCaptureProtection(message.isCopyProtected() || peerIsCopyProtected) || message.containsSecretMedia || (message.minAutoremoveOrClearTimeout == viewOnceTimeout && !message.ayuRevealsSelfDestructingMedia) || message.paidContent != nil
              if file.isAnimated {
                  content = NativeVideoContent(id: .message(message.stableId, file.fileId), userLocation: .peer(message.id.peerId), fileReference: .message(message: MessageReference(message), media: file), imageReference: mediaImage.flatMap({ ImageMediaReference.message(message: MessageReference(message), media: $0) }), loopVideo: true, enableSound: false, tempFilePath: tempFilePath, captureProtected: captureProtected, storeAfterDownload: generateStoreAfterDownload?(message, file))
              } else {
+@@ -502,11 +502,11 @@ public func galleryItemForEntry(
+         var content: UniversalVideoContent?
+         switch websiteType(of: webpageContent.websiteName) {
+         case .instagram where webpageContent.file != nil && webpageContent.image != nil && webpageContent.file!.isVideo:
+-            content = NativeVideoContent(id: .message(message.stableId, webpageContent.file?.id ?? webpage.webpageId), userLocation: .peer(message.id.peerId), fileReference: .message(message: MessageReference(message), media: webpageContent.file!), imageReference: webpageContent.image.flatMap({ ImageMediaReference.message(message: MessageReference(message), media: $0) }), streamVideo: .conservative, enableSound: true, captureProtected: message.isCopyProtected() || message.containsSecretMedia || peerIsCopyProtected, storeAfterDownload: nil)
++            content = NativeVideoContent(id: .message(message.stableId, webpageContent.file?.id ?? webpage.webpageId), userLocation: .peer(message.id.peerId), fileReference: .message(message: MessageReference(message), media: webpageContent.file!), imageReference: webpageContent.image.flatMap({ ImageMediaReference.message(message: MessageReference(message), media: $0) }), streamVideo: .conservative, enableSound: true, captureProtected: ecoCaptureProtection(message.isCopyProtected() || peerIsCopyProtected) || message.containsSecretMedia, storeAfterDownload: nil)
+         default:
+             if let embedUrl = webpageContent.embedUrl, let image = webpageContent.image {
+                 if let file = webpageContent.file, file.isVideo {
+-                    content = NativeVideoContent(id: .message(message.stableId, file.fileId), userLocation: .peer(message.id.peerId), fileReference: .message(message: MessageReference(message), media: file), imageReference: mediaImage.flatMap({ ImageMediaReference.message(message: MessageReference(message), media: $0) }), streamVideo: .conservative, loopVideo: loopVideos, tempFilePath: tempFilePath, captureProtected: message.isCopyProtected() || message.containsSecretMedia || peerIsCopyProtected, storeAfterDownload: generateStoreAfterDownload?(message, file))
++                    content = NativeVideoContent(id: .message(message.stableId, file.fileId), userLocation: .peer(message.id.peerId), fileReference: .message(message: MessageReference(message), media: file), imageReference: mediaImage.flatMap({ ImageMediaReference.message(message: MessageReference(message), media: $0) }), streamVideo: .conservative, loopVideo: loopVideos, tempFilePath: tempFilePath, captureProtected: ecoCaptureProtection(message.isCopyProtected() || peerIsCopyProtected) || message.containsSecretMedia, storeAfterDownload: generateStoreAfterDownload?(message, file))
+                 } else if URL(string: embedUrl)?.pathExtension == "mp4" {
+                     content = SystemVideoContent(userLocation: .peer(message.id.peerId), url: embedUrl, imageReference: .webPage(webPage: WebpageReference(webpage), media: image), dimensions: webpageContent.embedSize?.cgSize ?? CGSize(width: 640.0, height: 640.0), duration: webpageContent.duration.flatMap(Double.init) ?? 0.0)
+                 }
+diff --git a/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift b/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
+index 2fd0417834ba11dd77ff560953e21a1cc4fd9aa6..c456aaf12dee52118e0879b720f46f03de8ad12e 100644
+--- a/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
++++ b/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
+@@ -464,7 +464,7 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
+         self.translateToLanguage = translateToLanguage
+         self.peerIsCopyProtected = peerIsCopyProtected
+         self.isSecret = isSecret
+-        self.imageNode.captureProtected = message.id.peerId.namespace == Namespaces.Peer.SecretChat || message.isCopyProtected() || peerIsCopyProtected || isSecret || message.paidContent != nil
++        self.imageNode.captureProtected = message.id.peerId.namespace == Namespaces.Peer.SecretChat || ecoCaptureProtection(message.isCopyProtected() || peerIsCopyProtected) || isSecret || message.paidContent != nil
+         self.updateFooter(animated: false)
+         
+         var title: String?
 diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
 index 767fd2867d058071b438b11b0d64b9bb4e096ed2..7255711f555d8570add7bb5544475a984bacd95e 100644
 --- a/submodules/TelegramUI/BUILD
@@ -448,8 +475,21 @@ index bf71cb207328261b644bc13dda3f3563bdb761f8..f23e24d542e5f3992af614162fb0886a
 +    }
      return dateText
  }
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift
+index f1455bfea6b8c1f8bdfac7db8a0acfdf790ed104..13d8f182d9fe8c16e9243e99df464dcc5c1c6541 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift
+@@ -812,7 +812,7 @@ public class ChatMessageInteractiveInstantVideoNode: ASDisplayNode {
+                                         }
+                                     }
+                                 }
+-                            }), content: NativeVideoContent(id: .message(item.message.stableId, telegramFile.fileId), userLocation: .peer(item.message.id.peerId), fileReference: .message(message: MessageReference(item.message), media: telegramFile), streamVideo: streamVideo ? .conservative : .none, enableSound: false, fetchAutomatically: false, isAudioVideoMessage: true, captureProtected: item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected(), storeAfterDownload: nil), priority: item.associatedData.isStandalone ? .overlay : .embedded, autoplay: item.context.sharedContext.energyUsageSettings.autoplayVideo && !isViewOnceMessage)
++                            }), content: NativeVideoContent(id: .message(item.message.stableId, telegramFile.fileId), userLocation: .peer(item.message.id.peerId), fileReference: .message(message: MessageReference(item.message), media: telegramFile), streamVideo: streamVideo ? .conservative : .none, enableSound: false, fetchAutomatically: false, isAudioVideoMessage: true, captureProtected: ecoCaptureProtection(item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()), storeAfterDownload: nil), priority: item.associatedData.isStandalone ? .overlay : .embedded, autoplay: item.context.sharedContext.energyUsageSettings.autoplayVideo && !isViewOnceMessage)
+                             if let previousVideoNode = previousVideoNode {
+                                 videoNode.bounds = previousVideoNode.bounds
+                                 videoNode.position = previousVideoNode.position
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
-index 6e1d726b490a3c7e3e5a141d86782044e7876c4d..31f3d64a83579b2640b13bbaed7bf814d6537861 100644
+index 6e1d726b490a3c7e3e5a141d86782044e7876c4d..26ed3d534d4ac2e90701d98fe4a89cbe5bf34b10 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
 @@ -2080,7 +2080,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
@@ -457,10 +497,28 @@ index 6e1d726b490a3c7e3e5a141d86782044e7876c4d..31f3d64a83579b2640b13bbaed7bf814
                                              // The node made here is the one the gallery takes over: protect it as the
                                              // gallery would.
 -                                            captureProtected: associatedData.isCopyProtectionEnabled || message.isCopyProtected() || isExtendedMedia || message.paidContent != nil || message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout,
-+                                            captureProtected: associatedData.isCopyProtectionEnabled || message.isCopyProtected() || isExtendedMedia || message.paidContent != nil || message.containsSecretMedia || (message.minAutoremoveOrClearTimeout == viewOnceTimeout && !message.ayuRevealsSelfDestructingMedia),
++                                            captureProtected: ecoCaptureProtection(associatedData.isCopyProtectionEnabled || message.isCopyProtected()) || isExtendedMedia || message.paidContent != nil || message.containsSecretMedia || (message.minAutoremoveOrClearTimeout == viewOnceTimeout && !message.ayuRevealsSelfDestructingMedia),
                                              codecConfiguration: HLSCodecConfiguration(context: context),
                                              // These three reach only the base-file player used when no quality is
                                              // playable.
+@@ -2107,7 +2107,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+                                             autoFetchFullSizeThumbnail: true,
+                                             continuePlayingWithoutSoundOnLostAudioSession: isInlinePlayableVideo,
+                                             placeholderColor: emptyColor,
+-                                            captureProtected: associatedData.isCopyProtectionEnabled || message.isCopyProtected() || isExtendedMedia,
++                                            captureProtected: ecoCaptureProtection(associatedData.isCopyProtectionEnabled || message.isCopyProtected()) || isExtendedMedia,
+                                             storeAfterDownload: { [weak context] in
+                                                 guard let context, let peerId else {
+                                                     return
+@@ -2409,7 +2409,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+                             }
+                             
+                             if let updateImageSignal = updateImageSignal {
+-                                strongSelf.imageNode.captureProtected = associatedData.isCopyProtectionEnabled || message.isCopyProtected() || isExtendedMedia
++                                strongSelf.imageNode.captureProtected = ecoCaptureProtection(associatedData.isCopyProtectionEnabled || message.isCopyProtected()) || isExtendedMedia
+                                 strongSelf.imageNode.setSignal(updateImageSignal(synchronousLoads, false), attemptSynchronously: synchronousLoads)
+ 
+                                 var imageDimensions: CGSize?
 @@ -3261,6 +3261,9 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                          self.internallyVisible = true
                          self.extendedMediaOverlayNode?.isRevealed = true
@@ -546,6 +604,32 @@ index beba1a106f17a5e32dfdc6d3ba886100178115ee..57e28eb174de4ba2b1fe9e14e6b8f368
                              
                              let imageFrame = CGRect(origin: CGPoint(x: bubbleInsets.left, y: bubbleInsets.top), size: imageSize)
                              
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift
+index 490443fc48020618cc67bd9c1b0cd8580e1a6710..b37d2cbe99692430f29b2c2ee3dcb79f96b1967d 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift
+@@ -853,7 +853,7 @@ public class ChatMessageReplyInfoNode: ASDisplayNode {
+                     node.imageNode = nil
+                 }
+                 if let message = arguments.message {
+-                    node.imageNode?.captureProtected = arguments.associatedData.isCopyProtectionEnabled || message.isCopyProtected()
++                    node.imageNode?.captureProtected = ecoCaptureProtection(arguments.associatedData.isCopyProtectionEnabled || message.isCopyProtected())
+                 }
+                 
+                 titleNode.frame = CGRect(origin: CGPoint(x: leftInset - textInsets.left - 2.0, y: spacing - textInsets.top + 1.0), size: titleLayout.size)
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift
+index 968a4ba82656a31891bef607d39f39a5ade905c6..0ea368bf495b600fff3bf290b7bc35d0f917142a 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift
+@@ -402,7 +402,7 @@ public class ChatMessageRichDataBubbleContentNode: ChatMessageBubbleContentNode
+     /// than captured once: `isCopyProtectionEnabled` is a peer setting that can flip while the
+     /// bubble is on screen.
+     private static func isCaptureProtected(item: ChatMessageBubbleContentItem) -> Bool {
+-        return item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()
++        return ecoCaptureProtection(item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected())
+     }
+ 
+     /// Builds (or reuses) the V2View. Same-message stableVersion bumps (streamed AI chunks) reuse
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
 index f05b8b8b4e8a411133d8fa1fb4470def9c369b82..1e963af9840a00e0a10845c243128d8eca500e4d 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
@@ -700,6 +784,32 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..997c03284b3f47174ec74a8872e982f0
  ]
  #
  # MARK: Swiftgram
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoAvatarTransformContainerNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoAvatarTransformContainerNode.swift
+index 46a47a3c7bdd9153009e142f9f446cad62db043e..10f24e42f7f670c38ec3dbbeac17598773cfebbb 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoAvatarTransformContainerNode.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoAvatarTransformContainerNode.swift
+@@ -484,7 +484,7 @@ final class PeerInfoAvatarTransformContainerNode: ASDisplayNode {
+                     markupNode.updateVisibility(true)
+                 } else if threadInfo == nil, let video = videoRepresentations.last, let peerReference = PeerReference(peer) {
+                     let videoFileReference = FileMediaReference.avatarList(peer: peerReference, media: TelegramMediaFile(fileId: EngineMedia.Id(namespace: Namespaces.Media.LocalFile, id: 0), partialReference: nil, resource: video.representation.resource, previewRepresentations: representations.map { $0.representation }, videoThumbnails: [], immediateThumbnailData: immediateThumbnailData, mimeType: "video/mp4", size: nil, attributes: [.Animated, .Video(duration: 0, size: video.representation.dimensions, flags: [], preloadSize: nil, coverTime: nil, videoCodec: nil)], alternativeRepresentations: []))
+-                    let videoContent = NativeVideoContent(id: .profileVideo(videoId, nil), userLocation: .other, fileReference: videoFileReference, streamVideo: isMediaStreamable(resource: video.representation.resource) ? .conservative : .none, loopVideo: true, enableSound: false, fetchAutomatically: true, onlyFullSizeThumbnail: false, useLargeThumbnail: true, autoFetchFullSizeThumbnail: true, startTimestamp: video.representation.startTimestamp, continuePlayingWithoutSoundOnLostAudioSession: false, placeholderColor: .clear, captureProtected: peer.isCopyProtectionEnabled, storeAfterDownload: nil)
++                    let videoContent = NativeVideoContent(id: .profileVideo(videoId, nil), userLocation: .other, fileReference: videoFileReference, streamVideo: isMediaStreamable(resource: video.representation.resource) ? .conservative : .none, loopVideo: true, enableSound: false, fetchAutomatically: true, onlyFullSizeThumbnail: false, useLargeThumbnail: true, autoFetchFullSizeThumbnail: true, startTimestamp: video.representation.startTimestamp, continuePlayingWithoutSoundOnLostAudioSession: false, placeholderColor: .clear, captureProtected: ecoCaptureProtection(peer.isCopyProtectionEnabled), storeAfterDownload: nil)
+                     if videoContent.id != self.videoContent?.id {
+                         self.videoNode?.removeFromSupernode()
+                         
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEditingAvatarNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEditingAvatarNode.swift
+index eb0660eb58db805d35281ab7fc35ffd8537dbf74..242d06f248cce38849f0f0a1ce9243b24ad55c94 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEditingAvatarNode.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEditingAvatarNode.swift
+@@ -188,7 +188,7 @@ final class PeerInfoEditingAvatarNode: ASDisplayNode {
+                 }
+                 
+                 let videoFileReference = FileMediaReference.avatarList(peer: peerReference, media: TelegramMediaFile(fileId: EngineMedia.Id(namespace: Namespaces.Media.LocalFile, id: 0), partialReference: nil, resource: video.representation.resource, previewRepresentations: representations.map { $0.representation }, videoThumbnails: [], immediateThumbnailData: immediateThumbnailData, mimeType: "video/mp4", size: nil, attributes: [.Animated, .Video(duration: 0, size: video.representation.dimensions, flags: [], preloadSize: nil, coverTime: nil, videoCodec: nil)], alternativeRepresentations: []))
+-                let videoContent = NativeVideoContent(id: .profileVideo(videoId, nil), userLocation: .other, fileReference: videoFileReference, streamVideo: isMediaStreamable(resource: video.representation.resource) ? .conservative : .none, loopVideo: true, enableSound: false, fetchAutomatically: true, onlyFullSizeThumbnail: false, useLargeThumbnail: true, autoFetchFullSizeThumbnail: true, startTimestamp: video.representation.startTimestamp, continuePlayingWithoutSoundOnLostAudioSession: false, placeholderColor: .clear, captureProtected: peer.isCopyProtectionEnabled, storeAfterDownload: nil)
++                let videoContent = NativeVideoContent(id: .profileVideo(videoId, nil), userLocation: .other, fileReference: videoFileReference, streamVideo: isMediaStreamable(resource: video.representation.resource) ? .conservative : .none, loopVideo: true, enableSound: false, fetchAutomatically: true, onlyFullSizeThumbnail: false, useLargeThumbnail: true, autoFetchFullSizeThumbnail: true, startTimestamp: video.representation.startTimestamp, continuePlayingWithoutSoundOnLostAudioSession: false, placeholderColor: .clear, captureProtected: ecoCaptureProtection(peer.isCopyProtectionEnabled), storeAfterDownload: nil)
+                 if videoContent.id != self.videoContent?.id {
+                     self.videoNode?.removeFromSupernode()
+                     
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..c9cb4e33ba90296d4a47d038e649d8beda9e2ef5 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
@@ -905,21 +1015,33 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..c9cb4e33ba90296d4a47d038e649d8be
              return
          }
          let maskScale: CGFloat = isAvatarExpanded ? width / 100.0 : 1.0
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoPaneContainerNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoPaneContainerNode.swift
+index 9619a552164f2c24d3977378ecfedc21cb1f71df..9ca1eb2720291871d826c21be3d63b5850b81265 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoPaneContainerNode.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoPaneContainerNode.swift
+@@ -445,7 +445,7 @@ private final class PeerInfoPendingPane {
+     ) {
+         let (chatLocationPeerId, chatLocation, chatLocationContextHolder) = peerInfoSharedMediaChatLocation(peerId: peerId, chatLocation: chatLocation, chatLocationContextHolder: chatLocationContextHolder, sharedMediaFromForumTopic: sharedMediaFromForumTopic)
+         
+-        var captureProtected = peerInfoIsCopyProtected(data: data, sharedMediaFromForumTopic: sharedMediaFromForumTopic)
++        var captureProtected = ecoCaptureProtection(peerInfoIsCopyProtected(data: data, sharedMediaFromForumTopic: sharedMediaFromForumTopic))
+         let paneNode: PeerInfoPaneNode
+         switch key {
+         case .gifts:
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
-index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..bea03f5b00f5b8e15fdc512661521d926e009d68 100644
+index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..5581c8b3c4502d84f6131d240231de663eefd3c7 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
-@@ -6,6 +6,9 @@ import SGStrings
+@@ -6,6 +6,8 @@ import SGStrings
  import CountrySelectionUI
  //
  import Foundation
 +import EcoStrings
 +import EcoBadges
-+import EcoPreferences
  import UIKit
  import Display
  import AsyncDisplayKit
-@@ -173,6 +176,8 @@ enum PeerInfoSettingsSection {
+@@ -173,6 +175,8 @@ enum PeerInfoSettingsSection {
      case swiftgram
      case swiftgramPro
      //
@@ -928,7 +1050,7 @@ index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..bea03f5b00f5b8e15fdc512661521d92
      case avatar
      case edit
      case proxy
-@@ -2419,6 +2424,17 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
+@@ -2419,6 +2423,17 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                  }
              }
              
@@ -946,19 +1068,6 @@ index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..bea03f5b00f5b8e15fdc512661521d92
              self.headerNode.displayStatusPremiumIntro = { [weak self] in
                  guard let self else {
                      return
-@@ -6860,9 +6876,9 @@ public final class PeerInfoScreenImpl: ViewController, PeerInfoScreen, KeyShortc
-             }
-             |> distinctUntilChanged
-             
--            let accountTabBarAvatar: Signal<(UIImage, UIImage)?, NoError> = combineLatest(self.accountsAndPeers.get(), context.sharedContext.presentationData)
--            |> map { primaryAndOther, presentationData -> (Account, EnginePeer, PresentationTheme)? in
--                if let primary = primaryAndOther.0, !primaryAndOther.1.isEmpty {
-+            let accountTabBarAvatar: Signal<(UIImage, UIImage)?, NoError> = combineLatest(self.accountsAndPeers.get(), context.sharedContext.presentationData, EcoPreferences.shared.avatarInTabBarSignal)
-+            |> map { primaryAndOther, presentationData, avatarInTabBar -> (Account, EnginePeer, PresentationTheme)? in
-+                if let primary = primaryAndOther.0, !primaryAndOther.1.isEmpty || avatarInTabBar {
-                     return (primary.0.account, primary.1, presentationData.theme)
-                 } else {
-                     return nil
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
 index 446979e1d4d5fb491531f9e23f8593836709fe2b..089b85b6731bf5d8d0380fdf4fdeaaf88fd90f08 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
@@ -1003,6 +1112,19 @@ index bb35640b764b8f450e904f6420d0e6248c2c9770..3fb015eb62eb2419b124c75e1d2a36aa
      items[.edit]!.append(contentsOf: sgPeerInfoSettingsProfileIdItems(data: data, interaction: interaction)) // MARK: Swiftgram
      
      if let settings = data.globalSettings {
+diff --git a/submodules/TelegramUI/Sources/ChatControllerNode.swift b/submodules/TelegramUI/Sources/ChatControllerNode.swift
+index a46c380873253f3c63241d0c06a95350bdc408f2..6e18625f6c137f82d68ec811403f11a39efa5388 100644
+--- a/submodules/TelegramUI/Sources/ChatControllerNode.swift
++++ b/submodules/TelegramUI/Sources/ChatControllerNode.swift
+@@ -1327,7 +1327,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
+             }
+         }
+         
+-        let isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
++        let isSecret = ecoCaptureProtection(self.chatPresentationInterfaceState.copyProtectionEnabled) || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
+         if self.historyNodeContainer.isSecret != isSecret {
+             #if DEBUG
+             self.historyNodeContainer.isSecret = false
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..39513c2ac3fb2a071875dbaa3c06775ce3e91c39 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
@@ -1030,6 +1152,19 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..39513c2ac3fb2a071875dbaa3c06775c
          sgInsertContextMenu(actions: &actions, sgActions: &sgActions, index: sgActionsIndex, chatPresentationInterfaceState: chatPresentationInterfaceState) // MARK: Swiftgram
          
          var reactionCount = 0
+diff --git a/submodules/TelegramUI/Sources/ChatPinnedMessageTitlePanelNode.swift b/submodules/TelegramUI/Sources/ChatPinnedMessageTitlePanelNode.swift
+index d5eac888b0ab1a950c6ceca73b15968d439537d5..7b06ca70f3172b12a57268aad7a4e30897544a69 100644
+--- a/submodules/TelegramUI/Sources/ChatPinnedMessageTitlePanelNode.swift
++++ b/submodules/TelegramUI/Sources/ChatPinnedMessageTitlePanelNode.swift
+@@ -307,7 +307,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
+         // The skeleton is inert: no tap, no long press.
+         self.tapButton.isUserInteractionEnabled = !isSkeleton
+         
+-        self.captureProtected = interfaceState.copyProtectionEnabled || interfaceState.myCopyProtectionEnabled
++        self.captureProtected = ecoCaptureProtection(interfaceState.copyProtectionEnabled || interfaceState.myCopyProtectionEnabled)
+         
+         self.contextContainer.isGestureEnabled = !isReplyThread && !isSkeleton
+         
 diff --git a/submodules/TelegramUI/Sources/OpenChatMessage.swift b/submodules/TelegramUI/Sources/OpenChatMessage.swift
 index 9e11d85200e700d5f04b2ba3532312ea9908d3bc..361b9e8691280726bb9c10b3ef6a0e132b941514 100644
 --- a/submodules/TelegramUI/Sources/OpenChatMessage.swift
@@ -1044,6 +1179,19 @@ index 9e11d85200e700d5f04b2ba3532312ea9908d3bc..361b9e8691280726bb9c10b3ef6a0e13
              
                  if GalleryController.maybeExpandPIP(context: params.context, messageId: params.message.id) {
                      return true
+diff --git a/submodules/TelegramUI/Sources/SharedMediaPlayer.swift b/submodules/TelegramUI/Sources/SharedMediaPlayer.swift
+index 740fdbcb7054ca6643eba41fbdfd42581cf18d25..d40a6913b2faa296accabde77f7a3d81c4c9d033 100644
+--- a/submodules/TelegramUI/Sources/SharedMediaPlayer.swift
++++ b/submodules/TelegramUI/Sources/SharedMediaPlayer.swift
+@@ -238,7 +238,7 @@ final class SharedMediaPlayer {
+                                 if let mediaManager = strongSelf.mediaManager, let context = strongSelf.context, let item = item as? MessageMediaPlaylistItem {
+                                     switch playbackData.source {
+                                         case let .telegramFile(fileReference, _, _):
+-                                        let videoNode = OverlayInstantVideoNode(context: context, audioSession: strongSelf.audioSession, manager: mediaManager.universalVideoManager, content: NativeVideoContent(id: .message(item.message.stableId, fileReference.media.fileId), userLocation: .peer(item.message.id.peerId), fileReference: fileReference, enableSound: false, baseRate: rateValue, isAudioVideoMessage: true, captureProtected: item.message.isCopyProtected(), storeAfterDownload: nil), close: { [weak mediaManager] in
++                                        let videoNode = OverlayInstantVideoNode(context: context, audioSession: strongSelf.audioSession, manager: mediaManager.universalVideoManager, content: NativeVideoContent(id: .message(item.message.stableId, fileReference.media.fileId), userLocation: .peer(item.message.id.peerId), fileReference: fileReference, enableSound: false, baseRate: rateValue, isAudioVideoMessage: true, captureProtected: ecoCaptureProtection(item.message.isCopyProtected()), storeAfterDownload: nil), close: { [weak mediaManager] in
+                                                 mediaManager?.setPlaylist(nil, type: .voice, control: .playback(.pause))
+                                             })
+                                             strongSelf.playbackItem = .instantVideo(videoNode)
 diff --git a/submodules/TelegramUI/Sources/SharedWakeupManager.swift b/submodules/TelegramUI/Sources/SharedWakeupManager.swift
 index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..8594f6e6ce3daa55cbc5b26d4dbeedbc91bca0ea 100644
 --- a/submodules/TelegramUI/Sources/SharedWakeupManager.swift

@@ -35,7 +35,7 @@ private func ecoBadgeSourceIcon(_ source: EcoBadgeSource) -> UIImage? {
     }
 }
 
-private func ecoBadgeSourceEnabled(_ source: EcoBadgeSource) -> Bool {
+func ecoBadgeSourceEnabled(_ source: EcoBadgeSource) -> Bool {
     switch source {
     case .telegram:
         return true

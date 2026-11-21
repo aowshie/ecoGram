@@ -1,23 +1,24 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 16:30:06 +0200
+Date: Sat, 21 Nov 2026 21:20:37 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
 diff --git a/submodules/TelegramCore/BUILD b/submodules/TelegramCore/BUILD
-index 9ed712747025dea831f4112ad0c1ffd5c1c503cf..7f2edd3b3d0f89145bab430a0c7df97ed5d7f36a 100644
+index 9ed712747025dea831f4112ad0c1ffd5c1c503cf..fb32a2c40686297aba11d2a0809f95ede419326c 100644
 --- a/submodules/TelegramCore/BUILD
 +++ b/submodules/TelegramCore/BUILD
-@@ -9,6 +9,8 @@ sgdeps = [
+@@ -9,6 +9,9 @@ sgdeps = [
      "//Swiftgram/SGGHSettingsScheme:SGGHSettingsScheme",
      "//Swiftgram/SGConfig:SGConfig",
      "//Swiftgram/SGLogging:SGLogging",
 +    "//EcoGram/Ayu/Settings:AyuSettings",
 +    "//EcoGram/Ayu/History:AyuHistory",
++    "//EcoGram/Preferences:EcoPreferences",
  ]
  
  sgsrc = [
-@@ -17,6 +19,7 @@ sgsrc = [
+@@ -17,6 +20,7 @@ sgsrc = [
      "//Swiftgram/SGServerSuggestions:SGServerSuggestions",
      "//Swiftgram/SGTranslate:SGTranslate",
      "//Swiftgram/SGLocalizationInfoExtension:SGLocalizationInfoExtension",

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftSignalKit
 import SGSimpleSettings
 
 public final class EcoPreferences {
@@ -8,7 +7,6 @@ public final class EcoPreferences {
 
     private enum Key: String {
         case backgroundNotifications
-        case avatarInTabBar
         case hideProfileShortcuts
         case islandAvatarAnimation
         case selectionOrder
@@ -17,6 +15,7 @@ public final class EcoPreferences {
         case contextEnabled
         case badgeOrder
         case showEcoBadges
+        case allowsProtectedScreenshots
         case swiftgramDefaultsApplied = "swiftgramDefaultsApplied.v2"
 
         var name: String {
@@ -25,7 +24,6 @@ public final class EcoPreferences {
     }
 
     private let defaults: UserDefaults
-    private let avatarInTabBarValue: ValuePromise<Bool>
     private let badgeOrderLock = NSLock()
     private var cachedBadgeOrder: [EcoBadgeSource]?
 
@@ -33,26 +31,17 @@ public final class EcoPreferences {
         self.defaults = defaults
         self.defaults.register(defaults: [
             Key.backgroundNotifications.name: true,
-            Key.avatarInTabBar.name: false,
             Key.hideProfileShortcuts.name: false,
             Key.islandAvatarAnimation.name: true,
-            Key.showEcoBadges.name: true
+            Key.showEcoBadges.name: true,
+            Key.allowsProtectedScreenshots.name: false
         ])
-        self.avatarInTabBarValue = ValuePromise(self.defaults.bool(forKey: Key.avatarInTabBar.name), ignoreRepeated: true)
         self.applySwiftgramDefaults()
     }
 
     public var backgroundNotifications: Bool {
         get { return self.defaults.bool(forKey: Key.backgroundNotifications.name) }
         set { self.store(newValue, .backgroundNotifications) }
-    }
-
-    public var avatarInTabBar: Bool {
-        get { return self.defaults.bool(forKey: Key.avatarInTabBar.name) }
-        set {
-            self.store(newValue, .avatarInTabBar)
-            self.avatarInTabBarValue.set(newValue)
-        }
     }
 
     public var hideProfileShortcuts: Bool {
@@ -63,6 +52,11 @@ public final class EcoPreferences {
     public var islandAvatarAnimation: Bool {
         get { return self.defaults.bool(forKey: Key.islandAvatarAnimation.name) }
         set { self.store(newValue, .islandAvatarAnimation) }
+    }
+
+    public var allowsProtectedScreenshots: Bool {
+        get { return self.defaults.bool(forKey: Key.allowsProtectedScreenshots.name) }
+        set { self.store(newValue, .allowsProtectedScreenshots) }
     }
 
     public var showEcoBadges: Bool {
@@ -89,10 +83,6 @@ public final class EcoPreferences {
         self.cachedBadgeOrder = nil
         self.badgeOrderLock.unlock()
         NotificationCenter.default.post(name: EcoPreferences.didChange, object: self)
-    }
-
-    public var avatarInTabBarSignal: Signal<Bool, NoError> {
-        return self.avatarInTabBarValue.get()
     }
 
     public var selectionOrder: [EcoSelectionAction] {

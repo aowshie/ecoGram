@@ -56,7 +56,9 @@ public struct EcoStrings {
         case selectionLimit
         case contextFooter
         case appearanceHeader
-        case avatarInTabBar
+        case appearanceTitle
+        case spyScreenshots
+        case spyScreenshotsFooter
         case hideProfileShortcuts
         case islandAvatarAnimation
         case islandAvatarFooter
@@ -143,7 +145,9 @@ public struct EcoStrings {
         .selectionLimit: ("You can enable up to 5 buttons", "Можно включить не больше 5 кнопок", "有効にできるボタンは5つまでです"),
         .contextFooter: ("Items shown when you hold a message. Check the ones you need and drag to reorder. Unchecked items are hidden, and the switches match the Swiftgram section.", "Пункты, которые появляются при удержании сообщения. Отметьте нужные и перетащите, чтобы изменить порядок. Неотмеченные пункты скрыты, переключатели совпадают с разделом Swiftgram.", "メッセージを長押ししたときに表示される項目です。必要なものにチェックを入れ、ドラッグで並べ替えます。チェックしない項目は非表示になり、Swiftgramの設定と連動します。"),
         .appearanceHeader: ("APPEARANCE", "ОФОРМЛЕНИЕ", "外観"),
-        .avatarInTabBar: ("Avatar Instead of Settings Icon", "Аватарка вместо шестерёнки", "設定アイコンの代わりにアバター"),
+        .appearanceTitle: ("Appearance", "Оформление", "外観"),
+        .spyScreenshots: ("Screenshots in Protected Chats", "Скриншоты в защищённых чатах", "保護されたチャットでスクリーンショット"),
+        .spyScreenshotsFooter: ("Allows screenshots and screen recording in chats and channels that restrict saving content. Secret chats and self-destructing media stay protected. Open chats update when you reopen them.", "Разрешает скриншоты и запись экрана в чатах и каналах с запретом копирования. Секретные чаты и самоудаляющиеся медиа остаются защищёнными. Уже открытые чаты обновятся, когда вы откроете их заново.", "コンテンツの保存が制限されたチャットやチャンネルでスクリーンショットと画面収録を許可します。シークレットチャットと自動削除メディアは引き続き保護されます。開いているチャットは開き直すと反映されます。"),
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
         .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
         .islandAvatarFooter: ("On iPhones without the Dynamic Island, the profile photo flows into the top of the screen like a drop as you scroll.", "На iPhone без Dynamic Island аватарка при прокрутке профиля втягивается в верх экрана, как капля.", "Dynamic IslandのないiPhoneで、スクロールするとプロフィール写真が水滴のように画面上部へ吸い込まれます。"),

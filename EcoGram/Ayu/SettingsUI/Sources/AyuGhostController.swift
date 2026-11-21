@@ -53,12 +53,12 @@ private func ayuGhostEntries(strings: EcoStrings, presentationStrings: Presentat
     entries.append(.notice(section: AyuGhostSection.options.rawValue, order: next(), text: strings.get(.ghostFooter)))
 
     entries.append(.header(section: AyuGhostSection.exceptions.rawValue, order: next(), text: presentationStrings.Notifications_MessageNotificationsExceptions))
-    entries.append(.addPeer(section: AyuGhostSection.exceptions.rawValue, order: next(), title: presentationStrings.Notification_Exceptions_AddException))
+    entries.append(.addPeer(section: AyuGhostSection.exceptions.rawValue, order: next(), title: presentationStrings.Notification_Exceptions_AddException, action: .addException))
     for (peer, options) in exceptions {
         entries.append(.peer(section: AyuGhostSection.exceptions.rawValue, order: next(), peer: peer, value: ayuGhostSummary(options, strings: strings, presentationStrings: presentationStrings), editing: state.editing, revealed: state.revealedPeerId == peer.id))
     }
     if !exceptions.isEmpty {
-        entries.append(.deleteAll(section: AyuGhostSection.exceptions.rawValue, order: next(), title: presentationStrings.Notifications_DeleteAllExceptions))
+        entries.append(.deleteAll(section: AyuGhostSection.exceptions.rawValue, order: next(), title: presentationStrings.Notifications_DeleteAllExceptions, action: .deleteExceptions))
     }
 
     return entries
