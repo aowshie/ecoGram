@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 15:14:52 +0200
+Date: Sat, 21 Nov 2026 16:30:06 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -59,14 +59,14 @@ index a38bead0e1910fca3a0dc94b41f0418df2580799..c89f8695b40b3919ab1fa800a1186c60
                          }
                          
 diff --git a/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift b/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift
-index 2889758cc0e722a9fc40433fbe52c70dda982c43..26c45ceff71bc68dc58049acbab7e672f2eda732 100644
+index 2889758cc0e722a9fc40433fbe52c70dda982c43..bb376faf02af0f9136782baaec4861f6a3e0b057 100644
 --- a/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift
 +++ b/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift
 @@ -796,6 +796,9 @@ public func enqueueMessages(account: Account, peerId: PeerId, messages: [Enqueue
              return (resultIds, ephemeralMessageIds)
          }
          |> map { resultIds, ephemeralMessageIds -> [MessageId?] in
-+            if messages.contains(where: { !$0.attributes.contains(where: { $0 is OutgoingScheduleInfoMessageAttribute }) }) {
++            if messages.contains(where: { !$0.1.attributes.contains(where: { $0 is OutgoingScheduleInfoMessageAttribute }) }) {
 +                ayuReadOnInteract(account: account, peerId: peerId)
 +            }
              for messageId in ephemeralMessageIds {

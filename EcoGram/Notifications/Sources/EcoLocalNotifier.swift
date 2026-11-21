@@ -160,20 +160,17 @@ public final class EcoLocalNotifier {
     private func post(account: Account, accountId: AccountRecordId, message: EngineMessage, count: Int) {
         let rootPath = URL(fileURLWithPath: account.basePath).deletingLastPathComponent().path
         let accountPeerId = account.peerId
-        let _ = (account.postbox.transaction { transaction -> (displayContents: Bool, sound: PeerMessageSound) in
-            let presentation = messagesForNotification(transaction: transaction, id: message.id, alwaysReturnMessage: true)
-            return (presentation.displayContents, presentation.sound)
-        }
+        let _ = (TelegramEngine(account: account).messages.ecoNotificationPresentation(id: message.id)
         |> deliverOnMainQueue).startStandalone(next: { [weak self] presentation in
             guard let self, EcoLocalNotifier.isPosting else {
                 return
             }
             let isLocked = EcoLocalNotifier.isAppLocked(rootPath: rootPath)
-            self.post(accountId: accountId, accountPeerId: accountPeerId, message: message, count: count, displayContents: presentation.displayContents && !isLocked, showsSender: !isLocked, sound: presentation.sound)
+            self.post(accountId: accountId, accountPeerId: accountPeerId, message: message, count: count, displayContents: presentation.displayContents && !isLocked, showsSender: !isLocked, playsSound: presentation.playsSound)
         })
     }
 
-    private func post(accountId: AccountRecordId, accountPeerId: EnginePeer.Id, message: EngineMessage, count: Int, displayContents: Bool, showsSender: Bool, sound: PeerMessageSound) {
+    private func post(accountId: AccountRecordId, accountPeerId: EnginePeer.Id, message: EngineMessage, count: Int, displayContents: Bool, showsSender: Bool, playsSound: Bool) {
         guard let presentationData = self.presentationData() else {
             return
         }
@@ -233,7 +230,7 @@ public final class EcoLocalNotifier {
             userInfo["threadId"] = threadId
         }
         content.userInfo = userInfo
-        if sound != .none {
+        if playsSound {
             content.sound = .default
         }
         let identifier = EcoLocalNotifier.identifier(accountId: accountId, messageId: message.id)
