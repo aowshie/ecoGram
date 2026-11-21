@@ -78,7 +78,7 @@ public final class EcoPreferences {
         if let cached = self.cachedBadgeOrder {
             return cached
         }
-        let order = self.ordered(key: .badgeOrder, all: EcoBadgeSource.allCases)
+        let order: [EcoBadgeSource] = self.ordered(key: .badgeOrder, all: EcoBadgeSource.allCases)
         self.cachedBadgeOrder = order
         return order
     }

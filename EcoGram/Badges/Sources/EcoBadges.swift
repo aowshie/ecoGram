@@ -100,15 +100,15 @@ public final class EcoBadges {
                 return
             }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let snapshot = status == 200 ? data.flatMap(EcoBadges.parse) : nil
+            let fetched = status == 200 ? data.flatMap(EcoBadges.parse) : nil
             self.lock.lock()
             self.isRefreshing = false
             let previous = self.snapshot
-            if let snapshot {
-                self.snapshot = snapshot
+            if let fetched {
+                self.snapshot = fetched
             }
             self.lock.unlock()
-            guard let snapshot else {
+            guard let snapshot = fetched else {
                 return
             }
             self.persist(snapshot)
