@@ -37,7 +37,6 @@ public final class AyuSettings {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.migrateGhostMode()
-        self.migrateGhostExceptions()
         self.defaults.register(defaults: [
             Key.ghostMode.name: false,
             Key.ghostHidesReadReceipts.name: false,
@@ -54,6 +53,7 @@ public final class AyuSettings {
             Key.historyCleanupDays.name: 0,
             Key.showAyuBadges.name: true
         ])
+        self.migrateGhostExceptions()
     }
 
     private func migrateGhostMode() {
@@ -196,6 +196,10 @@ public final class AyuSettings {
     public var saveSelfDestructing: Bool {
         get { return self.bool(.saveSelfDestructing) }
         set { self.set(newValue, .saveSelfDestructing) }
+    }
+
+    public var keepsSelfDestructingMedia: Bool {
+        return self.saveDeletedMessages && self.saveSelfDestructing
     }
 
     public var historyMediaLimitMegabytes: Int {

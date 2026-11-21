@@ -79,7 +79,7 @@ private func ayuMainEntries(strings: EcoStrings, presentationStrings: Presentati
     }
     entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, icon: ayuOutlineIcon("Premium/Stories/Stealth", color: iconColor), title: strings.get(.ghostMode), subtitle: ghostSubtitle, label: ayuStateLabel(presentationStrings, enabled: ghostCount, total: ghostTotal)))
 
-    let historyOptions = [settings.saveDeletedMessages, settings.saveEditedMessages, settings.saveSelfDestructing]
+    let historyOptions = [settings.saveDeletedMessages, settings.saveEditedMessages, settings.keepsSelfDestructingMedia]
     let historyCount = historyOptions.filter { $0 }.count
     entries.append(.header(section: AyuMainSection.spy.rawValue, order: next(), text: strings.get(.spyEssentials)))
     entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ayuOutlineIcon("Chat/Context Menu/Message", color: iconColor), title: strings.get(.historyTitle), subtitle: ayuCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ayuStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))

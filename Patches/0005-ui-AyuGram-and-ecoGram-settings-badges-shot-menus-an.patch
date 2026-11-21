@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 13:19:52 +0200
+Date: Sat, 21 Nov 2026 15:14:54 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -45,7 +45,7 @@ index c0fa1aaef0cfb60635e2e907a8469750f87d6565..e05bdaaf41c9fde44a80fed8c80aeca6
  sgsrcs = [
      "//Swiftgram/SGChatListSimpleSettingsSignal:SGChatListSimpleSettingsSignal",
 diff --git a/submodules/ChatListUI/Sources/Node/ChatListItem.swift b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
-index 655bed73fbb335838b2279db8ac9d95e68444dd0..f736eaaf0766c4672faff84c5ccc9319dd24e99a 100644
+index 655bed73fbb335838b2279db8ac9d95e68444dd0..be511dceef4d729c23b7c6189f0a663d7a9620f3 100644
 --- a/submodules/ChatListUI/Sources/Node/ChatListItem.swift
 +++ b/submodules/ChatListUI/Sources/Node/ChatListItem.swift
 @@ -1,5 +1,6 @@
@@ -108,7 +108,7 @@ index 655bed73fbb335838b2279db8ac9d95e68444dd0..f736eaaf0766c4672faff84c5ccc9319
                      if let verificationIconFileId = peer.verificationIconFileId {
                          currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
                      }
-+                    currentEcoBadges = EcoTitleBadges.resolve(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
++                    currentEcoBadges = peer.id.namespace == Namespaces.Peer.CloudUser || peer.id.namespace == Namespaces.Peer.CloudChannel ? EcoTitleBadges.resolve(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel) : .empty
                  }
              }
              if case let .peer(peerData) = item.content, peerData.isSideListAllThreadsItem {
@@ -266,7 +266,7 @@ index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..10df042ae53957bcf0df5413b7829e1b
  
  sgsrc = [
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
-index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..53e00bb080df31c76a0cd67d3de41d514b5ed671 100644
+index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..2cc5c8126de3a35fbd20fae2598e15d091309f3b 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 @@ -2,6 +2,7 @@ import SGStrings // MARK: Swiftgram
@@ -335,7 +335,7 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..53e00bb080df31c76a0cd67d3de41d51
                          credibilityIconWidth += 20.0
                      }
                  }
-+                ecoBadges = ecoAuthorBadges(item.message)
++                ecoBadges = viaSuffix == nil ? ecoAuthorBadges(item.message) : .empty
 +                if !ecoBadges.isEmpty {
 +                    credibilityIconWidth += ecoBadges.totalWidth(side: 18.0, spacing: 3.0) + 3.0
 +                }
@@ -701,7 +701,7 @@ index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..997c03284b3f47174ec74a8872e982f0
  #
  # MARK: Swiftgram
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
-index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..3f348fdfcc828be9b92152ee1c21bfde3c92143a 100644
+index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..c9cb4e33ba90296d4a47d038e649d8beda9e2ef5 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift
 @@ -1,5 +1,7 @@
@@ -783,7 +783,7 @@ index 521a4ab517c8cbc015d5c704f67d3aad5c1eea09..3f348fdfcc828be9b92152ee1c21bfde
          var verifiedIcon: CredibilityIcon = .none
          var statusIcon: CredibilityIcon = .none
 +        self.ecoBadges = peer.flatMap { peer in
-+            return EcoTitleBadges.resolve(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel)
++            return peer.id.namespace == Namespaces.Peer.CloudUser || peer.id.namespace == Namespaces.Peer.CloudChannel ? EcoTitleBadges.resolve(id: peer.id.id._internalGetInt64Value(), isChannel: peer.id.namespace == Namespaces.Peer.CloudChannel) : .empty
 +        } ?? .empty
          if let peer {
              if peer.id == self.context.account.peerId && !self.isSettings && !self.isMyProfile {
@@ -1136,18 +1136,19 @@ index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..8594f6e6ce3daa55cbc5b26d4dbeedbc
                  } else {
                      account.shouldBeServiceTaskMaster.set(.single(.never))
 diff --git a/submodules/TelegramUI/Sources/TelegramRootController.swift b/submodules/TelegramUI/Sources/TelegramRootController.swift
-index d38102d4c13d755997d9c131756ef1f89dd8ecd4..a983a425cd02019761073548ec8ef13f22dfa205 100644
+index d38102d4c13d755997d9c131756ef1f89dd8ecd4..35e6df72f9a340ac0c983f387518c96f59068dab 100644
 --- a/submodules/TelegramUI/Sources/TelegramRootController.swift
 +++ b/submodules/TelegramUI/Sources/TelegramRootController.swift
-@@ -2,6 +2,7 @@
+@@ -2,6 +2,8 @@
  import SGSimpleSettings
  //
  import Foundation
++import AyuSettingsUI
 +import EcoSettingsUI
  import UIKit
  import Display
  import AsyncDisplayKit
-@@ -270,6 +271,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
+@@ -270,6 +272,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
          self.accountSettingsController = accountSettingsController
          self.rootTabController = tabBarController
          self.pushViewController(tabBarController, animated: false)
@@ -1155,6 +1156,7 @@ index d38102d4c13d755997d9c131756ef1f89dd8ecd4..a983a425cd02019761073548ec8ef13f
 +        ecoClaimEarlyBadge(context: self.context, ready: chatListController.ready.get(), push: { [weak self] controller in
 +            self?.pushViewController(controller)
 +        })
++        ayuExpireHistory(context: self.context)
      }
          
      public func updateRootControllers(showCallsTab: Bool, showContactsTab: Bool, /* MARK: Swiftgram */ showNewsTab: Bool) {

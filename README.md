@@ -43,7 +43,7 @@
 
 ## Privacy
 
-No analytics. History stays on the device. The only ecoGram server is `api.ecogram.cc`: it serves the public badge list, and the app sends it your Telegram ID once to hand out the early user badge. Turning off ecoGram badges stops both.
+No analytics. History stays on the device. The only ecoGram server is `api.ecogram.cc`: it serves the public badge list, and the app sends it your Telegram ID to hand out the early user badge until the server answers. Turning off ecoGram badges stops both. AyuGram badges are downloaded from the AyuGram server, or exteraGram's as a fallback; turning them off stops that too.
 
 ## Install
 
@@ -53,7 +53,7 @@ IPA from [releases](../../releases), signed with SideStore, AltStore, Sideloadly
 
 GitHub Actions: `Build` workflow, `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` secrets.
 
-Locally, on a Mac:
+Locally, on a Mac with Python 3.11 or newer, `librsvg` (`brew install librsvg`) and the Xcode version from the pinned Swiftgram `versions.json` selected:
 
 ```bash
 python -m Tools.ecogram prepare
@@ -74,6 +74,7 @@ Swiftgram updates are pulled automatically by the `Upstream` workflow.
 | `EcoGram/Preferences/` | Preferences |
 | `EcoGram/ContextMenu/` | Message menu |
 | `EcoGram/Notifications/` | Notifications |
+| `EcoGram/Badges/` | ecoGram badges |
 | `EcoGram/Strings/` | Strings ru, en, ja |
 | `Patches/` | Swiftgram patches |
 | `Branding/` | Branding |

@@ -9,7 +9,9 @@ swift_library(
     deps = [
         "//EcoGram/Preferences:EcoPreferences",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+        "//submodules/Postbox:Postbox",
         "//submodules/TelegramCore:TelegramCore",
+        "//submodules/AppLockState:AppLockState",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/TelegramStringFormatting:TelegramStringFormatting",
         "//submodules/LocalizedPeerData:LocalizedPeerData",

@@ -158,7 +158,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         })
     }
 
-    var renderImpl: (() -> Void)?
+    let renderLoop = AyuShotRenderLoop()
     var dismissImpl: (() -> Void)?
     var moreImpl: ((UIView) -> Void)?
 
@@ -174,7 +174,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
                 defaults.set(value, forKey: ayuShotDateKey)
             }
         }
-        renderImpl?()
+        renderLoop.run()
     })
 
     let barButtonSize = CGSize(width: 44.0, height: 44.0)
@@ -253,13 +253,14 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         presentToast(.info(title: nil, text: strings.get(.shotFailed), timeout: nil, customUndoText: nil))
     }
 
-    renderImpl = { [weak controller] in
-        guard let controller else {
+    renderLoop.controller = controller
+    renderLoop.render = { loop in
+        guard let controller = loop.controller else {
             return
         }
         guard controller.view.window != nil else {
             Queue.mainQueue().after(0.1, {
-                renderImpl?()
+                loop.run()
             })
             return
         }
@@ -285,7 +286,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
                 }
             }
             if !isCurrent {
-                renderImpl?()
+                loop.run()
             } else if image == nil {
                 presentFailure()
             }
@@ -371,7 +372,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
 
     controller.didAppear = { firstTime in
         if firstTime {
-            renderImpl?()
+            renderLoop.run()
         }
     }
 
@@ -387,4 +388,13 @@ func ayuShotScreen(context: AccountContext, renderer: AyuShotRenderer, renderWid
     }
     controller.navigationPresentation = .flatModal
     return controller
+}
+
+private final class AyuShotRenderLoop {
+    weak var controller: ViewController?
+    var render: ((AyuShotRenderLoop) -> Void)?
+
+    func run() {
+        self.render?(self)
+    }
 }

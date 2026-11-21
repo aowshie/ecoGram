@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Thu, 19 Nov 2026 11:15:57 +0200
+Date: Sat, 21 Nov 2026 15:14:52 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -59,14 +59,16 @@ index a38bead0e1910fca3a0dc94b41f0418df2580799..c89f8695b40b3919ab1fa800a1186c60
                          }
                          
 diff --git a/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift b/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift
-index 2889758cc0e722a9fc40433fbe52c70dda982c43..e052701c265e66ef6c04b82e387b3c778ecaf03d 100644
+index 2889758cc0e722a9fc40433fbe52c70dda982c43..26c45ceff71bc68dc58049acbab7e672f2eda732 100644
 --- a/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift
 +++ b/submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift
-@@ -796,6 +796,7 @@ public func enqueueMessages(account: Account, peerId: PeerId, messages: [Enqueue
+@@ -796,6 +796,9 @@ public func enqueueMessages(account: Account, peerId: PeerId, messages: [Enqueue
              return (resultIds, ephemeralMessageIds)
          }
          |> map { resultIds, ephemeralMessageIds -> [MessageId?] in
-+            ayuReadOnInteract(account: account, peerId: peerId)
++            if messages.contains(where: { !$0.attributes.contains(where: { $0 is OutgoingScheduleInfoMessageAttribute }) }) {
++                ayuReadOnInteract(account: account, peerId: peerId)
++            }
              for messageId in ephemeralMessageIds {
                  let _ = _internal_sendEphemeralOutgoingMessage(account: account, messageId: messageId).startStandalone()
              }
@@ -84,7 +86,7 @@ index 9e7bd27c8e40d1b3b8b61b8bb4e8757906268d53..099b6ec00d32ec71108d43f2926d25ee
      if candidates.isEmpty {
          return nil
 diff --git a/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift b/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
-index 3dc6c7d5b63ebd351a1e41b40b204f1b31090595..aaf06365f0ddd47e665bf86678007bc5a0798556 100644
+index 3dc6c7d5b63ebd351a1e41b40b204f1b31090595..28ffdf163ed305e674bf75c6f1af3dc50cc049db 100644
 --- a/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
 +++ b/submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
 @@ -992,7 +992,7 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
@@ -92,7 +94,7 @@ index 3dc6c7d5b63ebd351a1e41b40b204f1b31090595..aaf06365f0ddd47e665bf86678007bc5
                                      })
                                  } else {
 -                                    _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
-+                                    AyuHistoryCapture.deleteUnlessKept(transaction: transaction, mediaBox: postbox.mediaBox, id: id)
++                                    AyuHistoryCapture.deleteDetected(transaction: transaction, mediaBox: postbox.mediaBox, id: id)
                                      Logger.shared.log("HistoryValidation", "deleting message \(id) in \(id.peerId)")
                                  }
                              }
@@ -101,7 +103,7 @@ index 3dc6c7d5b63ebd351a1e41b40b204f1b31090595..aaf06365f0ddd47e665bf86678007bc5
                      for id in removedMessageIds {
                          if !validMessageIds.contains(id) {
 -                            _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
-+                            AyuHistoryCapture.deleteUnlessKept(transaction: transaction, mediaBox: postbox.mediaBox, id: id)
++                            AyuHistoryCapture.deleteDetected(transaction: transaction, mediaBox: postbox.mediaBox, id: id)
                              Logger.shared.log("HistoryValidation", "deleting thread message \(id) in \(id.peerId)")
                          }
                      }
@@ -269,17 +271,39 @@ index b1a5ae4e3353459d62a09f78ee54b4d8bbe00220..8958b204145009dc8aaf111d78bf8b09
          var resolvedPrivacyValue: TelegramPaidReactionPrivacy = .default
          transaction.updateMessage(messageId, update: { currentMessage in
 diff --git a/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift b/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
-index 49d68a3791e25e97ce82d98076fc54ae4d50aca6..cc1cb210b80887a7d8b84865b12e56800395a9a7 100644
+index 49d68a3791e25e97ce82d98076fc54ae4d50aca6..c5f4d81eb88f4c6e346bf1e62263dd6bdede8332 100644
 --- a/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
 +++ b/submodules/TelegramCore/Sources/State/StoredMessageConfirmation.swift
-@@ -211,6 +211,7 @@ func confirmStoredMessages(accountPeerId: PeerId, postbox: Postbox, source: Fetc
+@@ -211,6 +211,8 @@ func confirmStoredMessages(accountPeerId: PeerId, postbox: Postbox, source: Fetc
  /// Returns the ids it deleted: the private-chat and basic-group ones, then the channel ones, each in the order given.
  @discardableResult
  func deleteStoredMessagesAsReceivedDeletion(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) -> [MessageId] {
-+    let ids = ids.filter { !AyuHistoryCapture.isKept(transaction: transaction, id: $0) }
++    let retention = AyuHistoryCapture.retain(transaction: transaction, mediaBox: mediaBox, ids: ids)
++    let ids = ids.filter { retention.isDeletable($0) }
      var regularIds: [MessageId] = []
      var channelIds: [MessageId] = []
      for id in ids {
+@@ -224,7 +226,9 @@ func deleteStoredMessagesAsReceivedDeletion(transaction: Transaction, mediaBox:
+     if !regularIds.isEmpty {
+         var resourceIds: [MediaResourceId] = []
+         transaction.deleteMessages(regularIds, forEachMedia: { media in
+-            addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
++            if !retention.protects(media) {
++                addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
++            }
+         })
+         if !resourceIds.isEmpty {
+             let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
+@@ -234,7 +238,8 @@ func deleteStoredMessagesAsReceivedDeletion(transaction: Transaction, mediaBox:
+         _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: channelIds)
+     }
+ 
+-    let deletedIds = regularIds + channelIds
++    retention.restore(transaction: transaction)
++    let deletedIds = (regularIds + channelIds).filter { retention.isReported($0) }
+     // The received-deletion events (owner decision D1): reported inside this transaction, as the replay reports
+     // its deletions inside its own; the deletedMessages pipe fires once it has committed.
+     StoredMessageConfirmationDeletionReporters.shared.report(deletedIds, mediaBox: mediaBox, transaction: transaction)
 diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 index cf1ab15d9cfae956abcb53bf5060db525b32448d..27279ce31c292dbb4d41bc61bee63b9d164270cc 100644
 --- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
@@ -457,6 +481,19 @@ index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..948db1aa901c255975e135fefc934b18
                      }
                  }
              }
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift
+index 79f901067eec4df0881d7bf03d06e8b86893b716..bd4e3be8a36e3e29045d02f7cd5d3b2405f503c4 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift
+@@ -5,7 +5,7 @@ import SwiftSignalKit
+ 
+ func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messageId: MessageId) -> Signal<Void, NoError> {
+     return postbox.transaction { transaction -> Void in
+-        if let message = transaction.getMessage(messageId), message.flags.contains(.Incoming) {
++        if !ayuSuppressesContentRead(peerId: messageId.peerId), let message = transaction.getMessage(messageId), message.flags.contains(.Incoming) {
+             var updateMessage = false
+             var updatedAttributes = message.attributes
+             
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
 index 04945389638f5bf66324fd44010a8b69d8ab0d5e..48fd5f68e0647eb8b9812d724eceb7912750b746 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift

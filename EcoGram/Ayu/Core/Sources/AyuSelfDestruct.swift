@@ -65,7 +65,7 @@ public extension TelegramEngine.Messages {
         let network = self.account.network
         let stateManager: AccountStateManager = self.account.stateManager
         return self.account.postbox.transaction { transaction -> Bool in
-            guard let message = transaction.getMessage(id), message.flags.contains(.Incoming), message.ayuSelfDestructTimeout != nil else {
+            guard !ayuSuppressesContentRead(peerId: id.peerId), let message = transaction.getMessage(id), message.flags.contains(.Incoming), message.ayuSelfDestructTimeout != nil else {
                 return false
             }
             let isStarted = message.attributes.contains(where: { (($0 as? AutoclearTimeoutMessageAttribute)?.countdownBeginTime ?? 0) != 0 })

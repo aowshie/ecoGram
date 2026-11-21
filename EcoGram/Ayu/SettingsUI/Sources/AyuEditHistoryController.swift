@@ -80,14 +80,19 @@ public func ayuEditHistoryContextItem(context: AccountContext, messageId: Engine
     guard messageId.namespace == Namespaces.Message.Cloud else {
         return nil
     }
-    let records = ayuHistoryStore(context: context).editRecords(peerId: messageId.peerId.toInt64(), messageId: messageId.id)
-    guard !records.isEmpty else {
+    let store = ayuHistoryStore(context: context)
+    guard store.hasEditRecords(peerId: messageId.peerId.toInt64(), messageId: messageId.id) else {
         return nil
     }
     return .action(ContextMenuActionItem(text: title, icon: { theme in
         return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Time"), color: theme.actionSheet.primaryTextColor)
     }, action: { _, f in
         f(.default)
-        push(ayuEditHistoryController(context: context, records: records, currentText: currentText))
+        store.loadEditRecords(peerId: messageId.peerId.toInt64(), messageId: messageId.id, completion: { records in
+            guard !records.isEmpty else {
+                return
+            }
+            push(ayuEditHistoryController(context: context, records: records, currentText: currentText))
+        })
     }))
 }

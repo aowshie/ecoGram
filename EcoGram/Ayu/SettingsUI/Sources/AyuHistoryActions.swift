@@ -17,7 +17,7 @@ private func ayuDeleteKeptMessages(context: AccountContext, records: [AyuHistory
     }
 }
 
-func ayuExpireHistory(context: AccountContext) {
+public func ayuExpireHistory(context: AccountContext) {
     ayuHistoryStore(context: context).expire { expired in
         ayuDeleteKeptMessages(context: context, records: expired)
     }

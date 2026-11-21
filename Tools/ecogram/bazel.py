@@ -11,6 +11,7 @@ UNSIGNED_RC = "\n".join((
     "build --worker_max_instances=SwiftCompile=1",
     "build --experimental_ui_max_stdouterr_bytes=-1",
     "build --keep_going",
+    "build --experimental_disk_cache_gc_max_size=6G",
     "build --@build_bazel_rules_swift//swift:copt=-no-warnings-as-errors",
 ))
 
@@ -48,6 +49,6 @@ def locate(tree: Path, versions: dict) -> Path:
     with chdir(tree):
         bazel = Path(locate_bazel(str(tree), None, None))
     expected_hash = versions["bazel"].split(":", 1)[1]
-    if calculate_sha256(str(bazel)) != expected_hash:
+    if not bazel.is_file() or calculate_sha256(str(bazel)) != expected_hash:
         raise RuntimeError("Downloaded Bazel does not match versions.json")
     return bazel

@@ -4,6 +4,10 @@ internal import TelegramApi
 import SwiftSignalKit
 import AyuSettings
 
+func ayuSuppressesContentRead(peerId: PeerId) -> Bool {
+    return AyuSettings.shared.suppressReadReceipts(peerId: peerId.toInt64())
+}
+
 func ayuReadOnInteract(account: Account, peerId: PeerId) {
     guard AyuSettings.shared.readsOnInteract(peerId: peerId.toInt64()) else {
         return
@@ -14,13 +18,14 @@ func ayuReadOnInteract(account: Account, peerId: PeerId) {
     let network = account.network
     let stateManager: AccountStateManager = account.stateManager
     let _ = (account.postbox.transaction { transaction -> (Api.InputPeer, Int32)? in
-        guard let peer = transaction.getPeer(peerId), let inputPeer = apiInputPeer(peer) else {
+        guard let peer = transaction.getPeer(peerId), peerKeepsReadState(peer), let inputPeer = apiInputPeer(peer) else {
             return nil
         }
         guard let index = transaction.getTopPeerMessageIndex(peerId: peerId, namespace: Namespaces.Message.Cloud) else {
             return nil
         }
         let _ = transaction.applyInteractiveReadMaxIndex(index)
+        stateManager.notifyAppliedIncomingReadMessages([index.id])
         return (inputPeer, index.id.id)
     }
     |> mapToSignal { value -> Signal<Never, NoError> in

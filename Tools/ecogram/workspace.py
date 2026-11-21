@@ -13,10 +13,23 @@ def patch_files() -> list[Path]:
     return sorted(PATCHES.glob("*.patch"))
 
 
-def checkout(tree: Path, lock: UpstreamLock, submodules: bool) -> None:
+def _is_applying(tree: Path) -> bool:
+    return (tree / ".git" / "rebase-apply").exists()
+
+
+def _has_local_changes(tree: Path) -> bool:
+    return bool(git("status", "--porcelain", "--untracked-files=no", cwd=tree, capture=True).strip())
+
+
+def checkout(tree: Path, lock: UpstreamLock, submodules: bool, force: bool = False) -> None:
     if not lock.pinned:
         raise RuntimeError("upstream.json has no pinned commit, run: python -m Tools.ecogram bump")
-    if (tree / ".git" / "rebase-apply").exists():
+    if (tree / ".git").exists() and not force:
+        if _is_applying(tree):
+            raise RuntimeError(f"a patch is being applied in {tree}, finish it with git am --continue and export, or pass --force to discard it")
+        if _has_local_changes(tree):
+            raise RuntimeError(f"{tree} has uncommitted changes, commit and export them, or pass --force to discard them")
+    if _is_applying(tree):
         git("am", "--abort", cwd=tree)
     if not (tree / ".git").exists():
         tree.mkdir(parents=True, exist_ok=True)
@@ -37,7 +50,14 @@ def apply_patches(tree: Path) -> int:
     return len(patches)
 
 
-def export_patches(tree: Path) -> int:
+def export_patches(tree: Path, lock: UpstreamLock) -> int:
+    if _is_applying(tree):
+        raise RuntimeError(f"a patch is still being applied in {tree}, finish it with git am --continue first")
+    if _has_local_changes(tree):
+        raise RuntimeError(f"{tree} has uncommitted changes, commit them first")
+    base = git("rev-parse", f"{BASE_TAG}^{{commit}}", cwd=tree, capture=True).strip()
+    if base != lock.commit:
+        raise RuntimeError(f"{BASE_TAG} is {base}, but upstream.json pins {lock.commit}, run sync first")
     for stale in patch_files():
         stale.unlink()
     PATCHES.mkdir(exist_ok=True)
@@ -60,6 +80,11 @@ def install_sources(tree: Path) -> None:
     if resources.exists():
         shutil.rmtree(resources)
     resources.mkdir(parents=True)
-    for resource in SOURCES.glob("**/Resources/*"):
-        if resource.is_file():
-            shutil.copyfile(resource, resources / resource.name)
+    installed: dict[str, Path] = {}
+    for resource in sorted(SOURCES.glob("**/Resources/*")):
+        if not resource.is_file():
+            raise RuntimeError(f"{resource} is not a file, resources must be flat files")
+        if resource.name in installed:
+            raise RuntimeError(f"{resource} and {installed[resource.name]} share the name {resource.name}")
+        installed[resource.name] = resource
+        shutil.copyfile(resource, resources / resource.name)

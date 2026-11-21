@@ -45,7 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           commit="$(python -c 'import json; print(json.load(open("upstream.json"))["commit"])')"
-          title="Patches do not apply to Swiftgram ${commit:0:10}"
-          gh issue list --state open --search "$title in:title" --json number --jq 'length' | grep -qx 0 || exit 0
-          gh issue create --title "$title" --body "Run \`python -m Tools.ecogram sync\` locally, resolve the conflicting patch and \`python -m Tools.ecogram export\`. Upstream commit: $commit"
+          title="Swiftgram update does not apply"
+          body="Syncing Swiftgram $commit failed. Check the Upstream run log; if a patch conflicts, run \`python -m Tools.ecogram sync\` locally, resolve it and \`python -m Tools.ecogram export\`."
+          issue="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')"
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

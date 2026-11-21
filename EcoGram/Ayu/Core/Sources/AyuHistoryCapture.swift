@@ -9,15 +9,23 @@ struct AyuRetention {
     let keptIds: Set<MessageId>
     let retained: [StoreMessage]
     let protectedMediaIds: Set<MediaId>
+    private let retainedIds: Set<MessageId>
+    private let keptGlobalIds: Set<Int32>
+    private let retainedGlobalIds: Set<Int32>
 
-    private var retainedIds: Set<MessageId> {
-        var result = Set<MessageId>()
-        for message in self.retained {
+    init(keptIds: Set<MessageId>, retained: [StoreMessage], protectedMediaIds: Set<MediaId>) {
+        self.keptIds = keptIds
+        self.retained = retained
+        self.protectedMediaIds = protectedMediaIds
+        var retainedIds = Set<MessageId>()
+        for message in retained {
             if case let .Id(id) = message.id {
-                result.insert(id)
+                retainedIds.insert(id)
             }
         }
-        return result
+        self.retainedIds = retainedIds
+        self.keptGlobalIds = Set(keptIds.map(\.id))
+        self.retainedGlobalIds = Set(retainedIds.map(\.id))
     }
 
     func isDeletable(_ id: MessageId) -> Bool {
@@ -25,7 +33,7 @@ struct AyuRetention {
     }
 
     func isDeletable(globalId: Int32) -> Bool {
-        return !self.keptIds.contains(where: { $0.id == globalId })
+        return !self.keptGlobalIds.contains(globalId)
     }
 
     func isReported(_ id: MessageId) -> Bool {
@@ -33,7 +41,7 @@ struct AyuRetention {
     }
 
     func isReported(globalId: Int32) -> Bool {
-        return !self.keptIds.contains(where: { $0.id == globalId }) && !self.retainedIds.contains(where: { $0.id == globalId })
+        return !self.keptGlobalIds.contains(globalId) && !self.retainedGlobalIds.contains(globalId)
     }
 
     func protects(_ media: Media) -> Bool {
@@ -56,7 +64,6 @@ enum AyuHistoryCapture {
             return .empty
         }
         let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
-        self.expireIfNeeded(transaction: transaction, mediaBox: mediaBox, store: store)
         var keptIds = Set<MessageId>()
         for id in ids {
             if transaction.getMessage(id)?.ayuIsDeleted == true {
@@ -117,7 +124,7 @@ enum AyuHistoryCapture {
     }
 
     static func addSelfDestructSpoiler(attributes: inout [MessageAttribute], peerId: PeerId, isOutgoing: Bool = false) {
-        guard AyuSettings.shared.saveSelfDestructing, !isOutgoing, peerId.namespace != Namespaces.Peer.SecretChat else {
+        guard AyuSettings.shared.keepsSelfDestructingMedia, !isOutgoing, peerId.namespace != Namespaces.Peer.SecretChat else {
             return
         }
         if !attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {
@@ -125,26 +132,17 @@ enum AyuHistoryCapture {
         }
     }
 
-    static func deleteUnlessKept(transaction: Transaction, mediaBox: MediaBox, id: MessageId) {
-        if transaction.getMessage(id)?.ayuIsDeleted == true {
+    static func deleteDetected(transaction: Transaction, mediaBox: MediaBox, id: MessageId) {
+        let retention = self.retain(transaction: transaction, mediaBox: mediaBox, ids: [id])
+        guard retention.isDeletable(id) else {
             return
         }
         _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: [id])
+        retention.restore(transaction: transaction)
     }
 
     static func isKept(transaction: Transaction, id: MessageId) -> Bool {
         return transaction.getMessage(id)?.ayuIsDeleted == true
-    }
-
-    private static func expireIfNeeded(transaction: Transaction, mediaBox: MediaBox, store: AyuHistoryStore) {
-        let expired = store.takeExpiredRecords()
-        guard !expired.isEmpty else {
-            return
-        }
-        let ids = expired.filter { $0.kind == .deleted || $0.kind == .expired }.map { record in
-            MessageId(peerId: PeerId(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
-        }
-        self.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: ids)
     }
 
     private static func retainedMessage(_ message: Message, deletedAt: Int32, isExpired: Bool) -> StoreMessage {

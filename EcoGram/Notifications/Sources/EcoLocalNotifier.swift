@@ -2,10 +2,12 @@ import Foundation
 import UIKit
 import UserNotifications
 import SwiftSignalKit
+import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramStringFormatting
 import LocalizedPeerData
+import AppLockState
 import EcoPreferences
 
 public final class EcoLocalNotifier {
@@ -40,13 +42,15 @@ public final class EcoLocalNotifier {
                 guard let self, let account else {
                     return
                 }
-                guard EcoPreferences.shared.backgroundNotifications, UIApplication.shared.applicationState != .active else {
+                guard EcoLocalNotifier.isPosting else {
                     return
                 }
+                var coveredIds = Set<MessageId>()
                 for (messages, _, notify, _) in list {
-                    guard notify, let first = messages.first else {
+                    guard notify, let first = messages.first, !coveredIds.contains(first.id) else {
                         continue
                     }
+                    coveredIds.formUnion(messages.map(\.id))
                     if let groupingKey = first.groupingKey {
                         let key = "\(id.int64)_\(first.id.peerId.toInt64())_\(groupingKey)"
                         if self.seenGroups.contains(key) {
@@ -58,12 +62,16 @@ public final class EcoLocalNotifier {
                         }
                     }
                     let message = messages.first(where: { !$0.text.isEmpty }) ?? first
-                    self.post(accountId: id, accountPeerId: account.peerId, message: EngineMessage(message), count: messages.count)
+                    self.post(account: account, accountId: id, message: message, count: messages.count)
                 }
             }), forKey: id)
             self.observeReadState(accountId: id, account: account)
         }
         self.accountIds = ids
+    }
+
+    private static var isPosting: Bool {
+        return EcoPreferences.shared.backgroundNotifications && UIApplication.shared.applicationState != .active
     }
 
     private func observeReadState(accountId: AccountRecordId, account: Account) {
@@ -143,7 +151,30 @@ public final class EcoLocalNotifier {
         return "ecogram-\(accountId.int64)-\(messageId.peerId.toInt64())-\(messageId.namespace)-\(messageId.id)"
     }
 
-    private func post(accountId: AccountRecordId, accountPeerId: EnginePeer.Id, message: EngineMessage, count: Int) {
+    private static func isAppLocked(rootPath: String) -> Bool {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: appLockStatePath(rootPath: rootPath))), let state = try? JSONDecoder().decode(LockState.self, from: data) else {
+            return false
+        }
+        return AppLockState.isAppLocked(state: state)
+    }
+
+    private func post(account: Account, accountId: AccountRecordId, message: Message, count: Int) {
+        let rootPath = URL(fileURLWithPath: account.basePath).deletingLastPathComponent().path
+        let accountPeerId = account.peerId
+        let _ = (account.postbox.transaction { transaction -> (displayContents: Bool, sound: PeerMessageSound) in
+            let presentation = messagesForNotification(transaction: transaction, id: message.id, alwaysReturnMessage: true)
+            return (presentation.displayContents, presentation.sound)
+        }
+        |> deliverOnMainQueue).startStandalone(next: { [weak self] presentation in
+            guard let self, EcoLocalNotifier.isPosting else {
+                return
+            }
+            let isLocked = EcoLocalNotifier.isAppLocked(rootPath: rootPath)
+            self.post(accountId: accountId, accountPeerId: accountPeerId, message: EngineMessage(message), count: count, displayContents: presentation.displayContents && !isLocked, showsSender: !isLocked, sound: presentation.sound)
+        })
+    }
+
+    private func post(accountId: AccountRecordId, accountPeerId: EnginePeer.Id, message: EngineMessage, count: Int, displayContents: Bool, showsSender: Bool, sound: PeerMessageSound) {
         guard let presentationData = self.presentationData() else {
             return
         }
@@ -179,14 +210,16 @@ public final class EcoLocalNotifier {
                 }
             }
         }
-        let description = descriptionStringForMessage(contentSettings: ContentSettings.default, message: message, strings: strings, nameDisplayOrder: order, dateTimeFormat: presentationData.dateTimeFormat, accountPeerId: accountPeerId).0.string
-        var body = prefix + description
-        if count > 1 {
-            body += " (+\(count - 1))"
+        let body: String
+        if displayContents {
+            let description = descriptionStringForMessage(contentSettings: ContentSettings.default, message: message, strings: strings, nameDisplayOrder: order, dateTimeFormat: presentationData.dateTimeFormat, accountPeerId: accountPeerId).0.string
+            body = prefix + description + (count > 1 ? " (+\(count - 1))" : "")
+        } else {
+            body = strings.PUSH_LOCKED_MESSAGE("").string
         }
 
         let content = UNMutableNotificationContent()
-        content.title = title
+        content.title = showsSender ? title : ""
         content.body = body
         content.categoryIdentifier = category
         content.threadIdentifier = "ecogram-\(accountId.int64)-\(message.id.peerId.toInt64())"
@@ -201,13 +234,7 @@ public final class EcoLocalNotifier {
             userInfo["threadId"] = threadId
         }
         content.userInfo = userInfo
-        let isMuted = message.attributes.contains(where: { attribute in
-            if let attribute = attribute as? NotificationInfoMessageAttribute {
-                return attribute.flags.contains(.muted)
-            }
-            return false
-        })
-        if !isMuted {
+        if sound != .none {
             content.sound = .default
         }
         let identifier = EcoLocalNotifier.identifier(accountId: accountId, messageId: message.id)

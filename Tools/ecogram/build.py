@@ -62,6 +62,7 @@ def run_build(tree: Path, output: Path, configuration: str) -> Path:
             run([*make, "build", *common, f"--configuration={configuration}"], cwd=tree)
     finally:
         configuration_file.unlink(missing_ok=True)
+        (tree / "build-input/configuration-repository/variables.bzl").unlink(missing_ok=True)
     built = tree / "bazel-bin/Telegram/Swiftgram.ipa"
     if not built.is_file():
         raise RuntimeError("Build finished without bazel-bin/Telegram/Swiftgram.ipa")

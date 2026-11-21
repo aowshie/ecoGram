@@ -10,7 +10,12 @@ public final class EcoKeepAlive {
     private let updated: (Bool) -> Void
 
     private var player: AVAudioPlayer?
-    private var isPlaying = false
+    private var isWanted = false
+    private var isPlaying = false {
+        didSet {
+            self.isActive = self.isWanted && self.isPlaying
+        }
+    }
     private var inForeground = true
     private var telegramAudioActive = false
     private var interrupted = false
@@ -78,12 +83,13 @@ public final class EcoKeepAlive {
     }
 
     private func updateWanted() {
-        self.isActive = !self.inForeground && EcoPreferences.shared.backgroundNotifications
+        self.isWanted = !self.inForeground && EcoPreferences.shared.backgroundNotifications
+        self.isActive = self.isWanted && self.isPlaying
         self.apply()
     }
 
     private func handleInterruption(began: Bool) {
-        guard self.isActive else {
+        guard self.isWanted else {
             return
         }
         if began {
@@ -100,7 +106,10 @@ public final class EcoKeepAlive {
     }
 
     private func apply() {
-        let shouldPlay = self.isActive && !self.telegramAudioActive && !self.interrupted
+        let shouldPlay = self.isWanted && !self.telegramAudioActive && !self.interrupted
+        if self.isPlaying && self.player?.isPlaying != true {
+            self.isPlaying = false
+        }
         if shouldPlay {
             if !self.isPlaying {
                 if self.start() {
@@ -111,7 +120,7 @@ public final class EcoKeepAlive {
             }
             return
         }
-        if !self.interrupted || !self.isActive {
+        if !self.interrupted || !self.isWanted {
             self.stopRetry()
         }
         if self.isPlaying {
@@ -164,7 +173,7 @@ public final class EcoKeepAlive {
                 guard let self else {
                     return
                 }
-                if !self.isActive || self.telegramAudioActive {
+                if !self.isWanted || self.telegramAudioActive {
                     self.stopRetry()
                     return
                 }

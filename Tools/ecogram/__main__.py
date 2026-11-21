@@ -12,18 +12,18 @@ def command_bump(_: argparse.Namespace) -> None:
 
 
 def command_sync(args: argparse.Namespace) -> None:
-    workspace.checkout(args.tree, lock.load(), submodules=args.submodules)
+    workspace.checkout(args.tree, lock.load(), submodules=args.submodules, force=args.force)
     print(f"{workspace.apply_patches(args.tree)} patches applied in {args.tree}")
 
 
 def command_export(args: argparse.Namespace) -> None:
-    print(f"{workspace.export_patches(args.tree)} patches written")
+    print(f"{workspace.export_patches(args.tree, lock.load())} patches written")
 
 
 def command_prepare(args: argparse.Namespace) -> None:
     from . import branding
 
-    workspace.checkout(args.tree, lock.load(), submodules=True)
+    workspace.checkout(args.tree, lock.load(), submodules=True, force=args.force)
     count = workspace.apply_patches(args.tree)
     workspace.install_sources(args.tree)
     branding.install(args.tree)
@@ -45,6 +45,7 @@ def parser() -> argparse.ArgumentParser:
     sync = commands.add_parser("sync", help="check out pinned upstream and apply patches")
     sync.add_argument("--tree", **tree)
     sync.add_argument("--submodules", action="store_true")
+    sync.add_argument("--force", action="store_true", help="discard uncommitted changes and an unfinished patch in the tree")
     sync.set_defaults(handler=command_sync)
 
     export = commands.add_parser("export", help="write workspace commits back to Patches")
@@ -53,6 +54,7 @@ def parser() -> argparse.ArgumentParser:
 
     prepare = commands.add_parser("prepare", help="full build tree: upstream with submodules, patches, sources, branding")
     prepare.add_argument("--tree", **tree)
+    prepare.add_argument("--force", action="store_true", help="discard uncommitted changes and an unfinished patch in the tree")
     prepare.set_defaults(handler=command_prepare)
 
     build = commands.add_parser("build", help="build an unsigned IPA on macOS")
