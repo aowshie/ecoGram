@@ -27,8 +27,8 @@ public enum EcoBadgeImages {
         let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { rendererContext in
             let context = rendererContext.cgContext
             context.scaleBy(x: side / self.canvas, y: side / self.canvas)
-            context.setFillColor(UIColor.black.cgColor)
-            context.setStrokeColor(UIColor.black.cgColor)
+            context.setFillColor(UIColor.white.cgColor)
+            context.setStrokeColor(UIColor.white.cgColor)
             context.setLineCap(.round)
             context.setLineJoin(.round)
             glyph.draw(in: context)
@@ -61,10 +61,10 @@ public enum EcoBadgeImages {
                 let planeScale: CGFloat = 0.62
                 EcoBadgeImages.fillRosette(in: context)
                 context.setBlendMode(.destinationOut)
-                context.setStrokeColor(UIColor(white: 0.0, alpha: EcoBadgeImages.rosetteBracesCut).cgColor)
+                context.setStrokeColor(UIColor(white: 1.0, alpha: EcoBadgeImages.rosetteBracesCut).cgColor)
                 EcoBadgeImages.stroke(EcoBadgeImages.scaled(EcoBadgeImages.leftBrace(offset: -28.0), by: bracesScale), width: 96.0 * bracesScale, in: context)
                 EcoBadgeImages.stroke(EcoBadgeImages.scaled(EcoBadgeImages.rightBrace(offset: 28.0), by: bracesScale), width: 96.0 * bracesScale, in: context)
-                context.setStrokeColor(UIColor.black.cgColor)
+                context.setStrokeColor(UIColor.white.cgColor)
                 context.setBlendMode(.clear)
                 EcoBadgeImages.fillAndStroke(EcoBadgeImages.plane(center: CGPoint(x: 507.0, y: 520.0), scale: planeScale), width: 70.0 * planeScale, in: context)
                 context.setBlendMode(.normal)

@@ -55,12 +55,10 @@ private func ecoSettingsEntries(strings: EcoStrings) -> [EcoEntry] {
     entries.append(.header(id: id.count, section: .appearance, text: strings.get(.appearanceHeader), badge: nil))
     entries.append(.toggle(id: id.count, section: .appearance, settingName: .avatarInTabBar, value: preferences.avatarInTabBar, text: strings.get(.avatarInTabBar), enabled: true))
     entries.append(.toggle(id: id.count, section: .appearance, settingName: .hideProfileShortcuts, value: preferences.hideProfileShortcuts, text: strings.get(.hideProfileShortcuts), enabled: true))
-    var appearanceFooter = [strings.get(.profileSuggestionsFooter)]
     if !ecoHasDynamicIsland {
         entries.append(.toggle(id: id.count, section: .appearance, settingName: .islandAvatarAnimation, value: preferences.islandAvatarAnimation, text: strings.get(.islandAvatarAnimation), enabled: true))
-        appearanceFooter.append(strings.get(.islandAvatarFooter))
+        entries.append(.notice(id: id.count, section: .appearance, text: strings.get(.islandAvatarFooter)))
     }
-    entries.append(.notice(id: id.count, section: .appearance, text: appearanceFooter.joined(separator: "\n\n")))
 
     entries.append(.header(id: id.count, section: .badges, text: strings.get(.badgesHeader), badge: nil))
     entries.append(.disclosure(id: id.count, section: .badges, link: .badges, text: strings.get(.badgesTitle)))

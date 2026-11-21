@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Fri, 20 Nov 2026 18:20:41 +0200
+Date: Sat, 21 Nov 2026 09:07:35 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -1064,7 +1064,7 @@ index b7c69492d575f8cdfc5f77e2086de4c2dbae66b8..8594f6e6ce3daa55cbc5b26d4dbeedbc
                  } else {
                      account.shouldBeServiceTaskMaster.set(.single(.never))
 diff --git a/submodules/TelegramUI/Sources/TelegramRootController.swift b/submodules/TelegramUI/Sources/TelegramRootController.swift
-index d38102d4c13d755997d9c131756ef1f89dd8ecd4..0e1418e3d1c085ae3e52ca50305592d8004fec97 100644
+index d38102d4c13d755997d9c131756ef1f89dd8ecd4..a983a425cd02019761073548ec8ef13f22dfa205 100644
 --- a/submodules/TelegramUI/Sources/TelegramRootController.swift
 +++ b/submodules/TelegramUI/Sources/TelegramRootController.swift
 @@ -2,6 +2,7 @@
@@ -1075,14 +1075,12 @@ index d38102d4c13d755997d9c131756ef1f89dd8ecd4..0e1418e3d1c085ae3e52ca50305592d8
  import UIKit
  import Display
  import AsyncDisplayKit
-@@ -270,6 +271,12 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
+@@ -270,6 +271,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
          self.accountSettingsController = accountSettingsController
          self.rootTabController = tabBarController
          self.pushViewController(tabBarController, animated: false)
 +        
-+        ecoClaimEarlyBadge(context: self.context, ready: chatListController.ready.get(), present: { [weak self] controller in
-+            self?.chatListController?.present(controller, in: .window(.root))
-+        }, push: { [weak self] controller in
++        ecoClaimEarlyBadge(context: self.context, ready: chatListController.ready.get(), push: { [weak self] controller in
 +            self?.pushViewController(controller)
 +        })
      }

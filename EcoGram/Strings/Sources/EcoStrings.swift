@@ -60,7 +60,6 @@ public struct EcoStrings {
         case hideProfileShortcuts
         case islandAvatarAnimation
         case islandAvatarFooter
-        case profileSuggestionsFooter
         case badgeSupporterInfo
         case badgeOfficialInfo
         case badgeDeveloperInfo
@@ -148,7 +147,6 @@ public struct EcoStrings {
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
         .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
         .islandAvatarFooter: ("On iPhones without the Dynamic Island, the profile photo flows into the top of the screen like a drop as you scroll.", "На iPhone без Dynamic Island аватарка при прокрутке профиля втягивается в верх экрана, как капля.", "Dynamic IslandのないiPhoneで、スクロールするとプロフィール写真が水滴のように画面上部へ吸い込まれます。"),
-        .profileSuggestionsFooter: ("Hides the suggestions to set an emoji status, profile color, profile photo and username at the top of Settings.", "Скрывает предложения «Изменить статус», «Изменить цвет профиля», «Изменить фото» и «Имя пользователя» вверху настроек.", "設定上部の絵文字ステータス、プロフィールの色、プロフィール写真、ユーザー名の提案を非表示にします。"),
         .badgeSupporterInfo: ("**%@** supported the development of exteraGram or AyuGram and received a unique badge.", "За поддержку разработки exteraGram или AyuGram **%@** получает уникальный значок.", "**%@**はexteraGramまたはAyuGramの開発を支援し、特別なバッジを受け取りました。"),
         .badgeOfficialInfo: ("**%@** is the official resource of exteraGram or AyuGram.", "**%@** — официальный ресурс exteraGram или AyuGram.", "**%@**はexteraGramまたはAyuGramの公式リソースです。"),
         .badgeDeveloperInfo: ("**%@** is the developer of ecoGram.", "**%@** — разработчик ecoGram.", "**%@**はecoGramの開発者です。"),

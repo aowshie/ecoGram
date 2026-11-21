@@ -74,7 +74,7 @@ public func ecoBadgesController(context: AccountContext) -> ViewController {
 
 private let ecoEarlyAlertSettleDelay: Double = 0.6
 
-public func ecoClaimEarlyBadge(context: AccountContext, ready: Signal<Bool, NoError>, present: @escaping (ViewController) -> Void, push: @escaping (ViewController) -> Void) {
+public func ecoClaimEarlyBadge(context: AccountContext, ready: Signal<Bool, NoError>, push: @escaping (ViewController) -> Void) {
     let presentWhenReady: () -> Void = {
         let _ = (ready
         |> filter { $0 }
@@ -83,9 +83,9 @@ public func ecoClaimEarlyBadge(context: AccountContext, ready: Signal<Bool, NoEr
             guard EcoBadges.shared.hasPendingEarlyAlert else {
                 return
             }
-            present(ecoEarlyBadgeAlert(context: context, openSettings: {
+            context.sharedContext.mainWindow?.present(ecoEarlyBadgeAlert(context: context, openSettings: {
                 push(ecoBadgesController(context: context))
-            }))
+            }), on: .root)
         })
     }
     if EcoBadges.shared.hasPendingEarlyAlert {
