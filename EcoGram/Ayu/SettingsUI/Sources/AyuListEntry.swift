@@ -1,5 +1,5 @@
 import Foundation
-import EcoSettingsUI
+import EcoListUI
 
 enum AyuListAction: Hashable {
     case openGhost

@@ -1,0 +1,13 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+<circle cx="512" cy="512" r="320" fill="white"/><circle cx="812.0" cy="512.0" r="165" fill="white"/><circle cx="724.1" cy="724.1" r="165" fill="white"/><circle cx="512.0" cy="812.0" r="165" fill="white"/><circle cx="299.9" cy="724.1" r="165" fill="white"/><circle cx="212.0" cy="512.0" r="165" fill="white"/><circle cx="299.9" cy="299.9" r="165" fill="white"/><circle cx="512.0" cy="212.0" r="165" fill="white"/><circle cx="724.1" cy="299.9" r="165" fill="white"/>
+<g transform="translate(512 512) scale(0.68) translate(-512 -512)" stroke="rgb(115,115,115)" stroke-width="96" stroke-linecap="round" stroke-linejoin="round">
+<path d="M336.6 194C261.9 194 224.6 231.3 224.6 306V400C224.6 474.7 194.7 512 135 512C194.7 512 224.6 549.3 224.6 624V718C224.6 792.7 261.9 830 336.6 830" transform="translate(-28 0)"/>
+<path d="M687.6 194C762.3 194 799.6 231.3 799.6 306V400C799.6 474.7 829.5 512 889.2 512C829.5 512 799.6 549.3 799.6 624V718C799.6 792.7 762.3 830 687.6 830" transform="translate(28 0)"/>
+</g>
+<path d="M634.1 354.6C661.2 345.8 677.3 360.1 668.7 387C647 454.7 604.5 578.1 577.5 656.1C570.5 676.4 537.7 675.6 529.5 655.7C515.4 621.5 494.7 581.6 466.4 552.6C439.3 524.9 401.4 504.8 367.7 491.1C347.2 482.7 346.4 448.6 367.5 441.7L634.1 354.6Z" transform="translate(507 520) scale(0.62) translate(-512 -512)" fill="black" stroke="black" stroke-width="70" stroke-linejoin="round"/>
+</mask>
+</defs>
+<rect width="1024" height="1024" fill="#3E88F7" mask="url(#cut)"/>
+</svg>

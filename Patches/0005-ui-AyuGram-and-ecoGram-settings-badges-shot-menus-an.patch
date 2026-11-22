@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 21:20:39 +0200
+Date: Sun, 22 Nov 2026 17:14:03 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -1069,7 +1069,7 @@ index 5f1e30c2f6655fc988957a8fd34e8081cf5cd505..5581c8b3c4502d84f6131d240231de66
                  guard let self else {
                      return
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
-index 446979e1d4d5fb491531f9e23f8593836709fe2b..089b85b6731bf5d8d0380fdf4fdeaaf88fd90f08 100644
+index 446979e1d4d5fb491531f9e23f8593836709fe2b..90e4a8f191c7d093828e8b37ee506f8b393761a4 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
 @@ -1,6 +1,8 @@
@@ -1086,7 +1086,7 @@ index 446979e1d4d5fb491531f9e23f8593836709fe2b..089b85b6731bf5d8d0380fdf4fdeaaf8
                  }
              }
 +        case .ayugram:
-+            self.controller?.push(ayuSettingsController(context: self.context))
++            self.controller?.push(ayuSettingsController(context: self.context, badgesController: { ecoBadgesController(context: $0) }))
 +        case .ecogram:
 +            self.controller?.push(ecoSettingsController(context: self.context))
          case .avatar:

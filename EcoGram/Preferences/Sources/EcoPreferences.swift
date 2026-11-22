@@ -17,6 +17,7 @@ public final class EcoPreferences {
         case showEcoBadges
         case allowsProtectedScreenshots
         case swiftgramDefaultsApplied = "swiftgramDefaultsApplied.v2"
+        case saveToFilesDefaultApplied
 
         var name: String {
             return "ecogram." + self.rawValue
@@ -37,6 +38,7 @@ public final class EcoPreferences {
             Key.allowsProtectedScreenshots.name: false
         ])
         self.applySwiftgramDefaults()
+        self.applySaveToFilesDefault()
     }
 
     public var backgroundNotifications: Bool {
@@ -207,7 +209,7 @@ public final class EcoPreferences {
         }
         let settings = SGSimpleSettings.shared
         settings.contextShowReport = false
-        settings.contextShowSaveMedia = false
+        settings.contextShowSaveMedia = true
         settings.contextShowMessageReplies = false
         settings.contextShowSaveToCloud = false
         settings.contextShowHideForwardName = false
@@ -217,6 +219,20 @@ public final class EcoPreferences {
         settings.contextShowRestrict = true
         settings.contextShowSelectFromUser = true
         self.defaults.set(true, forKey: Key.swiftgramDefaultsApplied.name)
+    }
+
+    private func applySaveToFilesDefault() {
+        guard !self.defaults.bool(forKey: Key.saveToFilesDefaultApplied.name) else {
+            return
+        }
+        SGSimpleSettings.shared.contextShowSaveMedia = true
+        if var order = self.defaults.stringArray(forKey: Key.contextOrder.name) {
+            order.removeAll(where: { $0 == EcoContextAction.saveToFiles.rawValue })
+            let index = order.firstIndex(of: EcoContextAction.copy.rawValue).map { $0 + 1 } ?? 0
+            order.insert(EcoContextAction.saveToFiles.rawValue, at: index)
+            self.defaults.set(order, forKey: Key.contextOrder.name)
+        }
+        self.defaults.set(true, forKey: Key.saveToFilesDefaultApplied.name)
     }
 
     private func ordered<T: RawRepresentable & CaseIterable & Equatable>(key: Key, all: T.AllCases) -> [T] where T.RawValue == String {

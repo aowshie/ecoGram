@@ -11,7 +11,7 @@ import SGItemListUI
 import AppBundle
 import AyuSettings
 import EcoStrings
-import EcoSettingsUI
+import EcoListUI
 
 private enum AyuMainSection: Int32 {
     case ghost
@@ -20,7 +20,6 @@ private enum AyuMainSection: Int32 {
 }
 
 private func ayuMainEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> [AyuListEntry] {
-    let iconColor = theme.list.itemAccentColor
     let settings = AyuSettings.shared
     var entries: [AyuListEntry] = []
     var order = 0
@@ -29,20 +28,13 @@ private func ayuMainEntries(strings: EcoStrings, presentationStrings: Presentati
         return order
     }
 
-    let ghostCount = settings.ghostEnabledCount
-    let ghostTotal = AyuSettings.ghostOptionCount
+    let ghost = ayuCategorySummary(.ghost, strings: strings, presentationStrings: presentationStrings, theme: theme)
     entries.append(.header(section: AyuMainSection.ghost.rawValue, order: next(), text: strings.get(.ghostEssentials)))
-    var ghostSubtitle = ecoCountLabel(strings, enabled: ghostCount, total: ghostTotal)
-    let exceptionCount = settings.ghostExceptions.count
-    if exceptionCount > 0 {
-        ghostSubtitle += ", " + presentationStrings.Notifications_CategoryExceptions(Int32(exceptionCount))
-    }
-    entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, icon: ecoOutlineIcon("Premium/Stories/Stealth", color: iconColor), title: strings.get(.ghostMode), subtitle: ghostSubtitle, label: ecoStateLabel(presentationStrings, enabled: ghostCount, total: ghostTotal)))
+    entries.append(.category(section: AyuMainSection.ghost.rawValue, order: next(), action: .openGhost, icon: ghost.icon, title: ghost.title, subtitle: ghost.subtitle, label: ghost.label))
 
-    let historyOptions = [settings.saveDeletedMessages, settings.saveEditedMessages, settings.keepsSelfDestructingMedia]
-    let historyCount = historyOptions.filter { $0 }.count
+    let history = ayuCategorySummary(.history, strings: strings, presentationStrings: presentationStrings, theme: theme)
     entries.append(.header(section: AyuMainSection.spy.rawValue, order: next(), text: strings.get(.spyEssentials)))
-    entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: ecoOutlineIcon("Chat/Context Menu/Message", color: iconColor), title: strings.get(.historyTitle), subtitle: ecoCountLabel(strings, enabled: historyCount, total: historyOptions.count), label: ecoStateLabel(presentationStrings, enabled: historyCount, total: historyOptions.count)))
+    entries.append(.category(section: AyuMainSection.spy.rawValue, order: next(), action: .openHistory, icon: history.icon, title: history.title, subtitle: history.subtitle, label: history.label))
 
     entries.append(.header(section: AyuMainSection.badges.rawValue, order: next(), text: strings.get(.badgesHeader)))
     entries.append(.toggle(section: AyuMainSection.badges.rawValue, order: next(), key: "badges", title: strings.get(.badgesShow), value: settings.showAyuBadges, enabled: true))
@@ -62,7 +54,7 @@ private func ayuSettingsChanges() -> Signal<Void, NoError> {
     }
 }
 
-public func ayuSettingsController(context: AccountContext) -> ViewController {
+public func ayuSettingsController(context: AccountContext, badgesController: @escaping (AccountContext) -> ViewController) -> ViewController {
     var pushControllerImpl: ((ViewController) -> Void)?
 
     let arguments = AyuListArguments(context: context, toggle: { key, value in
@@ -72,11 +64,11 @@ public func ayuSettingsController(context: AccountContext) -> ViewController {
     }, perform: { action in
         switch action {
         case .openGhost:
-            pushControllerImpl?(ayuGhostController(context: context))
+            pushControllerImpl?(ayuCategoryController(.ghost, context: context))
         case .openHistory:
-            pushControllerImpl?(ayuHistoryController(context: context))
+            pushControllerImpl?(ayuCategoryController(.history, context: context))
         case .openBadges:
-            pushControllerImpl?(ecoBadgesController(context: context))
+            pushControllerImpl?(badgesController(context))
         default:
             break
         }
@@ -136,7 +128,7 @@ private func ayuHistoryEntries(strings: EcoStrings) -> [AyuHistoryEntry] {
     return entries
 }
 
-private func ayuHistoryController(context: AccountContext) -> ViewController {
+func ayuHistoryController(context: AccountContext) -> ViewController {
     let refresh = ValuePromise<Bool>(true, ignoreRepeated: false)
     var presentControllerImpl: ((ViewController) -> Void)?
     var presentSelectorImpl: ((AyuSelector, [SGOneFromManyOption]) -> Void)?

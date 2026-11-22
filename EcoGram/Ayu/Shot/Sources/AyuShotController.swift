@@ -201,7 +201,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
             size: barButtonSize,
             backgroundColor: nil,
             isDark: theme.overallDarkAppearance,
-            state: .generic,
+            state: .glass,
             animateScale: false,
             component: AnyComponentWithIdentity(id: "close", component: AnyComponent(BundleIconComponent(name: "Navigation/Close", tintColor: iconColor))),
             action: { _ in
@@ -213,7 +213,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
             size: barButtonSize,
             backgroundColor: nil,
             isDark: theme.overallDarkAppearance,
-            state: .generic,
+            state: .glass,
             isEnabled: state.image != nil && !state.isLoading,
             animateScale: false,
             component: AnyComponentWithIdentity(id: "more", component: AnyComponent(LottieComponent(content: LottieComponent.AppBundleContent(name: "anim_morewide"), color: iconColor, size: CGSize(width: 34.0, height: 34.0)))),

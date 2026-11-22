@@ -17,6 +17,7 @@ public enum EcoSelectionAction: String, CaseIterable {
 public enum EcoContextAction: String, CaseIterable {
     case reply
     case copy
+    case saveToFiles
     case pin
     case copyLink
     case forward
@@ -27,7 +28,6 @@ public enum EcoContextAction: String, CaseIterable {
     case editHistory
     case edit
     case translate
-    case saveToFiles
     case report
     case viewReplies
     case saveToCloud

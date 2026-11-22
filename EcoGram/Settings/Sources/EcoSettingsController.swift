@@ -9,9 +9,11 @@ import AccountContext
 import PresentationDataUtils
 import SettingsUI
 import AyuSettings
+import AyuSettingsUI
 import EcoBadges
 import EcoPreferences
 import EcoStrings
+import EcoListUI
 
 private let ecoHasDynamicIsland = DeviceMetrics(screenSize: UIScreen.main.bounds.size, scale: UIScreen.main.scale, statusBarHeight: 0.0, onScreenNavigationHeight: nil).hasDynamicIsland
 
@@ -21,6 +23,8 @@ enum EcoSettingsAction: Hashable {
     case contextMenu
     case appearance
     case badges
+    case spy
+    case ayuCategory(AyuCategory)
 }
 
 private enum EcoSettingsSection: Int32 {
@@ -28,7 +32,8 @@ private enum EcoSettingsSection: Int32 {
     case chat
     case appearance
     case spy
-    case badges
+    case ayugram
+    case ecogram
 }
 
 private enum EcoToggle: String {
@@ -100,22 +105,69 @@ private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: Presen
 
     let appearance = EcoSettingsSection.appearance.rawValue
     let appearanceOptions = EcoAppearanceOptions(preferences: preferences)
-    entries.append(.header(section: appearance, order: next(), text: strings.get(.appearanceHeader)))
-    entries.append(.category(section: appearance, order: next(), action: .appearance, icon: ecoOutlineIcon("Chat/Context Menu/Palette", color: iconColor), title: strings.get(.appearanceTitle), subtitle: ecoCountLabel(strings, enabled: appearanceOptions.enabled, total: appearanceOptions.values.count), label: ecoStateLabel(presentationStrings, enabled: appearanceOptions.enabled, total: appearanceOptions.values.count)))
-
-    let spy = EcoSettingsSection.spy.rawValue
-    entries.append(.header(section: spy, order: next(), text: strings.get(.spyEssentials)))
-    entries.append(.toggle(section: spy, order: next(), key: EcoToggle.protectedScreenshots.rawValue, title: strings.get(.spyScreenshots), value: preferences.allowsProtectedScreenshots, enabled: true))
-    entries.append(.notice(section: spy, order: next(), text: strings.get(.spyScreenshotsFooter)))
-
-    let badges = EcoSettingsSection.badges.rawValue
     let badgesEnabled = EcoBadgeSource.allCases.filter(ecoBadgeSourceEnabled).count
     let badgesTotal = EcoBadgeSource.allCases.count
     let badgesIcon = ecoCategoryIcon(key: "ecogram.badge.developer", color: iconColor, image: { EcoBadgeImages.image(.developer, side: 24.0) })
-    entries.append(.header(section: badges, order: next(), text: strings.get(.badgesHeader)))
-    entries.append(.category(section: badges, order: next(), action: .badges, icon: badgesIcon, title: strings.get(.badgesTitle), subtitle: ecoCountLabel(strings, enabled: badgesEnabled, total: badgesTotal), label: ecoStateLabel(presentationStrings, enabled: badgesEnabled, total: badgesTotal)))
+    entries.append(.header(section: appearance, order: next(), text: strings.get(.appearanceHeader)))
+    entries.append(.category(section: appearance, order: next(), action: .appearance, icon: ecoOutlineIcon("Chat/Context Menu/Palette", color: iconColor), title: strings.get(.appearanceTitle), subtitle: ecoCountLabel(strings, enabled: appearanceOptions.enabled, total: appearanceOptions.values.count), label: ecoStateLabel(presentationStrings, enabled: appearanceOptions.enabled, total: appearanceOptions.values.count)))
+    entries.append(.category(section: appearance, order: next(), action: .badges, icon: badgesIcon, title: strings.get(.badgesTitle), subtitle: ecoCountLabel(strings, enabled: badgesEnabled, total: badgesTotal), label: ecoStateLabel(presentationStrings, enabled: badgesEnabled, total: badgesTotal)))
+
+    let spy = EcoSettingsSection.spy.rawValue
+    let spyCounts = ecoSpyCounts(strings: strings, presentationStrings: presentationStrings, theme: theme)
+    entries.append(.header(section: spy, order: next(), text: strings.get(.spyEssentials)))
+    entries.append(.category(section: spy, order: next(), action: .spy, icon: ecoOutlineIcon("Chat/Context Menu/Eye", color: iconColor), title: strings.get(.spyTitle), subtitle: ecoCountLabel(strings, enabled: spyCounts.enabled, total: spyCounts.total), label: ecoStateLabel(presentationStrings, enabled: spyCounts.enabled, total: spyCounts.total)))
 
     return entries
+}
+
+private let ecoSpyCategories: [AyuCategory] = [.ghost, .history]
+
+private func ecoSpyCounts(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> (enabled: Int, total: Int) {
+    let summaries = ecoSpyCategories.map { ayuCategorySummary($0, strings: strings, presentationStrings: presentationStrings, theme: theme) }
+    let screenshots = EcoPreferences.shared.allowsProtectedScreenshots ? 1 : 0
+    return (summaries.reduce(screenshots) { $0 + $1.enabled }, summaries.reduce(1) { $0 + $1.total })
+}
+
+private func ecoSpyEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> [EcoSettingsEntry] {
+    let preferences = EcoPreferences.shared
+    var entries: [EcoSettingsEntry] = []
+    var order = 0
+    func next() -> Int {
+        order += 1
+        return order
+    }
+    let ayugram = EcoSettingsSection.ayugram.rawValue
+    entries.append(.header(section: ayugram, order: next(), text: strings.get(.ayuTitle).uppercased()))
+    for category in ecoSpyCategories {
+        let summary = ayuCategorySummary(category, strings: strings, presentationStrings: presentationStrings, theme: theme)
+        entries.append(.category(section: ayugram, order: next(), action: .ayuCategory(category), icon: summary.icon, title: summary.title, subtitle: summary.subtitle, label: summary.label))
+    }
+    let ecogram = EcoSettingsSection.ecogram.rawValue
+    entries.append(.header(section: ecogram, order: next(), text: strings.get(.settingsTitle).uppercased()))
+    entries.append(.toggle(section: ecogram, order: next(), key: EcoToggle.protectedScreenshots.rawValue, title: strings.get(.spyScreenshots), value: preferences.allowsProtectedScreenshots, enabled: true))
+    entries.append(.notice(section: ecogram, order: next(), text: strings.get(.spyScreenshotsFooter)))
+    return entries
+}
+
+private func ecoSpyController(context: AccountContext) -> ViewController {
+    var pushControllerImpl: ((ViewController) -> Void)?
+    let arguments = EcoListArguments<EcoSettingsAction>(context: context, toggle: ecoApplyToggle, perform: { action in
+        if case let .ayuCategory(category) = action {
+            pushControllerImpl?(ayuCategoryController(category, context: context))
+        }
+    })
+    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData)
+    |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
+        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.spyTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSpyEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
+        return (controllerState, (listState, arguments))
+    }
+    let controller = ItemListController(context: context, state: signal)
+    pushControllerImpl = { [weak controller] c in
+        (controller?.navigationController as? NavigationController)?.pushViewController(c)
+    }
+    return controller
 }
 
 private func ecoAppearanceEntries(strings: EcoStrings) -> [EcoSettingsEntry] {
@@ -178,6 +230,10 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
             pushControllerImpl?(ecoAppearanceController(context: context))
         case .badges:
             pushControllerImpl?(ecoBadgesController(context: context))
+        case .spy:
+            pushControllerImpl?(ecoSpyController(context: context))
+        case let .ayuCategory(category):
+            pushControllerImpl?(ayuCategoryController(category, context: context))
         }
     })
 

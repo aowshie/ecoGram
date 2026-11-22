@@ -57,6 +57,7 @@ public struct EcoStrings {
         case contextFooter
         case appearanceHeader
         case appearanceTitle
+        case spyTitle
         case spyScreenshots
         case spyScreenshotsFooter
         case hideProfileShortcuts
@@ -136,7 +137,7 @@ public struct EcoStrings {
         .notificationsHeader: ("NOTIFICATIONS", "УВЕДОМЛЕНИЯ", "通知"),
         .notificationsBackground: ("Local Notifications", "Локальные уведомления", "ローカル通知"),
         .notificationSettings: ("Notification Settings", "Настройки уведомлений", "通知設定"),
-        .notificationsFooter: ("Keeps ecoGram running in the background with silent audio so new messages arrive as local notifications without any servers. Uses more battery.", "ecoGram работает в фоне благодаря беззвучному звуку и показывает новые сообщения локальными уведомлениями, без серверов. Расходует больше заряда.", "無音のオーディオでecoGramをバックグラウンドで動作させ、サーバーを使わずに新着メッセージをローカル通知で表示します。バッテリー消費が増えます。"),
+        .notificationsFooter: ("Keeps ecoGram running in the background with silent audio so new messages arrive as local notifications without any servers.", "ecoGram работает в фоне благодаря беззвучному звуку и показывает новые сообщения локальными уведомлениями, без серверов.", "無音のオーディオでecoGramをバックグラウンドで動作させ、サーバーを使わずに新着メッセージをローカル通知で表示します。"),
         .chatHeader: ("CHAT", "ЧАТ", "チャット"),
         .selectionPanel: ("Selection Bar", "Панель выделения", "選択バー"),
         .contextMenu: ("Message Menu", "Меню сообщения", "メッセージメニュー"),
@@ -146,8 +147,9 @@ public struct EcoStrings {
         .contextFooter: ("Items shown when you hold a message. Check the ones you need and drag to reorder. Unchecked items are hidden, and the switches match the Swiftgram section.", "Пункты, которые появляются при удержании сообщения. Отметьте нужные и перетащите, чтобы изменить порядок. Неотмеченные пункты скрыты, переключатели совпадают с разделом Swiftgram.", "メッセージを長押ししたときに表示される項目です。必要なものにチェックを入れ、ドラッグで並べ替えます。チェックしない項目は非表示になり、Swiftgramの設定と連動します。"),
         .appearanceHeader: ("APPEARANCE", "ОФОРМЛЕНИЕ", "外観"),
         .appearanceTitle: ("Appearance", "Оформление", "外観"),
+        .spyTitle: ("Spy Essentials", "Шпион", "スパイ"),
         .spyScreenshots: ("Screenshots in Protected Chats", "Скриншоты в защищённых чатах", "保護されたチャットでスクリーンショット"),
-        .spyScreenshotsFooter: ("Allows screenshots and screen recording in chats and channels that restrict saving content. Secret chats and self-destructing media stay protected. Open chats update when you reopen them.", "Разрешает скриншоты и запись экрана в чатах и каналах с запретом копирования. Секретные чаты и самоудаляющиеся медиа остаются защищёнными. Уже открытые чаты обновятся, когда вы откроете их заново.", "コンテンツの保存が制限されたチャットやチャンネルでスクリーンショットと画面収録を許可します。シークレットチャットと自動削除メディアは引き続き保護されます。開いているチャットは開き直すと反映されます。"),
+        .spyScreenshotsFooter: ("Allows screenshots and screen recording in chats and channels that restrict saving content.", "Разрешает скриншоты и запись экрана в чатах и каналах с запретом копирования.", "コンテンツの保存が制限されたチャットやチャンネルでスクリーンショットと画面収録を許可します。"),
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
         .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
         .islandAvatarFooter: ("On iPhones without the Dynamic Island, the profile photo flows into the top of the screen like a drop as you scroll.", "На iPhone без Dynamic Island аватарка при прокрутке профиля втягивается в верх экрана, как капля.", "Dynamic IslandのないiPhoneで、スクロールするとプロフィール写真が水滴のように画面上部へ吸い込まれます。"),
