@@ -246,7 +246,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         controller.present(UndoOverlayController(presentationData: presentationData, content: content, elevatedLayout: false, position: .top, action: { _ in
             return false
-        }), in: .current)
+        }), in: .window(.root))
     }
     let presentFailure: () -> Void = {
         let strings = EcoStrings(languageCode: context.sharedContext.currentPresentationData.with { $0 }.strings.baseLanguageCode)
