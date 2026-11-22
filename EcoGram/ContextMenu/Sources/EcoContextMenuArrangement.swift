@@ -31,7 +31,7 @@ private func ecoContextAction(title: String, strings: PresentationStrings) -> Ec
         return .edit
     case strings.Conversation_ContextMenuTranslate:
         return .translate
-    case strings.Conversation_SaveToFiles:
+    case strings.Conversation_SaveToFiles, strings.Gallery_SaveImage, strings.Gallery_SaveVideo:
         return .saveToFiles
     case strings.Conversation_ContextMenuReport:
         return .report
