@@ -17,6 +17,8 @@ private func ecoContextAction(title: String, strings: PresentationStrings) -> Ec
         return .copyLink
     case strings.Conversation_ContextMenuForward:
         return .forward
+    case EcoStrings(languageCode: strings.baseLanguageCode).get(.actionShot):
+        return .shot
     case strings.Conversation_ContextMenuBan:
         return .restrict
     case strings.Conversation_ContextMenuDelete, strings.Chat_MessageContextMenu_Remove, strings.Conversation_ContextMenuCancelSending, strings.Conversation_ContextMenuCancelEditing:

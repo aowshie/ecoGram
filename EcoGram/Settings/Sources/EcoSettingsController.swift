@@ -25,6 +25,7 @@ enum EcoSettingsAction: Hashable {
     case badges
     case spy
     case ayuCategory(AyuCategory)
+    case protectedChats
 }
 
 private enum EcoSettingsSection: Int32 {
@@ -32,18 +33,15 @@ private enum EcoSettingsSection: Int32 {
     case chat
     case appearance
     case spy
-    case ayugram
-    case ecogram
 }
 
 private enum EcoToggle: String {
     case localNotifications
-    case protectedScreenshots
     case hideProfileShortcuts
     case islandAvatarAnimation
 }
 
-private typealias EcoSettingsEntry = EcoListEntry<EcoSettingsAction>
+typealias EcoSettingsEntry = EcoListEntry<EcoSettingsAction>
 
 private struct EcoAppearanceOptions {
     let values: [Bool]
@@ -120,56 +118,6 @@ private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: Presen
     return entries
 }
 
-private let ecoSpyCategories: [AyuCategory] = [.ghost, .history]
-
-private func ecoSpyCounts(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> (enabled: Int, total: Int) {
-    let summaries = ecoSpyCategories.map { ayuCategorySummary($0, strings: strings, presentationStrings: presentationStrings, theme: theme) }
-    let screenshots = EcoPreferences.shared.allowsProtectedScreenshots ? 1 : 0
-    return (summaries.reduce(screenshots) { $0 + $1.enabled }, summaries.reduce(1) { $0 + $1.total })
-}
-
-private func ecoSpyEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> [EcoSettingsEntry] {
-    let preferences = EcoPreferences.shared
-    var entries: [EcoSettingsEntry] = []
-    var order = 0
-    func next() -> Int {
-        order += 1
-        return order
-    }
-    let ayugram = EcoSettingsSection.ayugram.rawValue
-    entries.append(.header(section: ayugram, order: next(), text: strings.get(.ayuTitle).uppercased()))
-    for category in ecoSpyCategories {
-        let summary = ayuCategorySummary(category, strings: strings, presentationStrings: presentationStrings, theme: theme)
-        entries.append(.category(section: ayugram, order: next(), action: .ayuCategory(category), icon: summary.icon, title: summary.title, subtitle: summary.subtitle, label: summary.label))
-    }
-    let ecogram = EcoSettingsSection.ecogram.rawValue
-    entries.append(.header(section: ecogram, order: next(), text: strings.get(.settingsTitle).uppercased()))
-    entries.append(.toggle(section: ecogram, order: next(), key: EcoToggle.protectedScreenshots.rawValue, title: strings.get(.spyScreenshots), value: preferences.allowsProtectedScreenshots, enabled: true))
-    entries.append(.notice(section: ecogram, order: next(), text: strings.get(.spyScreenshotsFooter)))
-    return entries
-}
-
-private func ecoSpyController(context: AccountContext) -> ViewController {
-    var pushControllerImpl: ((ViewController) -> Void)?
-    let arguments = EcoListArguments<EcoSettingsAction>(context: context, toggle: ecoApplyToggle, perform: { action in
-        if case let .ayuCategory(category) = action {
-            pushControllerImpl?(ayuCategoryController(category, context: context))
-        }
-    })
-    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData)
-    |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
-        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.spyTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSpyEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
-        return (controllerState, (listState, arguments))
-    }
-    let controller = ItemListController(context: context, state: signal)
-    pushControllerImpl = { [weak controller] c in
-        (controller?.navigationController as? NavigationController)?.pushViewController(c)
-    }
-    return controller
-}
-
 private func ecoAppearanceEntries(strings: EcoStrings) -> [EcoSettingsEntry] {
     let preferences = EcoPreferences.shared
     let section = EcoSettingsSection.appearance.rawValue
@@ -192,8 +140,6 @@ private func ecoApplyToggle(_ key: String, _ value: Bool) {
     switch EcoToggle(rawValue: key) {
     case .localNotifications:
         preferences.backgroundNotifications = value
-    case .protectedScreenshots:
-        preferences.allowsProtectedScreenshots = value
     case .hideProfileShortcuts:
         preferences.hideProfileShortcuts = value
     case .islandAvatarAnimation:
@@ -234,6 +180,8 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
             pushControllerImpl?(ecoSpyController(context: context))
         case let .ayuCategory(category):
             pushControllerImpl?(ayuCategoryController(category, context: context))
+        case .protectedChats:
+            pushControllerImpl?(ecoProtectedChatsController(context: context))
         }
     })
 

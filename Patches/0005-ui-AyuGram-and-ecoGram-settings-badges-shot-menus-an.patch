@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sun, 22 Nov 2026 17:14:03 +0200
+Date: Tue, 24 Nov 2026 00:14:09 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -250,9 +250,18 @@ index 72b8ebf6619a36282fd148370806e06b789f804c..ff54e5455571a51b8a61ca1c33e092cf
                      content = SystemVideoContent(userLocation: .peer(message.id.peerId), url: embedUrl, imageReference: .webPage(webPage: WebpageReference(webpage), media: image), dimensions: webpageContent.embedSize?.cgSize ?? CGSize(width: 640.0, height: 640.0), duration: webpageContent.duration.flatMap(Double.init) ?? 0.0)
                  }
 diff --git a/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift b/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
-index 2fd0417834ba11dd77ff560953e21a1cc4fd9aa6..c456aaf12dee52118e0879b720f46f03de8ad12e 100644
+index 2fd0417834ba11dd77ff560953e21a1cc4fd9aa6..9ff88480ac165c691e8a428387073fae2f47d83a 100644
 --- a/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
 +++ b/submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
+@@ -363,7 +363,7 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
+     }
+     
+     private func setupImageRecognition(_ generate: @escaping (TransformImageArguments) -> DrawingContext?, dimensions: PixelDimensions) {
+-        guard let message = self.message, !message.isCopyProtected() && message.paidContent == nil else {
++        guard let message = self.message, !ecoCopyProtection(message.isCopyProtected()) && message.paidContent == nil else {
+             return
+         }
+         let displaySize = dimensions.cgSize.fitted(CGSize(width: 1280.0, height: 1280.0)).dividedByScreenScale().integralFloor
 @@ -464,7 +464,7 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
          self.translateToLanguage = translateToLanguage
          self.peerIsCopyProtected = peerIsCopyProtected
@@ -262,11 +271,42 @@ index 2fd0417834ba11dd77ff560953e21a1cc4fd9aa6..c456aaf12dee52118e0879b720f46f03
          self.updateFooter(animated: false)
          
          var title: String?
+@@ -738,7 +738,7 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
+                     f(.default)
+                 })))
+                 
+-                if !message.isCopyProtected() && !self.peerIsCopyProtected && message.paidContent == nil, let media = self.contextAndMedia?.1 {
++                if !ecoSaveProtection(message.isCopyProtected() || self.peerIsCopyProtected) && message.paidContent == nil, let media = self.contextAndMedia?.1 {
+                     items.append(.action(ContextMenuActionItem(text: self.presentationData.strings.Gallery_CreateSticker, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Sticker"), color: theme.actionSheet.primaryTextColor) }, action: { [weak self] _, f in
+                         f(.default)
+                         guard let self else {
+diff --git a/submodules/GalleryUI/Sources/Items/UniversalVideoGalleryItem.swift b/submodules/GalleryUI/Sources/Items/UniversalVideoGalleryItem.swift
+index 2ffe9f00dbec0dec6ea72d89c34e00fde0e2783c..ab69050fc83139efd1f848f85f41bd3949e7fbe1 100644
+--- a/submodules/GalleryUI/Sources/Items/UniversalVideoGalleryItem.swift
++++ b/submodules/GalleryUI/Sources/Items/UniversalVideoGalleryItem.swift
+@@ -3717,7 +3717,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
+                 items.append(contentsOf: sgVideoControlItems)
+                 //
+ 
+-                if let (message, maybeFile, _) = strongSelf.contentInfo(), let file = maybeFile, !message.isCopyProtected() && !item.peerIsCopyProtected && message.paidContent == nil {
++                if let (message, maybeFile, _) = strongSelf.contentInfo(), let file = maybeFile, !ecoSaveProtection(message.isCopyProtected() || item.peerIsCopyProtected) && message.paidContent == nil {
+                     if !sgVideoControlItems.isEmpty { // MARK: Swiftgram
+                         items.append(.separator)
+                     }
+@@ -3894,7 +3894,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
+                     })))
+                 }
+                 
+-                if let (message, _, _) = strongSelf.contentInfo(), let image = message.effectiveMedia.first(where: { $0 is TelegramMediaImage }) as? TelegramMediaImage, !message.isCopyProtected() && !item.peerIsCopyProtected && message.paidContent == nil {
++                if let (message, _, _) = strongSelf.contentInfo(), let image = message.effectiveMedia.first(where: { $0 is TelegramMediaImage }) as? TelegramMediaImage, !ecoSaveProtection(message.isCopyProtected() || item.peerIsCopyProtected) && message.paidContent == nil {
+                     let context = strongSelf.context
+                     var videoReference: AnyMediaReference?
+                     if let video = image.video {
 diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
-index 767fd2867d058071b438b11b0d64b9bb4e096ed2..7255711f555d8570add7bb5544475a984bacd95e 100644
+index 767fd2867d058071b438b11b0d64b9bb4e096ed2..983df89619dd8d5e8575d81dc1c5fbc2074ca1e8 100644
 --- a/submodules/TelegramUI/BUILD
 +++ b/submodules/TelegramUI/BUILD
-@@ -25,6 +25,11 @@ sgdeps = [
+@@ -25,6 +25,12 @@ sgdeps = [
      "//Swiftgram/SGProUI:SGProUI",
      "//Swiftgram/SGKeychainBackupManager:SGKeychainBackupManager",
      "//Swiftgram/SGGHSettings:SGGHSettings",
@@ -275,6 +315,7 @@ index 767fd2867d058071b438b11b0d64b9bb4e096ed2..7255711f555d8570add7bb5544475a98
 +    "//EcoGram/Ayu/SettingsUI:AyuSettingsUI",
 +    "//EcoGram/Strings:EcoStrings",
 +    "//EcoGram/Settings:EcoSettingsUI",
++    "//EcoGram/Ayu/Shot:AyuShot",
      # "//Swiftgram/SGContentAnalysis:SGContentAnalysis"
  ]
  
@@ -644,7 +685,7 @@ index f05b8b8b4e8a411133d8fa1fb4470def9c369b82..1e963af9840a00e0a10845c243128d8e
          "//submodules/TelegramCore",
          "//submodules/SSignalKit/SwiftSignalKit",
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift
-index a5412dc0d1d590c6c196d74c057382a76028f5ea..703b05f577a18f2dfc986519f40b26e69d09c00c 100644
+index a5412dc0d1d590c6c196d74c057382a76028f5ea..8732ad2cf91192acf74bd8d14c5443fa24a5d705 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/Sources/ChatMessageSelectionInputPanelNode.swift
 @@ -1,4 +1,6 @@
@@ -698,7 +739,20 @@ index a5412dc0d1d590c6c196d74c057382a76028f5ea..703b05f577a18f2dfc986519f40b26e6
          //
          
          if self.selectedMessages.isEmpty {
-@@ -396,6 +407,38 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+@@ -356,7 +367,11 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+             return
+         }
+         if let actions = self.actions, actions.isCopyProtected {
+-            self.interfaceInteraction?.displayCopyProtectionTip(self.forwardButton, false)
++            if ecoForwardsAsShot(actions.isCopyProtected) {
++                self.interfaceInteraction?.forwardSelectedMessages("ecoShot")
++            } else {
++                self.interfaceInteraction?.displayCopyProtectionTip(self.forwardButton, false)
++            }
+         } else if !self.forwardButton.isImplicitlyDisabled {
+             self.interfaceInteraction?.forwardSelectedMessages(nil)
+         }
+@@ -396,6 +411,38 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
          }
      }
      
@@ -737,7 +791,21 @@ index a5412dc0d1d590c6c196d74c057382a76028f5ea..703b05f577a18f2dfc986519f40b26e6
      @objc private func tagButtonPressed() {
          guard let context = self.context else {
              return
-@@ -656,18 +699,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+@@ -534,10 +581,10 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+         if let actions = self.actions {
+             self.deleteButton.isEnabled = false
+             self.reportButton.isEnabled = false
+-            self.forwardButton.isImplicitlyDisabled = !actions.options.contains(.forward)
++            self.forwardButton.isImplicitlyDisabled = !actions.options.contains(.forward) && !ecoForwardsAsShot(actions.isCopyProtected)
+             // MARK: Swiftgram
+-            self.cloudButton.isImplicitlyDisabled = self.forwardButton.isImplicitlyDisabled
+-            self.forwardHideNamesButton.isImplicitlyDisabled = self.forwardButton.isImplicitlyDisabled
++            self.cloudButton.isImplicitlyDisabled = !actions.options.contains(.forward)
++            self.forwardHideNamesButton.isImplicitlyDisabled = !actions.options.contains(.forward)
+             
+             if self.peerMedia {
+                 self.deleteButton.isEnabled = !actions.options.intersection([.deleteLocally, .deleteGlobally]).isEmpty
+@@ -656,18 +703,7 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
          
          let buttonSize = CGSize(width: 40.0, height: 40.0)
  
@@ -757,7 +825,7 @@ index a5412dc0d1d590c6c196d74c057382a76028f5ea..703b05f577a18f2dfc986519f40b26e6
          
          let availableWidth = width - leftInset - rightInset
          let spacing: CGFloat = floor((availableWidth - buttonSize.width * CGFloat(buttons.count)) / CGFloat(buttons.count - 1))
-@@ -675,7 +707,9 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
+@@ -675,7 +711,9 @@ public final class ChatMessageSelectionInputPanelNode: ChatInputPanelNode {
          for i in 0 ..< buttons.count {
              let button = buttons[i]
              let buttonFrame: CGRect
@@ -768,6 +836,19 @@ index a5412dc0d1d590c6c196d74c057382a76028f5ea..703b05f577a18f2dfc986519f40b26e6
                  buttonFrame = CGRect(origin: CGPoint(x: width - rightInset - buttonSize.width, y: 0.0), size: buttonSize)
              } else {
                  buttonFrame = CGRect(origin: CGPoint(x: offset, y: 0.0), size: buttonSize)
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift
+index 4cf1b43b8f64815b2a3862ee1ffcc8efb696a2c8..fdc336617f1228ea89b354ef0fec46712f57834e 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift
+@@ -1654,7 +1654,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
+                     }
+                 }
+                 
+-                let enableCopy = (!item.associatedData.isCopyProtectionEnabled && !item.message.isCopyProtected()) || item.message.id.peerId.isVerificationCodes
++                let enableCopy = !ecoCopyProtection(item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()) || item.message.id.peerId.isVerificationCodes
+                 textSelectionNode.enableCopy = enableCopy
+                 
+                 var enableQuote = !item.message.text.isEmpty
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
 index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..997c03284b3f47174ec74a8872e982f0774608b1 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
@@ -1112,6 +1193,178 @@ index bb35640b764b8f450e904f6420d0e6248c2c9770..3fb015eb62eb2419b124c75e1d2a36aa
      items[.edit]!.append(contentsOf: sgPeerInfoSettingsProfileIdItems(data: data, interaction: interaction)) // MARK: Swiftgram
      
      if let settings = data.globalSettings {
+diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShotForward.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShotForward.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..a7bdff4a79e321a689a446e62da46e8820305db7
+--- /dev/null
++++ b/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShotForward.swift
+@@ -0,0 +1,106 @@
++import Foundation
++import UIKit
++import Display
++import SwiftSignalKit
++import TelegramCore
++import AccountContext
++import MediaPickerUI
++import UndoUI
++import AyuShot
++import EcoStrings
++
++extension ChatControllerImpl {
++    func ecoForwardAsShot(messageIds: [EngineMessage.Id]) {
++        guard let navigationController = self.effectiveNavigationController, !messageIds.isEmpty else {
++            return
++        }
++        let image = Promise<UIImage?>()
++        image.set(ayuShotImage(context: self.context, messageIds: messageIds, parentView: navigationController.view))
++        let controller = self.context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: self.context, updatedPresentationData: self.updatedPresentationData, filter: [.onlyWriteable, .excludeDisabled, .doNotSearchMessages], hasFilters: true, selectForumThreads: true))
++        controller.peerSelected = { [weak self, weak controller] peer, threadId in
++            guard let self, let controller, !controller.inProgress else {
++                return
++            }
++            controller.inProgress = true
++            self.updateChatPresentationInterfaceState(animated: false, interactive: true, { $0.updatedInterfaceState({ $0.withoutSelectionState() }) })
++            let _ = (image.get()
++            |> take(1)
++            |> deliverOnMainQueue).startStandalone(next: { [weak self, weak controller] image in
++                guard let self, let controller else {
++                    return
++                }
++                guard let image else {
++                    controller.inProgress = false
++                    let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
++                    let text = EcoStrings(languageCode: presentationData.strings.baseLanguageCode).get(.shotFailed)
++                    controller.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in
++                        return false
++                    }), in: .current)
++                    return
++                }
++                self.ecoOpenShotPaste(image: image, peerId: peer.id, threadId: threadId, selectionController: controller)
++            })
++        }
++        self.chatDisplayNode.dismissInput()
++        navigationController.pushViewController(controller)
++    }
++
++    private var ecoAcceptsShotPaste: Bool {
++        guard self.parentController == nil else {
++            return false
++        }
++        switch self.subject {
++        case nil, .some(.message):
++            return true
++        default:
++            return false
++        }
++    }
++
++    private func ecoOpenShotPaste(image: UIImage, peerId: EnginePeer.Id, threadId: Int64?, selectionController: ViewController) {
++        guard let navigationController = self.effectiveNavigationController else {
++            return
++        }
++        let paste: (ChatControllerImpl?) -> Void = { chatController in
++            chatController?.displayPasteMenu([.image(image)])
++        }
++        if case .peer(peerId) = self.chatLocation, threadId == nil, self.ecoAcceptsShotPaste {
++            let viewControllers = navigationController.viewControllers.filter { !($0 is PeerSelectionController) }
++            navigationController.setViewControllers(viewControllers, animated: true, completion: { [weak self] in
++                paste(self)
++            })
++            return
++        }
++        let proceed: (ChatController) -> Void = { [weak navigationController, weak selectionController] chatController in
++            guard let navigationController, let selectionController else {
++                return
++            }
++            var viewControllers = navigationController.viewControllers
++            guard let index = viewControllers.firstIndex(where: { $0 === selectionController }) else {
++                return
++            }
++            viewControllers.insert(chatController, at: index)
++            navigationController.setViewControllers(viewControllers, animated: false)
++            let _ = (chatController.ready.get()
++            |> SwiftSignalKit.filter { $0 }
++            |> take(1)
++            |> deliverOnMainQueue).startStandalone(next: { [weak navigationController, weak chatController] _ in
++                guard let navigationController else {
++                    return
++                }
++                let viewControllers = navigationController.viewControllers.filter { !($0 is PeerSelectionController) }
++                navigationController.setViewControllers(viewControllers, animated: true, completion: {
++                    paste(chatController as? ChatControllerImpl)
++                })
++            })
++        }
++        if let threadId {
++            let _ = (self.context.sharedContext.chatControllerForForumThread(context: self.context, peerId: peerId, threadId: threadId)
++            |> deliverOnMainQueue).startStandalone(next: { chatController in
++                proceed(chatController)
++            })
++        } else {
++            proceed(ChatControllerImpl(context: self.context, chatLocation: .peer(id: peerId)))
++        }
++    }
++}
+diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift
+index 43bc43a6cc14d87e1599952f2fbee95b67351a86..83cb0dddf80f9dc42299c8a02546b056ef06558b 100644
+--- a/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift
++++ b/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift
+@@ -1984,6 +1984,8 @@ extension ChatControllerImpl {
+                             strongSelf.forwardMessagesToCloud(messageIds: forwardMessageIds, removeNames: false, openCloud: false, resetCurrent: true)
+                         case "hideNames":
+                             strongSelf.forwardMessages(forceHideNames: true, messageIds: forwardMessageIds, options: ChatInterfaceForwardOptionsState(hideNames: true, hideCaptions: false, unhideNamesOnCaptionChange: false))
++                        case "ecoShot":
++                            strongSelf.ecoForwardAsShot(messageIds: forwardMessageIds)
+                         default:
+                             strongSelf.forwardMessages(messageIds: forwardMessageIds)
+                         }
+@@ -2016,6 +2018,8 @@ extension ChatControllerImpl {
+                             strongSelf.forwardMessagesToCloud(messageIds: forwardMessageIds, removeNames: false, openCloud: false)
+                         case "forwardMessagesWithNoNames":
+                             strongSelf.forwardMessages(forceHideNames: true, messageIds: forwardMessageIds, options: ChatInterfaceForwardOptionsState(hideNames: true, hideCaptions: false, unhideNamesOnCaptionChange: false))
++                        case "ecoShot":
++                            strongSelf.ecoForwardAsShot(messageIds: forwardMessageIds)
+                         default:
+                             strongSelf.forwardMessages(messageIds: forwardMessageIds)
+                     }
+diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerOpenMessageContextMenu.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerOpenMessageContextMenu.swift
+index 5bf77c1bbdd4ae7620927dfcbe71a33446c3ceff..c40e0bf227f2f0d6e2095862b533b9f595c09ef2 100644
+--- a/submodules/TelegramUI/Sources/Chat/ChatControllerOpenMessageContextMenu.swift
++++ b/submodules/TelegramUI/Sources/Chat/ChatControllerOpenMessageContextMenu.swift
+@@ -90,9 +90,9 @@ extension ChatControllerImpl {
+                             break
+                         }
+                     }
+-                    if self.presentationInterfaceState.myCopyProtectionEnabled && !isAction && !isAd {
++                    if ecoCopyProtection(self.presentationInterfaceState.myCopyProtectionEnabled) && !isAction && !isAd {
+                         tip = .messageCopyProtection(text: self.presentationData.strings.Conversation_CopyProtectionInfoPrivateYou)
+-                    } else if self.presentationInterfaceState.copyProtectionEnabled && !isAction && !isAd {
++                    } else if ecoCopyProtection(self.presentationInterfaceState.copyProtectionEnabled) && !isAction && !isAd {
+                         if case .scheduledMessages = self.subject {
+                         } else {
+                             if let peer = self.presentationInterfaceState.renderedPeer?.peer {
+@@ -335,7 +335,7 @@ extension ChatControllerImpl {
+                     }
+                 }
+                 
+-                let isSecret = self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
++                let isSecret = ecoCaptureProtection(self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled) || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
+                 let controller = makeContextController(presentationData: self.presentationData, source: source, items: actionsSignal, recognizer: recognizer, gesture: gesture, disableScreenshots: isSecret, hideReactionPanelTail: hideReactionPanelTail)
+                 controller.dismissed = { [weak self] in
+                     self?.canReadHistory.set(true)
+diff --git a/submodules/TelegramUI/Sources/ChatController.swift b/submodules/TelegramUI/Sources/ChatController.swift
+index 349cb54d97972c221154a7095326f3b221728589..6577a67ec1330100c4d126da5dd60d46a193e5ce 100644
+--- a/submodules/TelegramUI/Sources/ChatController.swift
++++ b/submodules/TelegramUI/Sources/ChatController.swift
+@@ -2396,7 +2396,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
+                 }
+             }
+ 
+-            let isSecret = strongSelf.presentationInterfaceState.copyProtectionEnabled || strongSelf.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
++            let isSecret = ecoCaptureProtection(strongSelf.presentationInterfaceState.copyProtectionEnabled) || strongSelf.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
+             let pinchController = makePinchController(sourceNode: sourceNode, disableScreenshots: isSecret, getContentAreaInScreenSpace: {
+                 guard let strongSelf = self else {
+                     return CGRect()
 diff --git a/submodules/TelegramUI/Sources/ChatControllerNode.swift b/submodules/TelegramUI/Sources/ChatControllerNode.swift
 index a46c380873253f3c63241d0c06a95350bdc408f2..6e18625f6c137f82d68ec811403f11a39efa5388 100644
 --- a/submodules/TelegramUI/Sources/ChatControllerNode.swift
@@ -1126,20 +1379,82 @@ index a46c380873253f3c63241d0c06a95350bdc408f2..6e18625f6c137f82d68ec811403f11a3
              #if DEBUG
              self.historyNodeContainer.isSecret = false
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..39513c2ac3fb2a071875dbaa3c06775ce3e91c39 100644
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..881a5b81c0cb4e93f7f703a717254fb62f02f87f 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 +++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-@@ -1,6 +1,9 @@
+@@ -1,6 +1,10 @@
  import SGSimpleSettings // MARK: Swiftgram
  import PeerInfoUI
  import Foundation
++import AyuShot
 +import EcoStrings
 +import AyuSettingsUI
 +import EcoContextMenu
  import UIKit
  import TelegramCore
  import AsyncDisplayKit
-@@ -2297,6 +2300,12 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+@@ -1361,7 +1365,9 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+             }
+         }
+         
+-        let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
++        let isProtectedContent = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
++        let isCopyProtected = ecoCopyProtection(isProtectedContent)
++        let isSaveProtected = ecoSaveProtection(isProtectedContent)
+         if !messageText.isEmpty || richMessageMarkdown != nil || (resourceAvailable && isImage) || diceEmoji != nil {
+             if !isExpired {
+                 if !isPoll {
+@@ -1517,7 +1523,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+             }
+         }
+         
+-        if resourceAvailable, !message.containsSecretMedia && !isCopyProtected {
++        if resourceAvailable, !message.containsSecretMedia && !isSaveProtected {
+             var mediaReference: AnyMediaReference?
+             var isVideo = false
+             for media in message.effectiveMedia {
+@@ -1562,7 +1568,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+             }
+         }
+         
+-        if !isCopyProtected {
++        if !isSaveProtected {
+             for media in message.effectiveMedia {
+                 if let file = media as? TelegramMediaFile {
+                     if file.isMusic {
+@@ -1911,7 +1917,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+                     }
+                     if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
+                         
+-                    } else if let file = media as? TelegramMediaFile, !isCopyProtected {
++                    } else if let file = media as? TelegramMediaFile, !isSaveProtected {
+                         if file.isVideo {
+                             if file.isAnimated && !file.isVideoSticker {
+                                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_SaveGif, icon: { theme in
+@@ -1980,7 +1986,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+         }
+ 
+         if data.messageActions.options.contains(.forward) {
+-            if !isCopyProtected {
++            if !isProtectedContent {
+                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
+                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
+                 }, action: { _, f in
+@@ -2006,6 +2012,13 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+                 }
+                 //
+             }
++        } else if ecoForwardsAsShot(isProtectedContent) && message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia && !message.media.contains(where: { $0 is TelegramMediaAction || $0 is TelegramMediaExpiredContent }) {
++            actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
++                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
++            }, action: { _, f in
++                interfaceInteraction.forwardMessages(selectAll || isImage ? messages : [message], "ecoShot")
++                f(.dismissWithoutContent)
++            })))
+         }
+         
+         if canReveal {
+@@ -2297,6 +2310,22 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
              canViewStats = canViewReadStats(message: message, participantCount: infoSummaryData.participantCount, isMessageRead: isMessageRead, isPremium: isPremium, appConfig: appConfig)
          }
  
@@ -1147,6 +1462,16 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..39513c2ac3fb2a071875dbaa3c06775c
 +            controllerInteraction.navigationController()?.pushViewController(controller)
 +        }) {
 +            actions.append(editHistoryItem)
++        }
++        if message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.media.contains(where: { $0 is TelegramMediaAction }) {
++            actions.append(.action(ContextMenuActionItem(text: EcoStrings(languageCode: chatPresentationInterfaceState.strings.baseLanguageCode).get(.actionShot), icon: { theme in
++                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Camera"), color: theme.actionSheet.primaryTextColor)
++            }, action: { _, f in
++                if let view = controllerInteraction.navigationController()?.view {
++                    ayuPresentShot(context: context, messageIds: (selectAll || isImage ? messages : [message]).map { $0.id }, sourceView: view)
++                }
++                f(.dismissWithoutContent)
++            })))
 +        }
 +        ecoArrangeContextMenu(actions: &actions, sgActions: &sgActions, strings: chatPresentationInterfaceState.strings, isKeptMessage: messages.contains(where: { $0.ayuIsDeleted || $0.ayuIsMediaExpired }))
          sgInsertContextMenu(actions: &actions, sgActions: &sgActions, index: sgActionsIndex, chatPresentationInterfaceState: chatPresentationInterfaceState) // MARK: Swiftgram

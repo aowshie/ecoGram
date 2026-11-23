@@ -16,8 +16,12 @@ public final class EcoPreferences {
         case badgeOrder
         case showEcoBadges
         case allowsProtectedScreenshots
+        case allowsProtectedCopy
+        case allowsProtectedSaving
+        case forwardsProtectedAsShot
         case swiftgramDefaultsApplied = "swiftgramDefaultsApplied.v2"
         case saveToFilesDefaultApplied
+        case shotDefaultApplied
 
         var name: String {
             return "ecogram." + self.rawValue
@@ -35,10 +39,13 @@ public final class EcoPreferences {
             Key.hideProfileShortcuts.name: false,
             Key.islandAvatarAnimation.name: true,
             Key.showEcoBadges.name: true,
-            Key.allowsProtectedScreenshots.name: false
+            Key.allowsProtectedScreenshots.name: false,
+            Key.allowsProtectedCopy.name: false,
+            Key.allowsProtectedSaving.name: false,
+            Key.forwardsProtectedAsShot.name: false
         ])
         self.applySwiftgramDefaults()
-        self.applySaveToFilesDefault()
+        self.applyContextDefaults()
     }
 
     public var backgroundNotifications: Bool {
@@ -59,6 +66,25 @@ public final class EcoPreferences {
     public var allowsProtectedScreenshots: Bool {
         get { return self.defaults.bool(forKey: Key.allowsProtectedScreenshots.name) }
         set { self.store(newValue, .allowsProtectedScreenshots) }
+    }
+
+    public var allowsProtectedCopy: Bool {
+        get { return self.defaults.bool(forKey: Key.allowsProtectedCopy.name) }
+        set { self.store(newValue, .allowsProtectedCopy) }
+    }
+
+    public var allowsProtectedSaving: Bool {
+        get { return self.defaults.bool(forKey: Key.allowsProtectedSaving.name) }
+        set { self.store(newValue, .allowsProtectedSaving) }
+    }
+
+    public var forwardsProtectedAsShot: Bool {
+        get { return self.defaults.bool(forKey: Key.forwardsProtectedAsShot.name) }
+        set { self.store(newValue, .forwardsProtectedAsShot) }
+    }
+
+    public var protectedChatOptions: [Bool] {
+        return [self.allowsProtectedScreenshots, self.allowsProtectedCopy, self.allowsProtectedSaving, self.forwardsProtectedAsShot]
     }
 
     public var showEcoBadges: Bool {
@@ -221,18 +247,29 @@ public final class EcoPreferences {
         self.defaults.set(true, forKey: Key.swiftgramDefaultsApplied.name)
     }
 
-    private func applySaveToFilesDefault() {
-        guard !self.defaults.bool(forKey: Key.saveToFilesDefaultApplied.name) else {
+    private func applyContextDefaults() {
+        if !self.defaults.bool(forKey: Key.saveToFilesDefaultApplied.name) {
+            SGSimpleSettings.shared.contextShowSaveMedia = true
+        }
+        self.introduce(.saveToFiles, after: .copy, flag: .saveToFilesDefaultApplied)
+        self.introduce(.shot, after: .forward, flag: .shotDefaultApplied)
+    }
+
+    private func introduce(_ action: EcoContextAction, after anchor: EcoContextAction, flag: Key) {
+        guard !self.defaults.bool(forKey: flag.name) else {
             return
         }
-        SGSimpleSettings.shared.contextShowSaveMedia = true
         if var order = self.defaults.stringArray(forKey: Key.contextOrder.name) {
-            order.removeAll(where: { $0 == EcoContextAction.saveToFiles.rawValue })
-            let index = order.firstIndex(of: EcoContextAction.copy.rawValue).map { $0 + 1 } ?? 0
-            order.insert(EcoContextAction.saveToFiles.rawValue, at: index)
+            order.removeAll(where: { $0 == action.rawValue })
+            let index = order.firstIndex(of: anchor.rawValue).map { $0 + 1 } ?? 0
+            order.insert(action.rawValue, at: index)
             self.defaults.set(order, forKey: Key.contextOrder.name)
         }
-        self.defaults.set(true, forKey: Key.saveToFilesDefaultApplied.name)
+        if !self.isManagedBySwiftgram(action), var enabled = self.defaults.stringArray(forKey: Key.contextEnabled.name), !enabled.contains(action.rawValue) {
+            enabled.append(action.rawValue)
+            self.defaults.set(enabled.sorted(), forKey: Key.contextEnabled.name)
+        }
+        self.defaults.set(true, forKey: flag.name)
     }
 
     private func ordered<T: RawRepresentable & CaseIterable & Equatable>(key: Key, all: T.AllCases) -> [T] where T.RawValue == String {

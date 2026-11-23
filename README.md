@@ -35,13 +35,14 @@
 - Edit history of every edited message
 - One-time and self-destructing photos and videos are kept and can be reopened
 - <img src="Branding/Readme/ecogram.svg" width="14" height="14"> In ghost mode, opening them neither tells the sender nor starts the timer
-- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> Screenshots in chats that restrict saving content
+- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> Protected chats: screenshots, copying text and saving media where content is restricted
+- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> Forward from protected chats as a Shot image
 
 ### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Chat
 
 - Selection bar: choose and reorder its buttons
 - Message menu: choose and reorder its actions
-- <img src="Branding/Readme/ayugram.svg" width="14" height="14"> Shot: share messages as an image
+- <img src="Branding/Readme/ayugram.svg" width="14" height="14"> Shot: share messages as an image, from the selection bar or the message menu
 
 ### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Notifications
 

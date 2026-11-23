@@ -69,6 +69,8 @@ struct EcoActionCatalog {
             return self.strings.Conversation_ContextMenuCopyLink
         case .forward:
             return self.strings.Conversation_ContextMenuForward
+        case .shot:
+            return self.ecoStrings.get(.actionShot)
         case .restrict:
             return self.strings.Conversation_ContextMenuBan
         case .delete:
@@ -113,6 +115,8 @@ struct EcoActionCatalog {
             name = "Link"
         case .forward:
             name = "Forward"
+        case .shot:
+            name = "Camera"
         case .restrict:
             name = "Restrict"
         case .delete:

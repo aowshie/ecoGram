@@ -138,15 +138,8 @@ private final class AyuShotContextReferenceContentSource: ContextReferenceConten
     }
 }
 
-private let ayuShotBackgroundKey = "ecogram.shot.showBackground"
-private let ayuShotDateKey = "ecogram.shot.showDate"
-
 private func ayuShotController(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat) -> AyuShotController {
-    let defaults = UserDefaults.standard
-    let initialOptions = AyuShotOptions(
-        showBackground: defaults.object(forKey: ayuShotBackgroundKey) as? Bool ?? true,
-        showDate: defaults.object(forKey: ayuShotDateKey) as? Bool ?? false
-    )
+    let initialOptions = AyuShotOptions.stored
     let initialState = AyuShotState(options: initialOptions, image: nil, imageOptions: nil, renderingOptions: nil, failed: false)
     let stateValue = Atomic<AyuShotState>(value: initialState)
     let statePromise = ValuePromise<AyuShotState>(initialState, ignoreRepeated: true)
@@ -168,11 +161,10 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
             switch option {
             case .background:
                 state.options.showBackground = value
-                defaults.set(value, forKey: ayuShotBackgroundKey)
             case .date:
                 state.options.showDate = value
-                defaults.set(value, forKey: ayuShotDateKey)
             }
+            state.options.store()
         }
         renderLoop.run()
     })

@@ -60,6 +60,11 @@ public struct EcoStrings {
         case spyTitle
         case spyScreenshots
         case spyScreenshotsFooter
+        case protectedChats
+        case protectedCopy
+        case protectedSaving
+        case protectedForward
+        case protectedForwardFooter
         case hideProfileShortcuts
         case islandAvatarAnimation
         case islandAvatarFooter
@@ -148,8 +153,13 @@ public struct EcoStrings {
         .appearanceHeader: ("APPEARANCE", "ОФОРМЛЕНИЕ", "外観"),
         .appearanceTitle: ("Appearance", "Оформление", "外観"),
         .spyTitle: ("Spy Essentials", "Шпион", "スパイ"),
-        .spyScreenshots: ("Screenshots in Protected Chats", "Скриншоты в защищённых чатах", "保護されたチャットでスクリーンショット"),
-        .spyScreenshotsFooter: ("Allows screenshots and screen recording in chats and channels that restrict saving content.", "Разрешает скриншоты и запись экрана в чатах и каналах с запретом копирования.", "コンテンツの保存が制限されたチャットやチャンネルでスクリーンショットと画面収録を許可します。"),
+        .spyScreenshots: ("Screenshots", "Скриншоты", "スクリーンショット"),
+        .spyScreenshotsFooter: ("Works in chats and channels that restrict saving content.", "Работает в чатах и каналах с запретом копирования.", "コンテンツの保存が制限されたチャットやチャンネルで動作します。"),
+        .protectedChats: ("Protected Chats", "Защищённые чаты", "保護されたチャット"),
+        .protectedCopy: ("Copy Text", "Копирование текста", "テキストのコピー"),
+        .protectedSaving: ("Save Media", "Сохранение медиа", "メディアの保存"),
+        .protectedForward: ("Forward as Shot", "Пересылка через Shot", "Shotで転送"),
+        .protectedForwardFooter: ("Forward sends the messages as a Shot image to the chat you choose.", "«Переслать» отправляет сообщения картинкой Shot в выбранный чат.", "転送するとメッセージをShot画像として選んだチャットに送信します。"),
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
         .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
         .islandAvatarFooter: ("On iPhones without the Dynamic Island, the profile photo flows into the top of the screen like a drop as you scroll.", "На iPhone без Dynamic Island аватарка при прокрутке профиля втягивается в верх экрана, как капля.", "Dynamic IslandのないiPhoneで、スクロールするとプロフィール写真が水滴のように画面上部へ吸い込まれます。"),

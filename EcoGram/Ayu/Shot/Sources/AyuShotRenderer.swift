@@ -10,8 +10,25 @@ import WallpaperBackgroundNode
 import EcoBadges
 
 struct AyuShotOptions: Hashable {
+    private static let backgroundKey = "ecogram.shot.showBackground"
+    private static let dateKey = "ecogram.shot.showDate"
+
     var showBackground: Bool
     var showDate: Bool
+
+    static var stored: AyuShotOptions {
+        let defaults = UserDefaults.standard
+        return AyuShotOptions(
+            showBackground: defaults.object(forKey: AyuShotOptions.backgroundKey) as? Bool ?? true,
+            showDate: defaults.object(forKey: AyuShotOptions.dateKey) as? Bool ?? false
+        )
+    }
+
+    func store() {
+        let defaults = UserDefaults.standard
+        defaults.set(self.showBackground, forKey: AyuShotOptions.backgroundKey)
+        defaults.set(self.showDate, forKey: AyuShotOptions.dateKey)
+    }
 }
 
 final class AyuShotRenderer {
@@ -21,12 +38,12 @@ final class AyuShotRenderer {
     private let groups: [[EngineMessage]]
     private var pass: AyuShotRenderPass?
 
-    init(context: AccountContext, groups: [[EngineMessage]]) {
+    init(context: AccountContext, groups: [[EngineMessage]], revealsProtectedContent: Bool) {
         self.context = context
         let accountPeerId = context.account.peerId
         let ownAlias = AyuShotRenderer.ownAlias(context: context, groups: groups)
         self.groups = groups.map { messages in
-            return messages.map { AyuShotRenderer.prepare($0, accountPeerId: accountPeerId, ownAlias: ownAlias) }
+            return messages.map { AyuShotRenderer.prepare($0, accountPeerId: accountPeerId, ownAlias: ownAlias, revealsProtectedContent: revealsProtectedContent) }
         }
     }
 
@@ -64,9 +81,17 @@ final class AyuShotRenderer {
         return nil
     }
 
-    private static func prepare(_ message: EngineMessage, accountPeerId: EnginePeer.Id, ownAlias: TelegramUser?) -> EngineMessage {
+    private static func prepare(_ message: EngineMessage, accountPeerId: EnginePeer.Id, ownAlias: TelegramUser?, revealsProtectedContent: Bool) -> EngineMessage {
         var raw = message._asMessage()
         var peers = raw.peers
+        if revealsProtectedContent {
+            raw = raw.withUpdatedFlags(raw.flags.subtracting(.CopyProtected))
+            if let channel = peers[raw.id.peerId] as? TelegramChannel {
+                peers[channel.id] = channel.withUpdatedFlags(channel.flags.subtracting(.copyProtectionEnabled))
+            } else if let group = peers[raw.id.peerId] as? TelegramGroup {
+                peers[group.id] = group.updateFlags(flags: group.flags.subtracting(.copyProtectionEnabled), version: group.version)
+            }
+        }
         if let ownAlias, raw.author?.id == accountPeerId {
             peers[ownAlias.id] = ownAlias
             raw = raw.withUpdatedAuthor(ownAlias).withUpdatedFlags(raw.flags.union(.Incoming))

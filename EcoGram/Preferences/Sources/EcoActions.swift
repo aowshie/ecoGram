@@ -21,6 +21,7 @@ public enum EcoContextAction: String, CaseIterable {
     case pin
     case copyLink
     case forward
+    case shot
     case restrict
     case delete
     case selectFromAuthor
@@ -35,5 +36,5 @@ public enum EcoContextAction: String, CaseIterable {
     case json
     case sendLogs
 
-    static let enabledByDefault: Set<EcoContextAction> = [.reply, .copy, .pin, .copyLink, .forward, .restrict, .delete, .selectFromAuthor, .select, .editHistory]
+    static let enabledByDefault: Set<EcoContextAction> = [.reply, .copy, .pin, .copyLink, .forward, .shot, .restrict, .delete, .selectFromAuthor, .select, .editHistory]
 }
