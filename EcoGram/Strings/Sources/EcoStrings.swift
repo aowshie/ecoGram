@@ -161,7 +161,7 @@ public struct EcoStrings {
         .protectedSaving: ("Save Media", "Сохранение медиа", "メディアの保存"),
         .protectedForward: ("Forward via Shot", "Пересылка через Shot", "Shotで転送"),
         .forwardViaShot: ("Forward via Shot", "Переслать через Shot", "Shotで転送"),
-        .protectedForwardFooter: ("Forward sends the messages as a Shot image to the chat you choose.", "«Переслать» отправляет сообщения картинкой Shot в выбранный чат.", "転送するとメッセージをShot画像として選んだチャットに送信します。"),
+        .protectedForwardFooter: ("Sends the messages as a Shot image to the chat you choose. Requires Screenshots.", "Отправляет сообщения картинкой Shot в выбранный чат. Работает при включённых скриншотах.", "メッセージをShot画像として選んだチャットに送信します。スクリーンショットをオンにする必要があります。"),
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
         .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
         .islandAvatarFooter: ("On iPhones without the Dynamic Island, the profile photo flows into the top of the screen like a drop as you scroll.", "На iPhone без Dynamic Island аватарка при прокрутке профиля втягивается в верх экрана, как капля.", "Dynamic IslandのないiPhoneで、スクロールするとプロフィール写真が水滴のように画面上部へ吸い込まれます。"),

@@ -31,7 +31,7 @@ public func ayuShotImage(context: AccountContext, messageIds: [EngineMessage.Id]
             return .single(nil)
         }
         return Signal { subscriber in
-            let renderer = AyuShotRenderer(context: context, groups: groups, revealsProtectedContent: true)
+            let renderer = AyuShotRenderer(context: context, groups: groups, revealsProtectedContent: !ecoCaptureProtection(true))
             renderer.render(in: parentView, width: min(window.bounds.width, ayuShotMaximumWidth), options: AyuShotOptions(showBackground: true, showDate: AyuShotOptions.stored.showDate), completion: { image in
                 subscriber.putNext(image)
                 subscriber.putCompletion()

@@ -65,7 +65,12 @@ public final class EcoPreferences {
 
     public var allowsProtectedScreenshots: Bool {
         get { return self.defaults.bool(forKey: Key.allowsProtectedScreenshots.name) }
-        set { self.store(newValue, .allowsProtectedScreenshots) }
+        set {
+            if !newValue {
+                self.defaults.set(false, forKey: Key.forwardsProtectedAsShot.name)
+            }
+            self.store(newValue, .allowsProtectedScreenshots)
+        }
     }
 
     public var allowsProtectedCopy: Bool {
@@ -79,8 +84,8 @@ public final class EcoPreferences {
     }
 
     public var forwardsProtectedAsShot: Bool {
-        get { return self.defaults.bool(forKey: Key.forwardsProtectedAsShot.name) }
-        set { self.store(newValue, .forwardsProtectedAsShot) }
+        get { return self.allowsProtectedScreenshots && self.defaults.bool(forKey: Key.forwardsProtectedAsShot.name) }
+        set { self.store(newValue && self.allowsProtectedScreenshots, .forwardsProtectedAsShot) }
     }
 
     public var protectedChatOptions: [Bool] {

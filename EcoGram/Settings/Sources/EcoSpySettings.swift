@@ -71,7 +71,7 @@ private func ecoProtectedChatsEntries(strings: EcoStrings) -> [EcoSettingsEntry]
     entries.append(.toggle(section: content, order: next(), key: EcoProtectedToggle.saving.rawValue, title: strings.get(.protectedSaving), value: preferences.allowsProtectedSaving, enabled: true))
     entries.append(.notice(section: content, order: next(), text: strings.get(.spyScreenshotsFooter)))
     let forward = EcoSpySection.forward.rawValue
-    entries.append(.toggle(section: forward, order: next(), key: EcoProtectedToggle.forward.rawValue, title: strings.get(.protectedForward), value: preferences.forwardsProtectedAsShot, enabled: true))
+    entries.append(.toggle(section: forward, order: next(), key: EcoProtectedToggle.forward.rawValue, title: strings.get(.protectedForward), value: preferences.forwardsProtectedAsShot, enabled: preferences.allowsProtectedScreenshots))
     entries.append(.notice(section: forward, order: next(), text: strings.get(.protectedForwardFooter)))
     return entries
 }
