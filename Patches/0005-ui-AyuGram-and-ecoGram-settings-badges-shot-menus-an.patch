@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Tue, 24 Nov 2026 00:22:32 +0200
+Date: Tue, 24 Nov 2026 00:47:05 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -1193,16 +1193,17 @@ index bb35640b764b8f450e904f6420d0e6248c2c9770..3fb015eb62eb2419b124c75e1d2a36aa
      items[.edit]!.append(contentsOf: sgPeerInfoSettingsProfileIdItems(data: data, interaction: interaction)) // MARK: Swiftgram
      
      if let settings = data.globalSettings {
-diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShotForward.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShotForward.swift
+diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShot.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShot.swift
 new file mode 100644
-index 0000000000000000000000000000000000000000..a7bdff4a79e321a689a446e62da46e8820305db7
+index 0000000000000000000000000000000000000000..196777f3da70b1bf786268d07eb89802e7865c5c
 --- /dev/null
-+++ b/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShotForward.swift
-@@ -0,0 +1,106 @@
++++ b/submodules/TelegramUI/Sources/Chat/ChatControllerEcoShot.swift
+@@ -0,0 +1,123 @@
 +import Foundation
 +import UIKit
 +import Display
 +import SwiftSignalKit
++import Postbox
 +import TelegramCore
 +import AccountContext
 +import MediaPickerUI
@@ -1305,6 +1306,22 @@ index 0000000000000000000000000000000000000000..a7bdff4a79e321a689a446e62da46e88
 +        }
 +    }
 +}
++
++func ecoShotMessageIdsFromHere(context: AccountContext, message: EngineRawMessage, threadId: Int64?) -> Signal<[EngineMessage.Id], NoError> {
++    let peerId = message.id.peerId
++    let namespace = message.id.namespace
++    let from = message.index
++    return context.account.postbox.transaction { transaction -> [EngineMessage.Id] in
++        let to = MessageIndex.upperBound(peerId: peerId, namespace: namespace)
++        let messages: [Message]
++        if let threadId {
++            messages = transaction.getMessagesWithThreadId(peerId: peerId, namespace: namespace, threadId: threadId, from: from, includeFrom: true, to: to, limit: ayuShotMessageLimit + 1)
++        } else {
++            messages = transaction.getMessages(peerId: peerId, namespace: namespace, from: from, includeFrom: true, to: to, limit: ayuShotMessageLimit + 1)
++        }
++        return messages.map { $0.id }
++    }
++}
 diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift
 index 43bc43a6cc14d87e1599952f2fbee95b67351a86..83cb0dddf80f9dc42299c8a02546b056ef06558b 100644
 --- a/submodules/TelegramUI/Sources/Chat/ChatControllerLoadDisplayNode.swift
@@ -1379,7 +1396,7 @@ index a46c380873253f3c63241d0c06a95350bdc408f2..6e18625f6c137f82d68ec811403f11a3
              #if DEBUG
              self.historyNodeContainer.isSecret = false
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..78baa694219c7d4e92ff051f908a2cea6ab539ab 100644
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..e3a0e02fa7d8afcc94a01c1b021e51029201873f 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 +++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 @@ -1,6 +1,10 @@
@@ -1454,7 +1471,7 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..78baa694219c7d4e92ff051f908a2cea
          }
          
          if canReveal {
-@@ -2297,6 +2310,22 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+@@ -2297,6 +2310,37 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
              canViewStats = canViewReadStats(message: message, participantCount: infoSummaryData.participantCount, isMessageRead: isMessageRead, isPremium: isPremium, appConfig: appConfig)
          }
  
@@ -1469,6 +1486,21 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..78baa694219c7d4e92ff051f908a2cea
 +            }, action: { _, f in
 +                if let view = controllerInteraction.navigationController()?.view {
 +                    ayuPresentShot(context: context, messageIds: (selectAll || isImage ? messages : [message]).map { $0.id }, sourceView: view)
++                }
++                f(.dismissWithoutContent)
++            })))
++            actions.append(.action(ContextMenuActionItem(text: EcoStrings(languageCode: chatPresentationInterfaceState.strings.baseLanguageCode).get(.shotFromHere), icon: { theme in
++                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Camera"), color: theme.actionSheet.primaryTextColor)
++            }, action: { _, f in
++                var threadId: Int64?
++                if case .replyThread = chatPresentationInterfaceState.chatLocation {
++                    threadId = message.threadId
++                }
++                if let view = controllerInteraction.navigationController()?.view {
++                    let _ = (ecoShotMessageIdsFromHere(context: context, message: message, threadId: threadId)
++                    |> deliverOnMainQueue).startStandalone(next: { messageIds in
++                        ayuPresentShot(context: context, messageIds: messageIds, sourceView: view)
++                    })
 +                }
 +                f(.dismissWithoutContent)
 +            })))

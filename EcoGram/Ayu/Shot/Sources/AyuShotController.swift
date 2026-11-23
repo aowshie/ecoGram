@@ -19,33 +19,45 @@ import EcoStrings
 
 private enum AyuShotSection: Int32 {
     case preview
+    case theme
     case preferences
+    case privacy
 }
 
-private enum AyuShotOption: String {
+private enum AyuShotOption: Int {
     case background
     case date
+    case reactions
+    case edited
+    case ownOnRight
+    case anonymous
 }
 
 private final class AyuShotArguments {
     let toggle: (AyuShotOption, Bool) -> Void
+    let selectTheme: (AyuShotTheme) -> Void
 
-    init(toggle: @escaping (AyuShotOption, Bool) -> Void) {
+    init(toggle: @escaping (AyuShotOption, Bool) -> Void, selectTheme: @escaping (AyuShotTheme) -> Void) {
         self.toggle = toggle
+        self.selectTheme = selectTheme
     }
 }
 
 private enum AyuShotEntry: ItemListNodeEntry {
     case preview(image: UIImage?, isLoading: Bool)
-    case header(String)
-    case option(AyuShotOption, title: String, value: Bool)
+    case header(AyuShotSection, String)
+    case theme(AyuShotTheme, title: String, selected: Bool)
+    case option(AyuShotOption, section: AyuShotSection, title: String, value: Bool)
+    case footer(AyuShotSection, String)
 
     var section: ItemListSectionId {
         switch self {
         case .preview:
             return AyuShotSection.preview.rawValue
-        case .header, .option:
-            return AyuShotSection.preferences.rawValue
+        case let .header(section, _), let .footer(section, _), let .option(_, section, _, _):
+            return section.rawValue
+        case .theme:
+            return AyuShotSection.theme.rawValue
         }
     }
 
@@ -53,25 +65,51 @@ private enum AyuShotEntry: ItemListNodeEntry {
         switch self {
         case .preview:
             return 0
+        case let .header(section, _):
+            return 100 + Int(section.rawValue)
+        case let .theme(theme, _, _):
+            return 200 + (AyuShotTheme.allCases.firstIndex(of: theme) ?? 0)
+        case let .option(option, _, _, _):
+            return 300 + option.rawValue
+        case let .footer(section, _):
+            return 400 + Int(section.rawValue)
+        }
+    }
+
+    private var sortIndex: Int {
+        switch self {
+        case .preview:
+            return 0
         case .header:
             return 1
-        case let .option(option, _, _):
-            return option == .background ? 2 : 3
+        case let .theme(theme, _, _):
+            return 2 + (AyuShotTheme.allCases.firstIndex(of: theme) ?? 0)
+        case let .option(option, _, _, _):
+            return 2 + option.rawValue
+        case .footer:
+            return 100
         }
     }
 
     static func < (lhs: AyuShotEntry, rhs: AyuShotEntry) -> Bool {
-        return lhs.stableId < rhs.stableId
+        if lhs.section != rhs.section {
+            return lhs.section < rhs.section
+        }
+        return lhs.sortIndex < rhs.sortIndex
     }
 
     static func == (lhs: AyuShotEntry, rhs: AyuShotEntry) -> Bool {
         switch (lhs, rhs) {
         case let (.preview(lhsImage, lhsLoading), .preview(rhsImage, rhsLoading)):
             return lhsImage === rhsImage && lhsLoading == rhsLoading
-        case let (.header(lhsText), .header(rhsText)):
-            return lhsText == rhsText
-        case let (.option(lhsOption, lhsTitle, lhsValue), .option(rhsOption, rhsTitle, rhsValue)):
-            return lhsOption == rhsOption && lhsTitle == rhsTitle && lhsValue == rhsValue
+        case let (.header(lhsSection, lhsText), .header(rhsSection, rhsText)):
+            return lhsSection == rhsSection && lhsText == rhsText
+        case let (.theme(lhsTheme, lhsTitle, lhsSelected), .theme(rhsTheme, rhsTitle, rhsSelected)):
+            return lhsTheme == rhsTheme && lhsTitle == rhsTitle && lhsSelected == rhsSelected
+        case let (.option(lhsOption, lhsSection, lhsTitle, lhsValue), .option(rhsOption, rhsSection, rhsTitle, rhsValue)):
+            return lhsOption == rhsOption && lhsSection == rhsSection && lhsTitle == rhsTitle && lhsValue == rhsValue
+        case let (.footer(lhsSection, lhsText), .footer(rhsSection, rhsText)):
+            return lhsSection == rhsSection && lhsText == rhsText
         default:
             return false
         }
@@ -82,12 +120,18 @@ private enum AyuShotEntry: ItemListNodeEntry {
         switch self {
         case let .preview(image, isLoading):
             return AyuShotPreviewItem(presentationData: presentationData, image: image, isLoading: isLoading, sectionId: self.section)
-        case let .header(text):
+        case let .header(_, text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
-        case let .option(option, title, value):
+        case let .theme(theme, title, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .left, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.selectTheme(theme)
+            })
+        case let .option(option, _, title, value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: title, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggle(option, value)
             })
+        case let .footer(_, text):
+            return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         }
     }
 }
@@ -163,7 +207,22 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
                 state.options.showBackground = value
             case .date:
                 state.options.showDate = value
+            case .reactions:
+                state.options.showReactions = value
+            case .edited:
+                state.options.showEdited = value
+            case .ownOnRight:
+                state.options.ownOnRight = value
+            case .anonymous:
+                state.options.anonymous = value
             }
+            state.options.store()
+        }
+        renderLoop.run()
+    }, selectTheme: { theme in
+        updateState { state in
+            state.failed = false
+            state.options.theme = theme
             state.options.store()
         }
         renderLoop.run()
@@ -217,12 +276,25 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         let leftNavigationButton = ItemListNavigationButton(content: .node(hostNode(closeButtonNode, AnyComponentWithIdentity(id: "close", component: AnyComponent(closeButton)))), style: .regular, enabled: true, action: {})
         let rightNavigationButton = ItemListNavigationButton(content: .node(hostNode(moreButtonNode, AnyComponentWithIdentity(id: "more", component: AnyComponent(moreButton)))), style: .regular, enabled: true, action: {})
 
-        let entries: [AyuShotEntry] = [
+        let options = state.options
+        let themeTitles: [(AyuShotTheme, EcoStrings.Key)] = [(.app, .shotThemeApp), (.day, .shotThemeDay), (.night, .shotThemeNight)]
+        var entries: [AyuShotEntry] = [
             .preview(image: state.image, isLoading: state.isLoading),
-            .header(strings.get(.shotPreferences).uppercased()),
-            .option(.background, title: strings.get(.shotShowBackground), value: state.options.showBackground),
-            .option(.date, title: strings.get(.shotShowDate), value: state.options.showDate)
+            .header(.theme, strings.get(.shotTheme).uppercased())
         ]
+        for (theme, key) in themeTitles {
+            entries.append(.theme(theme, title: strings.get(key), selected: options.theme == theme))
+        }
+        entries.append(contentsOf: [
+            .header(.preferences, strings.get(.shotPreferences).uppercased()),
+            .option(.background, section: .preferences, title: strings.get(.shotShowBackground), value: options.showBackground),
+            .option(.date, section: .preferences, title: strings.get(.shotShowDate), value: options.showDate),
+            .option(.reactions, section: .preferences, title: strings.get(.shotShowReactions), value: options.showReactions),
+            .option(.edited, section: .preferences, title: strings.get(.shotShowEdited), value: options.showEdited),
+            .option(.ownOnRight, section: .preferences, title: strings.get(.shotOwnOnRight), value: options.ownOnRight),
+            .option(.anonymous, section: .privacy, title: strings.get(.shotAnonymize), value: options.anonymous),
+            .footer(.privacy, strings.get(.shotAnonymizeFooter))
+        ])
 
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.actionShot)), leftNavigationButton: leftNavigationButton, rightNavigationButton: rightNavigationButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: true)
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, animateChanges: true)

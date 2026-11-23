@@ -80,6 +80,18 @@ public struct EcoStrings {
         case shotPreferences
         case shotShowBackground
         case shotShowDate
+        case shotShowReactions
+        case shotShowEdited
+        case shotOwnOnRight
+        case shotAnonymize
+        case shotAnonymizeFooter
+        case shotAnonymous
+        case shotTheme
+        case shotThemeApp
+        case shotThemeDay
+        case shotThemeNight
+        case shotLimit
+        case shotFromHere
         case shotCopy
         case shotCopied
         case labelTimer
@@ -176,6 +188,18 @@ public struct EcoStrings {
         .shotPreferences: ("Preferences", "Настройки", "設定"),
         .shotShowBackground: ("Show Background", "Показывать фон", "背景を表示"),
         .shotShowDate: ("Show Date", "Показывать дату", "日付を表示"),
+        .shotShowReactions: ("Show Reactions", "Показывать реакции", "リアクションを表示"),
+        .shotShowEdited: ("Show “Edited”", "Показывать «изменено»", "「編集済み」を表示"),
+        .shotOwnOnRight: ("My Messages on the Right", "Мои сообщения справа", "自分のメッセージを右側に"),
+        .shotAnonymize: ("Hide Names and Photos", "Скрыть имена и фото", "名前と写真を隠す"),
+        .shotAnonymizeFooter: ("Everyone is shown as Anonymous 1, 2, 3 without profile photos.", "Все участники показываются как Аноним 1, 2, 3 без фото профиля.", "全員がプロフィール写真なしで匿名 1、2、3 と表示されます。"),
+        .shotAnonymous: ("Anonymous", "Аноним", "匿名"),
+        .shotTheme: ("Theme", "Тема", "テーマ"),
+        .shotThemeApp: ("Same as App", "Как в приложении", "アプリと同じ"),
+        .shotThemeDay: ("Light", "Светлая", "ライト"),
+        .shotThemeNight: ("Dark", "Тёмная", "ダーク"),
+        .shotLimit: ("A shot fits up to %d messages, so only the first ones are included.", "В Shot помещается до %d сообщений, взяты только первые.", "Shotに入るのは最大%d件のため、最初のメッセージのみ含めました。"),
+        .shotFromHere: ("Shot from Here", "Shot отсюда", "ここからShot"),
         .shotCopy: ("Copy", "Скопировать", "コピー"),
         .shotCopied: ("Copied to clipboard", "Скопировано в буфер обмена", "クリップボードにコピーしました"),
         .labelTimer: ("timer", "таймер", "タイマー"),

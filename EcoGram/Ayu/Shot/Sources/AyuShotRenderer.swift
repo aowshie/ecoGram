@@ -7,120 +7,84 @@ import TelegramCore
 import TelegramPresentationData
 import AccountContext
 import WallpaperBackgroundNode
-import EcoBadges
-
-struct AyuShotOptions: Hashable {
-    private static let backgroundKey = "ecogram.shot.showBackground"
-    private static let dateKey = "ecogram.shot.showDate"
-
-    var showBackground: Bool
-    var showDate: Bool
-
-    static var stored: AyuShotOptions {
-        let defaults = UserDefaults.standard
-        return AyuShotOptions(
-            showBackground: defaults.object(forKey: AyuShotOptions.backgroundKey) as? Bool ?? true,
-            showDate: defaults.object(forKey: AyuShotOptions.dateKey) as? Bool ?? false
-        )
-    }
-
-    func store() {
-        let defaults = UserDefaults.standard
-        defaults.set(self.showBackground, forKey: AyuShotOptions.backgroundKey)
-        defaults.set(self.showDate, forKey: AyuShotOptions.dateKey)
-    }
-}
+import EcoStrings
 
 final class AyuShotRenderer {
-    private static let ownAliasOffset: Int64 = 1 << 48
-
     private let context: AccountContext
     private let groups: [[EngineMessage]]
+    private let revealsProtectedContent: Bool
+    private let mediaReady = Promise<Void>()
+    private let prerequisitesDisposable = MetaDisposable()
     private var pass: AyuShotRenderPass?
+    private var isRendering = false
 
     init(context: AccountContext, groups: [[EngineMessage]], revealsProtectedContent: Bool) {
         self.context = context
-        let accountPeerId = context.account.peerId
-        let ownAlias = AyuShotRenderer.ownAlias(context: context, groups: groups)
-        self.groups = groups.map { messages in
-            return messages.map { AyuShotRenderer.prepare($0, accountPeerId: accountPeerId, ownAlias: ownAlias, revealsProtectedContent: revealsProtectedContent) }
-        }
+        self.groups = groups
+        self.revealsProtectedContent = revealsProtectedContent
+        self.mediaReady.set(ayuShotMediaReady(context: context, messages: groups.flatMap { $0 }))
+    }
+
+    deinit {
+        self.prerequisitesDisposable.dispose()
     }
 
     func render(in parentView: UIView, width: CGFloat, options: AyuShotOptions, completion: @escaping (UIImage?) -> Void) {
-        guard self.pass == nil else {
+        guard !self.isRendering else {
             completion(nil)
             return
         }
-        let pass = AyuShotRenderPass(context: self.context, groups: self.groups, options: options)
-        self.pass = pass
-        pass.render(in: parentView, width: width, completion: { [weak self] image in
-            self?.pass = nil
-            completion(image)
-        })
+        self.isRendering = true
+        let strings = EcoStrings(languageCode: self.context.sharedContext.currentPresentationData.with { $0 }.strings.baseLanguageCode)
+        let preparation = AyuShotPreparation(accountPeerId: self.context.account.peerId, revealsProtectedContent: self.revealsProtectedContent, options: options, anonymousTitle: strings.get(.shotAnonymous))
+        let groups = preparation.prepare(self.groups)
+        self.prerequisitesDisposable.set((combineLatest(self.mediaReady.get() |> take(1), ayuShotAppearance(context: self.context, theme: options.theme))
+        |> deliverOnMainQueue).startStrict(next: { [weak self, weak parentView] _, appearance in
+            guard let self else {
+                return
+            }
+            guard let parentView else {
+                self.isRendering = false
+                completion(nil)
+                return
+            }
+            let pass = AyuShotRenderPass(context: self.context, groups: groups, options: options, appearance: appearance)
+            self.pass = pass
+            pass.render(in: parentView, width: width, completion: { [weak self] image in
+                self?.pass = nil
+                self?.isRendering = false
+                completion(image)
+            })
+        }))
     }
 
     func cancel() {
+        self.prerequisitesDisposable.set(nil)
         self.pass?.cancel()
         self.pass = nil
-    }
-
-    private static func ownAlias(context: AccountContext, groups: [[EngineMessage]]) -> TelegramUser? {
-        let accountPeerId = context.account.peerId
-        for messages in groups {
-            for message in messages {
-                if let author = message._asMessage().author as? TelegramUser, author.id == accountPeerId {
-                    let rawId = accountPeerId.id._internalGetInt64Value()
-                    let aliasRawId = rawId + AyuShotRenderer.ownAliasOffset
-                    EcoTitleBadges.registerAlias(aliasRawId, for: rawId)
-                    let aliasId = EnginePeer.Id(namespace: accountPeerId.namespace, id: EnginePeer.Id.Id._internalFromInt64Value(aliasRawId))
-                    return TelegramUser(id: aliasId, accessHash: author.accessHash, firstName: author.firstName, lastName: author.lastName, username: author.username, phone: nil, photo: author.photo, botInfo: nil, restrictionInfo: nil, flags: author.flags, emojiStatus: author.emojiStatus, usernames: author.usernames, storiesHidden: author.storiesHidden, nameColor: author.nameColor, backgroundEmojiId: author.backgroundEmojiId, profileColor: author.profileColor, profileBackgroundEmojiId: author.profileBackgroundEmojiId, subscriberCount: nil, verificationIconFileId: author.verificationIconFileId)
-                }
-            }
-        }
-        return nil
-    }
-
-    private static func prepare(_ message: EngineMessage, accountPeerId: EnginePeer.Id, ownAlias: TelegramUser?, revealsProtectedContent: Bool) -> EngineMessage {
-        var raw = message._asMessage()
-        var peers = raw.peers
-        if revealsProtectedContent {
-            raw = raw.withUpdatedFlags(raw.flags.subtracting(.CopyProtected))
-            if let channel = peers[raw.id.peerId] as? TelegramChannel {
-                peers[channel.id] = channel.withUpdatedFlags(channel.flags.subtracting(.copyProtectionEnabled))
-            } else if let group = peers[raw.id.peerId] as? TelegramGroup {
-                peers[group.id] = group.updateFlags(flags: group.flags.subtracting(.copyProtectionEnabled), version: group.version)
-            }
-        }
-        if let ownAlias, raw.author?.id == accountPeerId {
-            peers[ownAlias.id] = ownAlias
-            raw = raw.withUpdatedAuthor(ownAlias).withUpdatedFlags(raw.flags.union(.Incoming))
-        }
-        if raw.id.peerId.namespace == Namespaces.Peer.CloudUser || raw.id.peerId.namespace == Namespaces.Peer.SecretChat {
-            let groupId = EnginePeer.Id(namespace: Namespaces.Peer.CloudGroup, id: raw.id.peerId.id)
-            peers[groupId] = TelegramGroup(id: groupId, title: "", photo: [], participantCount: 2, role: .member, membership: .Member, flags: [], defaultBannedRights: nil, migrationReference: nil, creationDate: 0, version: 0)
-            raw = raw.withUpdatedId(id: EngineMessage.Id(peerId: groupId, namespace: raw.id.namespace, id: raw.id.id))
-        }
-        return EngineMessage(raw.withUpdatedPeers(peers))
+        self.isRendering = false
     }
 }
 
 private final class AyuShotRenderPass {
     private static let padding: CGFloat = 12.0
     private static let spacing: CGFloat = 2.0
+    private static let maximumPixelCount: CGFloat = 32_000_000.0
 
     private let context: AccountContext
     private let groups: [[EngineMessage]]
     private let options: AyuShotOptions
+    private let appearance: AyuShotAppearance
     private let containerNode: ASDisplayNode
     private let messagesNode: ASDisplayNode
     private var wallpaperNode: WallpaperBackgroundNode?
     private var readyDisposable: Disposable?
 
-    init(context: AccountContext, groups: [[EngineMessage]], options: AyuShotOptions) {
+    init(context: AccountContext, groups: [[EngineMessage]], options: AyuShotOptions, appearance: AyuShotAppearance) {
         self.context = context
         self.groups = groups
         self.options = options
+        self.appearance = appearance
         self.containerNode = ASDisplayNode()
         self.containerNode.displaysAsynchronously = false
         self.messagesNode = ASDisplayNode()
@@ -134,10 +98,10 @@ private final class AyuShotRenderPass {
 
     func render(in parentView: UIView, width: CGFloat, completion: @escaping (UIImage?) -> Void) {
         let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
-        let theme = presentationData.theme.withUpdated(preview: true)
+        let theme = self.appearance.theme.withUpdated(preview: true)
         if self.options.showBackground {
             let wallpaperNode = createWallpaperBackgroundNode(context: self.context, forChatDisplay: false)
-            wallpaperNode.update(wallpaper: presentationData.chatWallpaper, animated: false)
+            wallpaperNode.update(wallpaper: self.appearance.wallpaper, animated: false)
             wallpaperNode.updateBubbleTheme(bubbleTheme: theme, bubbleCorners: presentationData.chatBubbleCorners)
             self.wallpaperNode = wallpaperNode
             self.containerNode.addSubnode(wallpaperNode)
@@ -173,7 +137,7 @@ private final class AyuShotRenderPass {
                 return
             }
             let format = UIGraphicsImageRendererFormat()
-            format.scale = UIScreen.main.scale
+            format.scale = min(UIScreen.main.scale, (AyuShotRenderPass.maximumPixelCount / max(size.width * size.height, 1.0)).squareRoot())
             format.opaque = opaque
             let bounds = CGRect(origin: .zero, size: size)
             var drawn = false
@@ -194,7 +158,7 @@ private final class AyuShotRenderPass {
     private func layout(presentationData: PresentationData, theme: PresentationTheme, width: CGFloat) -> CGSize {
         let accountPeerId = self.context.account.peerId
         let items: [ListViewItem] = self.groups.map { messages in
-            return self.context.sharedContext.makeChatMessagePreviewItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: presentationData.chatWallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, forcedResourceStatus: nil, tapMessage: nil, clickThroughMessage: nil, backgroundNode: self.wallpaperNode, availableReactions: nil, accountPeer: nil, isCentered: false, isPreview: true, isStandalone: false, rank: nil, rankRole: nil, isGiftMessageComposerPreview: false, activateGiftMessageInput: nil)
+            return self.context.sharedContext.makeChatMessagePreviewItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, forcedResourceStatus: nil, tapMessage: nil, clickThroughMessage: nil, backgroundNode: self.wallpaperNode, availableReactions: nil, accountPeer: nil, isCentered: false, isPreview: true, isStandalone: false, rank: nil, rankRole: nil, isGiftMessageComposerPreview: false, activateGiftMessageInput: nil)
         }
         let params = ListViewItemLayoutParams(width: width, leftInset: 0.0, rightInset: 0.0, availableHeight: 10000.0)
         var nodes: [ListViewItemNode] = []
@@ -228,7 +192,7 @@ private final class AyuShotRenderPass {
                 if index > 0, let previous = self.groups[index - 1].first, calendar.isDate(date, inSameDayAs: Date(timeIntervalSince1970: TimeInterval(previous.timestamp))) {
                     continue
                 }
-                let header = self.context.sharedContext.makeChatMessageDateHeaderItem(context: self.context, timestamp: message.timestamp, theme: theme, strings: presentationData.strings, wallpaper: presentationData.chatWallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
+                let header = self.context.sharedContext.makeChatMessageDateHeaderItem(context: self.context, timestamp: message.timestamp, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
                 dateHeaders.append((index, header))
             }
         }
@@ -271,7 +235,7 @@ private final class AyuShotRenderPass {
             if let nextMessage, nextMessage.author?.id == author.id, dateFrames[index + 1] == nil {
                 continue
             }
-            let header = self.context.sharedContext.makeChatMessageAvatarHeaderItem(context: self.context, timestamp: message.timestamp, peer: author, message: message, theme: theme, strings: presentationData.strings, wallpaper: presentationData.chatWallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
+            let header = self.context.sharedContext.makeChatMessageAvatarHeaderItem(context: self.context, timestamp: message.timestamp, peer: author, message: message, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
             let headerNode = header.node(synchronousLoad: true)
             headerNode.subnodeTransform = CATransform3DMakeScale(-1.0, 1.0, 1.0)
             self.messagesNode.addSubnode(headerNode)

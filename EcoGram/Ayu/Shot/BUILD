@@ -15,6 +15,7 @@ swift_library(
         "//submodules/Display:Display",
         "//submodules/TelegramCore:TelegramCore",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
+        "//submodules/TelegramUIPreferences:TelegramUIPreferences",
         "//submodules/AccountContext:AccountContext",
         "//submodules/ComponentFlow:ComponentFlow",
         "//submodules/TelegramUI/Components/GlassBarButtonComponent:GlassBarButtonComponent",

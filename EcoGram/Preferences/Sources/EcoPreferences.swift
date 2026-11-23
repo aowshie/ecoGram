@@ -22,6 +22,7 @@ public final class EcoPreferences {
         case swiftgramDefaultsApplied = "swiftgramDefaultsApplied.v2"
         case saveToFilesDefaultApplied
         case shotDefaultApplied
+        case shotFromHereDefaultApplied
 
         var name: String {
             return "ecogram." + self.rawValue
@@ -258,6 +259,7 @@ public final class EcoPreferences {
         }
         self.introduce(.saveToFiles, after: .copy, flag: .saveToFilesDefaultApplied)
         self.introduce(.shot, after: .forward, flag: .shotDefaultApplied)
+        self.introduce(.shotFromHere, after: .shot, flag: .shotFromHereDefaultApplied)
     }
 
     private func introduce(_ action: EcoContextAction, after anchor: EcoContextAction, flag: Key) {
