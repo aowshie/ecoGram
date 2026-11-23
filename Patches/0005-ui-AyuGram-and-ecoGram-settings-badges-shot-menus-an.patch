@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Tue, 24 Nov 2026 00:14:09 +0200
+Date: Tue, 24 Nov 2026 00:22:32 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -1379,7 +1379,7 @@ index a46c380873253f3c63241d0c06a95350bdc408f2..6e18625f6c137f82d68ec811403f11a3
              #if DEBUG
              self.historyNodeContainer.isSecret = false
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..881a5b81c0cb4e93f7f703a717254fb62f02f87f 100644
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..78baa694219c7d4e92ff051f908a2cea6ab539ab 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 +++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 @@ -1,6 +1,10 @@
@@ -1445,7 +1445,7 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..881a5b81c0cb4e93f7f703a717254fb6
                  //
              }
 +        } else if ecoForwardsAsShot(isProtectedContent) && message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia && !message.media.contains(where: { $0 is TelegramMediaAction || $0 is TelegramMediaExpiredContent }) {
-+            actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
++            actions.append(.action(ContextMenuActionItem(text: EcoStrings(languageCode: chatPresentationInterfaceState.strings.baseLanguageCode).get(.forwardViaShot), icon: { theme in
 +                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
 +            }, action: { _, f in
 +                interfaceInteraction.forwardMessages(selectAll || isImage ? messages : [message], "ecoShot")

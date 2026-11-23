@@ -15,7 +15,7 @@ private func ecoContextAction(title: String, strings: PresentationStrings) -> Ec
         return .pin
     case strings.Conversation_ContextMenuCopyLink:
         return .copyLink
-    case strings.Conversation_ContextMenuForward:
+    case strings.Conversation_ContextMenuForward, EcoStrings(languageCode: strings.baseLanguageCode).get(.forwardViaShot):
         return .forward
     case EcoStrings(languageCode: strings.baseLanguageCode).get(.actionShot):
         return .shot

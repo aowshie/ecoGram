@@ -64,6 +64,7 @@ public struct EcoStrings {
         case protectedCopy
         case protectedSaving
         case protectedForward
+        case forwardViaShot
         case protectedForwardFooter
         case hideProfileShortcuts
         case islandAvatarAnimation
@@ -158,7 +159,8 @@ public struct EcoStrings {
         .protectedChats: ("Protected Chats", "Защищённые чаты", "保護されたチャット"),
         .protectedCopy: ("Copy Text", "Копирование текста", "テキストのコピー"),
         .protectedSaving: ("Save Media", "Сохранение медиа", "メディアの保存"),
-        .protectedForward: ("Forward as Shot", "Пересылка через Shot", "Shotで転送"),
+        .protectedForward: ("Forward via Shot", "Пересылка через Shot", "Shotで転送"),
+        .forwardViaShot: ("Forward via Shot", "Переслать через Shot", "Shotで転送"),
         .protectedForwardFooter: ("Forward sends the messages as a Shot image to the chat you choose.", "«Переслать» отправляет сообщения картинкой Shot в выбранный чат.", "転送するとメッセージをShot画像として選んだチャットに送信します。"),
         .hideProfileShortcuts: ("Hide Profile Suggestions", "Скрыть предложения профиля", "プロフィールの提案を隠す"),
         .islandAvatarAnimation: ("Dynamic Island Effect", "Эффект Dynamic Island", "Dynamic Island効果"),
