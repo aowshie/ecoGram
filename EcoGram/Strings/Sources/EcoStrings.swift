@@ -86,6 +86,7 @@ public struct EcoStrings {
         case shotAnonymize
         case shotAnonymizeFooter
         case shotAnonymous
+        case shotHideBadges
         case shotTheme
         case shotThemeApp
         case shotThemeDay
@@ -194,6 +195,7 @@ public struct EcoStrings {
         .shotAnonymize: ("Hide Names and Photos", "Скрыть имена и фото", "名前と写真を隠す"),
         .shotAnonymizeFooter: ("Everyone is shown as Anonymous 1, 2, 3 without profile photos.", "Все участники показываются как Аноним 1, 2, 3 без фото профиля.", "全員がプロフィール写真なしで匿名 1、2、3 と表示されます。"),
         .shotAnonymous: ("Anonymous", "Аноним", "匿名"),
+        .shotHideBadges: ("Hide Badges", "Скрыть значки", "バッジを隠す"),
         .shotTheme: ("Theme", "Тема", "テーマ"),
         .shotThemeApp: ("Same as App", "Как в приложении", "アプリと同じ"),
         .shotThemeDay: ("Light", "Светлая", "ライト"),

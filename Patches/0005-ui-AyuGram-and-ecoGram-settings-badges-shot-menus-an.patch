@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Tue, 24 Nov 2026 00:59:19 +0200
+Date: Tue, 24 Nov 2026 08:31:54 +0200
 Subject: [PATCH] ui: AyuGram and ecoGram settings, badges, shot, menus and
  kept messages
 
@@ -30,6 +30,18 @@ index bdec8f4fdf24c51fc14cd8bbf499573c83012109..0633af825b1e58f0f13b998f800fda58
 +    }))
      return items
  }
+diff --git a/submodules/AccountContext/Sources/AccountContext.swift b/submodules/AccountContext/Sources/AccountContext.swift
+index 091c9c88aeac0d1ee94e5c1a24fe9292a5ec8f85..46a19be873147bff92d2121ac534b50112283c3a 100644
+--- a/submodules/AccountContext/Sources/AccountContext.swift
++++ b/submodules/AccountContext/Sources/AccountContext.swift
+@@ -1562,6 +1562,7 @@ public protocol SharedAccountContext: AnyObject {
+     ) -> ChatHistoryListNode
+     func subscribeChatListData(context: AccountContext, location: ChatListControllerLocation) -> Signal<EngineChatList, NoError>
+     func makeChatMessagePreviewItem(context: AccountContext, messages: [EngineMessage], theme: PresentationTheme, strings: PresentationStrings, wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, chatBubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameOrder: PresentationPersonNameOrder, forcedResourceStatus: FileMediaResourceStatus?, tapMessage: ((EngineMessage) -> Void)?, clickThroughMessage: ((UIView?, CGPoint?) -> Void)?, backgroundNode: ASDisplayNode?, availableReactions: AvailableReactions?, accountPeer: EnginePeer?, isCentered: Bool, isPreview: Bool, isStandalone: Bool, rank: String?, rankRole: ChatRankInfoScreenRole?, isGiftMessageComposerPreview: Bool, activateGiftMessageInput: (() -> Void)?) -> ListViewItem
++    func makeChatMessageSnapshotItem(context: AccountContext, messages: [EngineMessage], theme: PresentationTheme, strings: PresentationStrings, wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, chatBubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameOrder: PresentationPersonNameOrder, backgroundNode: ASDisplayNode?, availableReactions: AvailableReactions?) -> ListViewItem
+     /// A message bubble's content for a feed row (the News tab's expanded post): the bubble's text, link preview and
+     /// other content, drawn without the bubble's background and author line. The host draws the channel line and the
+     /// photos and videos (the item never shows them).
 diff --git a/submodules/ChatListUI/BUILD b/submodules/ChatListUI/BUILD
 index c0fa1aaef0cfb60635e2e907a8469750f87d6565..e05bdaaf41c9fde44a80fed8c80aeca67e85e46d 100644
 --- a/submodules/ChatListUI/BUILD
@@ -302,6 +314,49 @@ index 2ffe9f00dbec0dec6ea72d89c34e00fde0e2783c..ab69050fc83139efd1f848f85f41bd39
                      let context = strongSelf.context
                      var videoReference: AnyMediaReference?
                      if let video = image.video {
+diff --git a/submodules/TelegramPresentationData/Sources/ChatPresentationData.swift b/submodules/TelegramPresentationData/Sources/ChatPresentationData.swift
+index 227b5c0d67c3d891e5f57257b9387ea445a84bc0..003778b058fa12cc5cb4b5b9272ced8f0d3c3586 100644
+--- a/submodules/TelegramPresentationData/Sources/ChatPresentationData.swift
++++ b/submodules/TelegramPresentationData/Sources/ChatPresentationData.swift
+@@ -33,6 +33,11 @@ public final class ChatPresentationData {
+     public let chatBubbleCorners: PresentationChatBubbleCorners
+     public let animatedEmojiScale: CGFloat
+     public let isPreview: Bool
++    public let isSnapshot: Bool
++
++    public var hidesMessageDetails: Bool {
++        return self.isPreview && !self.isSnapshot
++    }
+     
+     public let messageFont: UIFont
+     public let messageEmojiFont: UIFont
+@@ -45,7 +50,7 @@ public final class ChatPresentationData {
+     /// Built here: layouts read this object from several threads, so it is not lazy.
+     public let messageTextFonts: ChatMessageTextFonts?
+ 
+-    public init(theme: ChatPresentationThemeData, fontSize: PresentationFontSize, strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, nameDisplayOrder: PresentationPersonNameOrder, disableAnimations: Bool, largeEmoji: Bool, chatBubbleCorners: PresentationChatBubbleCorners, animatedEmojiScale: CGFloat = 1.0, isPreview: Bool = false) {
++    public init(theme: ChatPresentationThemeData, fontSize: PresentationFontSize, strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, nameDisplayOrder: PresentationPersonNameOrder, disableAnimations: Bool, largeEmoji: Bool, chatBubbleCorners: PresentationChatBubbleCorners, animatedEmojiScale: CGFloat = 1.0, isPreview: Bool = false, isSnapshot: Bool = false) {
+         self.theme = theme
+         self.fontSize = fontSize
+         self.strings = strings
+@@ -55,6 +60,7 @@ public final class ChatPresentationData {
+         self.chatBubbleCorners = chatBubbleCorners
+         self.largeEmoji = largeEmoji
+         self.isPreview = isPreview
++        self.isSnapshot = isSnapshot
+         
+         let baseFontSize = fontSize.baseDisplaySize
+         self.messageFont = Font.regular(baseFontSize)
+@@ -111,7 +117,8 @@ public final class ChatPresentationData {
+             largeEmoji: self.largeEmoji,
+             chatBubbleCorners: self.chatBubbleCorners,
+             animatedEmojiScale: self.animatedEmojiScale,
+-            isPreview: self.isPreview
++            isPreview: self.isPreview,
++            isSnapshot: self.isSnapshot
+         )
+     }
+ }
 diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
 index 767fd2867d058071b438b11b0d64b9bb4e096ed2..983df89619dd8d5e8575d81dc1c5fbc2074ca1e8 100644
 --- a/submodules/TelegramUI/BUILD
@@ -319,6 +374,28 @@ index 767fd2867d058071b438b11b0d64b9bb4e096ed2..983df89619dd8d5e8575d81dc1c5fbc2
      # "//Swiftgram/SGContentAnalysis:SGContentAnalysis"
  ]
  
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageAttachedContentNode/Sources/ChatMessageAttachedContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageAttachedContentNode/Sources/ChatMessageAttachedContentNode.swift
+index 9621540e5648cbb7cee9e5e5351877e26d7a7a46..39f9f503d06851d923d05aca8d99c5a996a82722 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageAttachedContentNode/Sources/ChatMessageAttachedContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageAttachedContentNode/Sources/ChatMessageAttachedContentNode.swift
+@@ -736,7 +736,7 @@ public final class ChatMessageAttachedContentNode: ASDisplayNode {
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if presentationData.isPreview {
++                if presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else {
+                     dateFormat = .regular
+@@ -776,7 +776,7 @@ public final class ChatMessageAttachedContentNode: ASDisplayNode {
+                             let statusLayoutAndContinueValue = makeStatusLayout(ChatMessageDateAndStatusNode.Arguments(
+                                 context: context,
+                                 presentationData: presentationData,
+-                                edited: edited && !isPreview,
++                                edited: edited && !presentationData.hidesMessageDetails,
+                                 impressionCount: !isPreview ? viewCount : nil,
+                                 dateText: dateText,
+                                 type: statusType,
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
 index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..10df042ae53957bcf0df5413b7829e1bb6b8996c 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/BUILD
@@ -334,7 +411,7 @@ index 385b8b9a72e5d1e64b6f34a420218ce9cd6cf26e..10df042ae53957bcf0df5413b7829e1b
  
  sgsrc = [
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
-index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..2cc5c8126de3a35fbd20fae2598e15d091309f3b 100644
+index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..2de6d369340f8fc33d1ea7886521e54120e27b0f 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
 @@ -2,6 +2,7 @@ import SGStrings // MARK: Swiftgram
@@ -391,6 +468,15 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..2cc5c8126de3a35fbd20fae2598e15d0
      override public func asyncLayout() -> (_ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: ChatMessageHeaderSpec) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
          var currentContentClassesPropertiesAndLayouts: [(Message, AnyClass, Bool, Int?, (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize, _ avatarInset: CGFloat) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))))] = []
          for contentNode in self.contentNodes {
+@@ -2729,7 +2755,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         } else {
+             bubbleReactions = ReactionsMessageAttribute(canViewList: false, isTags: false, reactions: [], recentPeers: [], topPeers: [])
+         }
+-        if !bubbleReactions.reactions.isEmpty && !item.presentationData.isPreview {
++        if !bubbleReactions.reactions.isEmpty && !item.presentationData.hidesMessageDetails {
+             if incoming {
+                 bottomNodeMergeStatus = .Left
+             } else {
 @@ -2738,6 +2764,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
          }
          
@@ -399,6 +485,24 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..2cc5c8126de3a35fbd20fae2598e15d0
          // The author's third-party verification icon, drawn left of the name. A channel's own posts carry no badges
          // beside its name (the chat header shows them), so it is the effective author's only.
          var authorVerificationIconFileId: Int64?
+@@ -3040,7 +3067,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else if let subject = item.associatedData.subject, case let .messageOptions(_, _, info) = subject, case .forward = info {
+                     dateFormat = .minimal
+@@ -3070,7 +3097,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                 let statusSuggestedWidthAndContinue = mosaicStatusLayout(ChatMessageDateAndStatusNode.Arguments(
+                     context: item.context,
+                     presentationData: item.presentationData,
+-                    edited: edited && !item.presentationData.isPreview,
++                    edited: edited && !item.presentationData.hidesMessageDetails,
+                     impressionCount: !item.presentationData.isPreview ? viewCount : nil,
+                     dateText: dateText,
+                     type: statusType,
 @@ -3227,6 +3254,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                          credibilityIconWidth += 20.0
                      }
@@ -410,6 +514,24 @@ index b05cb21f9566bd9fe4aca9dc09e8441ef1db65b6..2cc5c8126de3a35fbd20fae2598e15d0
                  
                  let rankBadgeSizeAndApply = rankBadgeLayout(TextNodeLayoutArguments(attributedString: rankBadgeString, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: max(0, maximumNodeWidth - layoutConstants.text.bubbleInsets.left - layoutConstants.text.bubbleInsets.right), height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
                  if rankBadgeSizeAndApply.0.size.width > 0.0 {
+@@ -3270,7 +3301,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+                     // baseline. It is just the time: who signed a post and when a message was edited are at the top of
+                     // its context menu. A post keeps its view count after it: an eye and a short number.
+                     let dateFont = Font.regular(chatMessageBubblelessHeaderTimeFontSize(baseDisplaySize: item.presentationData.fontSize.baseDisplaySize))
+-                    let timeText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(firstMessage), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: item.presentationData.isPreview ? .full : .regular, associatedData: item.associatedData, ignoreAuthor: true)
++                    let timeText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(firstMessage), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: item.presentationData.hidesMessageDetails ? .full : .regular, associatedData: item.associatedData, ignoreAuthor: true)
+                     let dateLayout = bubblelessHeaderDateLayout ?? TextNode.asyncLayout(nil)
+                     let dateSizeAndApply = dateLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: timeText, font: dateFont, textColor: messageTheme.secondaryTextColor), backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: max(0.0, maximumNodeWidth * 0.5), height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
+                     var rankSpace: CGFloat = 0.0
+@@ -3745,7 +3776,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         }
+         
+         var reactionButtonsFinalize: ((CGFloat) -> (CGSize, (_ animation: ListViewItemUpdateAnimation) -> ChatMessageReactionButtonsNode))?
+-        if !bubbleReactions.reactions.isEmpty && !item.presentationData.isPreview {
++        if !bubbleReactions.reactions.isEmpty && !item.presentationData.hidesMessageDetails {
+             var centerAligned = false
+             for media in item.message.media {
+                 if let action = media as? TelegramMediaAction {
 @@ -4357,6 +4388,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                  authorNameColor: authorNameColor,
                  layoutConstants: layoutConstants,
@@ -516,10 +638,85 @@ index bf71cb207328261b644bc13dda3f3563bdb761f8..f23e24d542e5f3992af614162fb0886a
 +    }
      return dateText
  }
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageFactCheckBubbleContentNode/Sources/ChatMessageFactCheckBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageFactCheckBubbleContentNode/Sources/ChatMessageFactCheckBubbleContentNode.swift
+index bfd3f35cc0a33fa4f789a2d65956797f9697e6b3..41b92efe990f4b94ce80382899f1ecddd529319c 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageFactCheckBubbleContentNode/Sources/ChatMessageFactCheckBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageFactCheckBubbleContentNode/Sources/ChatMessageFactCheckBubbleContentNode.swift
+@@ -325,7 +325,7 @@ public class ChatMessageFactCheckBubbleContentNode: ChatMessageBubbleContentNode
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else if let subject = item.associatedData.subject, case .messageOptions = subject {
+                     dateFormat = .minimal
+@@ -443,7 +443,7 @@ public class ChatMessageFactCheckBubbleContentNode: ChatMessageBubbleContentNode
+                     statusSuggestedWidthAndContinue = statusLayout(ChatMessageDateAndStatusNode.Arguments(
+                         context: item.context,
+                         presentationData: item.presentationData,
+-                        edited: edited && !item.presentationData.isPreview,
++                        edited: edited && !item.presentationData.hidesMessageDetails,
+                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
+                         dateText: dateText,
+                         type: statusType,
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageGiveawayBubbleContentNode/Sources/ChatMessageGiveawayBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageGiveawayBubbleContentNode/Sources/ChatMessageGiveawayBubbleContentNode.swift
+index b1280d3d67c665ba20108154e5ce4e229e3ca3bb..bd8a5a4f4d3ecf9ffbdf8574cd6af7f55c568189 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageGiveawayBubbleContentNode/Sources/ChatMessageGiveawayBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageGiveawayBubbleContentNode/Sources/ChatMessageGiveawayBubbleContentNode.swift
+@@ -531,7 +531,7 @@ public class ChatMessageGiveawayBubbleContentNode: ChatMessageBubbleContentNode,
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else {
+                     dateFormat = .regular
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveFileNode/Sources/ChatMessageInteractiveFileNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveFileNode/Sources/ChatMessageInteractiveFileNode.swift
+index 51523233546a27a1c4abd5b29887842c94e07eb6..4e2522ef9d39b7199c7204687dbc540e94bac0bd 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveFileNode/Sources/ChatMessageInteractiveFileNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveFileNode/Sources/ChatMessageInteractiveFileNode.swift
+@@ -952,7 +952,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
+                     }
+                     
+                     let dateFormat: MessageTimestampStatusFormat
+-                    if arguments.presentationData.isPreview {
++                    if arguments.presentationData.hidesMessageDetails {
+                         dateFormat = .full
+                     } else {
+                         dateFormat = .regular
+@@ -976,7 +976,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
+                     statusSuggestedWidthAndContinue = statusLayout(ChatMessageDateAndStatusNode.Arguments(
+                         context: arguments.context,
+                         presentationData: arguments.presentationData,
+-                        edited: edited && !arguments.presentationData.isPreview,
++                        edited: edited && !arguments.presentationData.hidesMessageDetails,
+                         impressionCount: !arguments.presentationData.isPreview ? viewCount : nil,
+                         dateText: dateText,
+                         type: statusType,
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift
-index f1455bfea6b8c1f8bdfac7db8a0acfdf790ed104..13d8f182d9fe8c16e9243e99df464dcc5c1c6541 100644
+index f1455bfea6b8c1f8bdfac7db8a0acfdf790ed104..e18da1a2a770b19a18bf20465d86711191dfb28f 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift
+@@ -572,7 +572,7 @@ public class ChatMessageInteractiveInstantVideoNode: ASDisplayNode {
+             }
+             
+             let dateFormat: MessageTimestampStatusFormat
+-            if item.presentationData.isPreview {
++            if item.presentationData.hidesMessageDetails {
+                 dateFormat = .full
+             } else {
+                 dateFormat = .regular
+@@ -600,7 +600,7 @@ public class ChatMessageInteractiveInstantVideoNode: ASDisplayNode {
+             let statusSuggestedWidthAndContinue = makeDateAndStatusLayout(ChatMessageDateAndStatusNode.Arguments(
+                 context: item.context,
+                 presentationData: item.presentationData,
+-                edited: edited && !sentViaBot && !item.presentationData.isPreview,
++                edited: edited && !sentViaBot && !item.presentationData.hidesMessageDetails,
+                 impressionCount: !item.presentationData.isPreview ? viewCount : nil,
+                 dateText: dateText,
+                 type: statusType,
 @@ -812,7 +812,7 @@ public class ChatMessageInteractiveInstantVideoNode: ASDisplayNode {
                                          }
                                      }
@@ -530,9 +727,18 @@ index f1455bfea6b8c1f8bdfac7db8a0acfdf790ed104..13d8f182d9fe8c16e9243e99df464dcc
                                  videoNode.bounds = previousVideoNode.bounds
                                  videoNode.position = previousVideoNode.position
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
-index 6e1d726b490a3c7e3e5a141d86782044e7876c4d..26ed3d534d4ac2e90701d98fe4a89cbe5bf34b10 100644
+index 6e1d726b490a3c7e3e5a141d86782044e7876c4d..e92f35cc1bbcd77c56c6ee6c09750a84a92514c6 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
+@@ -1146,7 +1146,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+                 let statusSuggestedWidthAndContinue = statusLayout(ChatMessageDateAndStatusNode.Arguments(
+                     context: context,
+                     presentationData: presentationData,
+-                    edited: dateAndStatus.edited && !presentationData.isPreview,
++                    edited: dateAndStatus.edited && !presentationData.hidesMessageDetails,
+                     impressionCount: !presentationData.isPreview ? dateAndStatus.viewCount : nil,
+                     dateText: dateAndStatus.dateText,
+                     type: dateAndStatus.type,
 @@ -2080,7 +2080,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                              autoFetchFullSizeThumbnail: true,
                                              // The node made here is the one the gallery takes over: protect it as the
@@ -598,8 +804,21 @@ index c8cf0659bd1bc1458410400af71e54af1ecda94d..932abd006bc897a73485deb11ca96a0c
      }
      
      open func updateAccessibilityData(_ accessibilityData: ChatMessageAccessibilityData) {
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageMapBubbleContentNode/Sources/ChatMessageMapBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageMapBubbleContentNode/Sources/ChatMessageMapBubbleContentNode.swift
+index d706557ec11509a84b2b8f27a63a0191f403c833..d45d0db0bda52f34efb7fabf98e573551b9b4ff8 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageMapBubbleContentNode/Sources/ChatMessageMapBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageMapBubbleContentNode/Sources/ChatMessageMapBubbleContentNode.swift
+@@ -237,7 +237,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else {
+                     dateFormat = .regular
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift
-index beba1a106f17a5e32dfdc6d3ba886100178115ee..57e28eb174de4ba2b1fe9e14e6b8f36825101db2 100644
+index beba1a106f17a5e32dfdc6d3ba886100178115ee..990465eaba13dd71844cb8b2e2b5f67b9983f11e 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageMediaBubbleContentNode/Sources/ChatMessageMediaBubbleContentNode.swift
 @@ -29,6 +29,7 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
@@ -637,6 +856,15 @@ index beba1a106f17a5e32dfdc6d3ba886100178115ee..57e28eb174de4ba2b1fe9e14e6b8f368
      required public init() {
          self.interactiveImageNode = ChatMessageInteractiveMediaNode()
          
+@@ -375,7 +396,7 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
+             }
+             
+             let dateFormat: MessageTimestampStatusFormat
+-            if item.presentationData.isPreview {
++            if item.presentationData.hidesMessageDetails {
+                 dateFormat = .full
+             } else {
+                 dateFormat = .regular
 @@ -472,6 +493,7 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
                              strongSelf.media = selectedMedia
                              strongSelf.mediaIndex = selectedMediaIndex
@@ -645,6 +873,19 @@ index beba1a106f17a5e32dfdc6d3ba886100178115ee..57e28eb174de4ba2b1fe9e14e6b8f368
                              
                              let imageFrame = CGRect(origin: CGPoint(x: bubbleInsets.left, y: bubbleInsets.top), size: imageSize)
                              
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessagePollBubbleContentNode/Sources/ChatMessagePollBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessagePollBubbleContentNode/Sources/ChatMessagePollBubbleContentNode.swift
+index 1c21c74d06eea0be7d803408b868b565e3f5f3ca..af0af76b5c6d639410817d5e323ce62ea37d6225 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessagePollBubbleContentNode/Sources/ChatMessagePollBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessagePollBubbleContentNode/Sources/ChatMessagePollBubbleContentNode.swift
+@@ -2708,7 +2708,7 @@ public class ChatMessagePollBubbleContentNode: ChatMessageBubbleContentNode {
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else {
+                     dateFormat = .regular
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift
 index 490443fc48020618cc67bd9c1b0cd8580e1a6710..b37d2cbe99692430f29b2c2ee3dcb79f96b1967d 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageReplyInfoNode/Sources/ChatMessageReplyInfoNode.swift
@@ -659,7 +900,7 @@ index 490443fc48020618cc67bd9c1b0cd8580e1a6710..b37d2cbe99692430f29b2c2ee3dcb79f
                  
                  titleNode.frame = CGRect(origin: CGPoint(x: leftInset - textInsets.left - 2.0, y: spacing - textInsets.top + 1.0), size: titleLayout.size)
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift
-index 968a4ba82656a31891bef607d39f39a5ade905c6..0ea368bf495b600fff3bf290b7bc35d0f917142a 100644
+index 968a4ba82656a31891bef607d39f39a5ade905c6..4ca3773890469a04ca17385a6aa629f67ea8dd5b 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageRichDataBubbleContentNode/Sources/ChatMessageRichDataBubbleContentNode.swift
 @@ -402,7 +402,7 @@ public class ChatMessageRichDataBubbleContentNode: ChatMessageBubbleContentNode
@@ -671,6 +912,24 @@ index 968a4ba82656a31891bef607d39f39a5ade905c6..0ea368bf495b600fff3bf290b7bc35d0
      }
  
      /// Builds (or reuses) the V2View. Same-message stableVersion bumps (streamed AI chunks) reuse
+@@ -1074,7 +1074,7 @@ public class ChatMessageRichDataBubbleContentNode: ChatMessageBubbleContentNode
+                 }
+ 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else if let subject = item.associatedData.subject, case .messageOptions = subject {
+                     dateFormat = .minimal
+@@ -1217,7 +1217,7 @@ public class ChatMessageRichDataBubbleContentNode: ChatMessageBubbleContentNode
+                     statusSuggestedWidthAndContinue = statusLayout(ChatMessageDateAndStatusNode.Arguments(
+                         context: item.context,
+                         presentationData: item.presentationData,
+-                        edited: edited && !item.presentationData.isPreview,
++                        edited: edited && !item.presentationData.hidesMessageDetails,
+                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
+                         dateText: dateText,
+                         type: statusType,
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
 index f05b8b8b4e8a411133d8fa1fb4470def9c369b82..1e963af9840a00e0a10845c243128d8eca500e4d 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode/BUILD
@@ -836,10 +1095,50 @@ index a5412dc0d1d590c6c196d74c057382a76028f5ea..8732ad2cf91192acf74bd8d14c5443fa
                  buttonFrame = CGRect(origin: CGPoint(x: width - rightInset - buttonSize.width, y: 0.0), size: buttonSize)
              } else {
                  buttonFrame = CGRect(origin: CGPoint(x: offset, y: 0.0), size: buttonSize)
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageStickerItemNode/Sources/ChatMessageStickerItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageStickerItemNode/Sources/ChatMessageStickerItemNode.swift
+index 870d4c97a1ae1cd706dafbc7b57f792527f67743..102a0a9f014a06659d8377cb11fcf9e462feb792 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageStickerItemNode/Sources/ChatMessageStickerItemNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageStickerItemNode/Sources/ChatMessageStickerItemNode.swift
+@@ -677,7 +677,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
+             }
+             
+             let dateFormat: MessageTimestampStatusFormat
+-            if item.presentationData.isPreview {
++            if item.presentationData.hidesMessageDetails {
+                 dateFormat = .full
+             } else {
+                 dateFormat = .regular
 diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift
-index 4cf1b43b8f64815b2a3862ee1ffcc8efb696a2c8..fdc336617f1228ea89b354ef0fec46712f57834e 100644
+index 4cf1b43b8f64815b2a3862ee1ffcc8efb696a2c8..8aca66699782a17b140ebfefdc8da81ace518042 100644
 --- a/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift
 +++ b/submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift
+@@ -287,7 +287,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else if let subject = item.associatedData.subject, case .messageOptions = subject {
+                     dateFormat = .minimal
+@@ -698,7 +698,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
+                     statusSuggestedWidthAndContinue = statusLayout(ChatMessageDateAndStatusNode.Arguments(
+                         context: item.context,
+                         presentationData: item.presentationData,
+-                        edited: edited && !item.presentationData.isPreview,
++                        edited: edited && !item.presentationData.hidesMessageDetails,
+                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
+                         dateText: dateText,
+                         type: statusType,
+@@ -706,7 +706,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
+                         constrainedSize: textConstrainedSize,
+                         availableReactions: item.associatedData.availableReactions,
+                         savedMessageTags: item.associatedData.savedMessageTags,
+-                        reactions: item.presentationData.isPreview ? [] : dateReactionsAndPeers.reactions,
++                        reactions: item.presentationData.hidesMessageDetails ? [] : dateReactionsAndPeers.reactions,
+                         reactionPeers: dateReactionsAndPeers.peers,
+                         displayAllReactionPeers: item.message.id.peerId.namespace == Namespaces.Peer.CloudUser,
+                         areReactionsTags: item.topMessage.areReactionsTags(accountPeerId: item.context.account.peerId),
 @@ -1654,7 +1654,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                      }
                  }
@@ -849,6 +1148,32 @@ index 4cf1b43b8f64815b2a3862ee1ffcc8efb696a2c8..fdc336617f1228ea89b354ef0fec4671
                  textSelectionNode.enableCopy = enableCopy
                  
                  var enableQuote = !item.message.text.isEmpty
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageTodoBubbleContentNode/Sources/ChatMessageTodoBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageTodoBubbleContentNode/Sources/ChatMessageTodoBubbleContentNode.swift
+index ecf91d2e9943ac8e3b45fa02b54db52733454eb7..f3107325367baf6da399949ab31d3d92c9e3d880 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageTodoBubbleContentNode/Sources/ChatMessageTodoBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageTodoBubbleContentNode/Sources/ChatMessageTodoBubbleContentNode.swift
+@@ -1132,7 +1132,7 @@ public class ChatMessageTodoBubbleContentNode: ChatMessageBubbleContentNode {
+                 }
+                 
+                 let dateFormat: MessageTimestampStatusFormat
+-                if item.presentationData.isPreview {
++                if item.presentationData.hidesMessageDetails {
+                     dateFormat = .full
+                 } else {
+                     dateFormat = .regular
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageWidgetBubbleContentNode/Sources/ChatMessageWidgetBubbleContentNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageWidgetBubbleContentNode/Sources/ChatMessageWidgetBubbleContentNode.swift
+index dd300fa0b46e17eea802dba24d0719f395133930..26439085f2bfa99a2faba4230316e7661bd3eee4 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageWidgetBubbleContentNode/Sources/ChatMessageWidgetBubbleContentNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageWidgetBubbleContentNode/Sources/ChatMessageWidgetBubbleContentNode.swift
+@@ -389,7 +389,7 @@ public final class ChatMessageWidgetBubbleContentNode: ChatMessageBubbleContentN
+                     if case .replyThread = item.chatLocation {
+                         isReplyThread = true
+                     }
+-                    let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: item.presentationData.isPreview ? .full : .regular, associatedData: item.associatedData)
++                    let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: item.presentationData.hidesMessageDetails ? .full : .regular, associatedData: item.associatedData)
+                     let statusSuggestedWidthAndContinue = statusLayout(ChatMessageDateAndStatusNode.Arguments(
+                         context: item.context,
+                         presentationData: item.presentationData,
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
 index 345ba82fffb1f700c09f11c54fac7077c5ae5a9f..997c03284b3f47174ec74a8872e982f0774608b1 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
@@ -1379,7 +1704,7 @@ index a46c380873253f3c63241d0c06a95350bdc408f2..6e18625f6c137f82d68ec811403f11a3
              #if DEBUG
              self.historyNodeContainer.isSecret = false
 diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
-index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..65c42c9960cbef84ec9e2801716f8fa9907ee332 100644
+index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..0534b85d0a793936a0692b371fba5071cb73bdc3 100644
 --- a/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 +++ b/submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 @@ -1,6 +1,10 @@
@@ -1440,21 +1765,22 @@ index 5a4e994ffef920042b5037b0a3b6a52466ab41eb..65c42c9960cbef84ec9e2801716f8fa9
                  actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
                      return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
                  }, action: { _, f in
-@@ -2006,6 +2012,13 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
-                 }
+@@ -2007,6 +2013,14 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                  //
              }
-+        } else if ecoForwardsAsShot(isProtectedContent) && message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia && !message.media.contains(where: { $0 is TelegramMediaAction || $0 is TelegramMediaExpiredContent }) {
+         }
++        if ecoForwardsAsShot(isProtectedContent) && message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia && !message.media.contains(where: { $0 is TelegramMediaAction || $0 is TelegramMediaExpiredContent }) {
 +            actions.append(.action(ContextMenuActionItem(text: EcoStrings(languageCode: chatPresentationInterfaceState.strings.baseLanguageCode).get(.forwardViaShot), icon: { theme in
 +                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
 +            }, action: { _, f in
 +                interfaceInteraction.forwardMessages(selectAll || isImage ? messages : [message], "ecoShot")
 +                f(.dismissWithoutContent)
 +            })))
-         }
++        }
          
          if canReveal {
-@@ -2297,6 +2310,37 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
+             actions.insert(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Username_ActivateAlertShow, icon: { theme in
+@@ -2297,6 +2311,37 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
              canViewStats = canViewReadStats(message: message, participantCount: infoSummaryData.participantCount, isMessageRead: isMessageRead, isPremium: isPremium, appConfig: appConfig)
          }
  
@@ -1519,6 +1845,40 @@ index 9e11d85200e700d5f04b2ba3532312ea9908d3bc..361b9e8691280726bb9c10b3ef6a0e13
              
                  if GalleryController.maybeExpandPIP(context: params.context, messageId: params.message.id) {
                      return true
+diff --git a/submodules/TelegramUI/Sources/SharedAccountContext.swift b/submodules/TelegramUI/Sources/SharedAccountContext.swift
+index 7c60aad011e5c075359d8164b251368e3ad39f41..fb64705bc27aa79ed101c85710048f8a1f7165ce 100644
+--- a/submodules/TelegramUI/Sources/SharedAccountContext.swift
++++ b/submodules/TelegramUI/Sources/SharedAccountContext.swift
+@@ -2590,6 +2590,10 @@ public final class SharedAccountContextImpl: SharedAccountContext {
+         return self.makeStandaloneChatMessageItem(context: context, messages: messages, theme: theme, strings: strings, wallpaper: wallpaper, fontSize: fontSize, chatBubbleCorners: chatBubbleCorners, dateTimeFormat: dateTimeFormat, nameOrder: nameOrder, forcedResourceStatus: forcedResourceStatus, tapMessage: tapMessage, clickThroughMessage: clickThroughMessage, backgroundNode: backgroundNode, availableReactions: availableReactions, accountPeer: accountPeer, isCentered: isCentered, isPreview: isPreview, isStandalone: isStandalone, rank: rank, rankRole: rankRole, isGiftMessageComposerPreview: isGiftMessageComposerPreview, activateGiftMessageInput: activateGiftMessageInput, feedActions: nil)
+     }
+ 
++    public func makeChatMessageSnapshotItem(context: AccountContext, messages: [EngineMessage], theme: PresentationTheme, strings: PresentationStrings, wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, chatBubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameOrder: PresentationPersonNameOrder, backgroundNode: ASDisplayNode?, availableReactions: AvailableReactions?) -> ListViewItem {
++        return self.makeStandaloneChatMessageItem(context: context, messages: messages, theme: theme, strings: strings, wallpaper: wallpaper, fontSize: fontSize, chatBubbleCorners: chatBubbleCorners, dateTimeFormat: dateTimeFormat, nameOrder: nameOrder, forcedResourceStatus: nil, tapMessage: nil, clickThroughMessage: nil, backgroundNode: backgroundNode, availableReactions: availableReactions, accountPeer: nil, isCentered: false, isPreview: true, isStandalone: false, rank: nil, rankRole: nil, isGiftMessageComposerPreview: false, activateGiftMessageInput: nil, feedActions: nil, isSnapshot: true)
++    }
++
+     public func makeChatMessageFeedItem(context: AccountContext, messages: [EngineMessage], presentationData: PresentationData, accountPeer: EnginePeer?, actions: ChatMessageFeedItemActions) -> ListViewItem {
+         // Not a preview: a preview hides a link preview's action button (Instant View), and the feed shows it.
+         // No tails: the text and link preview content nodes draw no status line (views, time) then, and the row
+@@ -2601,7 +2605,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
+ 
+     /// The item behind both the preview and the feed bubble; `feedActions` is set for the feed, which draws no
+     /// bubble background or author line and routes its taps to the host.
+-    private func makeStandaloneChatMessageItem(context: AccountContext, messages: [EngineMessage], theme: PresentationTheme, strings: PresentationStrings, wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, chatBubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameOrder: PresentationPersonNameOrder, forcedResourceStatus: FileMediaResourceStatus?, tapMessage: ((EngineMessage) -> Void)?, clickThroughMessage: ((UIView?, CGPoint?) -> Void)?, backgroundNode: ASDisplayNode?, availableReactions: AvailableReactions?, accountPeer: EnginePeer?, isCentered: Bool, isPreview: Bool, isStandalone: Bool, rank: String?, rankRole: ChatRankInfoScreenRole?, isGiftMessageComposerPreview: Bool, activateGiftMessageInput: (() -> Void)?, feedActions: ChatMessageFeedItemActions?) -> ListViewItem {
++    private func makeStandaloneChatMessageItem(context: AccountContext, messages: [EngineMessage], theme: PresentationTheme, strings: PresentationStrings, wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, chatBubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameOrder: PresentationPersonNameOrder, forcedResourceStatus: FileMediaResourceStatus?, tapMessage: ((EngineMessage) -> Void)?, clickThroughMessage: ((UIView?, CGPoint?) -> Void)?, backgroundNode: ASDisplayNode?, availableReactions: AvailableReactions?, accountPeer: EnginePeer?, isCentered: Bool, isPreview: Bool, isStandalone: Bool, rank: String?, rankRole: ChatRankInfoScreenRole?, isGiftMessageComposerPreview: Bool, activateGiftMessageInput: (() -> Void)?, feedActions: ChatMessageFeedItemActions?, isSnapshot: Bool = false) -> ListViewItem {
+         let messages = messages.map { $0._asMessage() }
+         let controllerInteraction: ChatControllerInteraction
+ 
+@@ -2906,7 +2910,8 @@ public final class SharedAccountContextImpl: SharedAccountContext {
+                 largeEmoji: false,
+                 chatBubbleCorners: chatBubbleCorners,
+                 animatedEmojiScale: 1.0,
+-                isPreview: isPreview
++                isPreview: isPreview,
++                isSnapshot: isSnapshot
+             ),
+             context: context,
+             chatLocation: chatLocation,
 diff --git a/submodules/TelegramUI/Sources/SharedMediaPlayer.swift b/submodules/TelegramUI/Sources/SharedMediaPlayer.swift
 index 740fdbcb7054ca6643eba41fbdfd42581cf18d25..d40a6913b2faa296accabde77f7a3d81c4c9d033 100644
 --- a/submodules/TelegramUI/Sources/SharedMediaPlayer.swift

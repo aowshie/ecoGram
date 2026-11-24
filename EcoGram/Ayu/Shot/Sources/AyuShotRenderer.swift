@@ -38,8 +38,8 @@ final class AyuShotRenderer {
         let strings = EcoStrings(languageCode: self.context.sharedContext.currentPresentationData.with { $0 }.strings.baseLanguageCode)
         let preparation = AyuShotPreparation(accountPeerId: self.context.account.peerId, revealsProtectedContent: self.revealsProtectedContent, options: options, anonymousTitle: strings.get(.shotAnonymous))
         let groups = preparation.prepare(self.groups)
-        self.prerequisitesDisposable.set((combineLatest(self.mediaReady.get() |> take(1), ayuShotAppearance(context: self.context, theme: options.theme))
-        |> deliverOnMainQueue).startStrict(next: { [weak self, weak parentView] _, appearance in
+        self.prerequisitesDisposable.set((combineLatest(self.mediaReady.get() |> take(1), ayuShotAppearance(context: self.context, theme: options.theme), self.context.engine.stickers.availableReactions() |> take(1))
+        |> deliverOnMainQueue).startStrict(next: { [weak self, weak parentView] _, appearance, availableReactions in
             guard let self else {
                 return
             }
@@ -48,7 +48,7 @@ final class AyuShotRenderer {
                 completion(nil)
                 return
             }
-            let pass = AyuShotRenderPass(context: self.context, groups: groups, options: options, appearance: appearance)
+            let pass = AyuShotRenderPass(context: self.context, groups: groups, options: options, appearance: appearance, availableReactions: availableReactions)
             self.pass = pass
             pass.render(in: parentView, width: width, completion: { [weak self] image in
                 self?.pass = nil
@@ -75,16 +75,18 @@ private final class AyuShotRenderPass {
     private let groups: [[EngineMessage]]
     private let options: AyuShotOptions
     private let appearance: AyuShotAppearance
+    private let availableReactions: AvailableReactions?
     private let containerNode: ASDisplayNode
     private let messagesNode: ASDisplayNode
     private var wallpaperNode: WallpaperBackgroundNode?
     private var readyDisposable: Disposable?
 
-    init(context: AccountContext, groups: [[EngineMessage]], options: AyuShotOptions, appearance: AyuShotAppearance) {
+    init(context: AccountContext, groups: [[EngineMessage]], options: AyuShotOptions, appearance: AyuShotAppearance, availableReactions: AvailableReactions?) {
         self.context = context
         self.groups = groups
         self.options = options
         self.appearance = appearance
+        self.availableReactions = availableReactions
         self.containerNode = ASDisplayNode()
         self.containerNode.displaysAsynchronously = false
         self.messagesNode = ASDisplayNode()
@@ -158,7 +160,7 @@ private final class AyuShotRenderPass {
     private func layout(presentationData: PresentationData, theme: PresentationTheme, width: CGFloat) -> CGSize {
         let accountPeerId = self.context.account.peerId
         let items: [ListViewItem] = self.groups.map { messages in
-            return self.context.sharedContext.makeChatMessagePreviewItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, forcedResourceStatus: nil, tapMessage: nil, clickThroughMessage: nil, backgroundNode: self.wallpaperNode, availableReactions: nil, accountPeer: nil, isCentered: false, isPreview: true, isStandalone: false, rank: nil, rankRole: nil, isGiftMessageComposerPreview: false, activateGiftMessageInput: nil)
+            return self.context.sharedContext.makeChatMessageSnapshotItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, backgroundNode: self.wallpaperNode, availableReactions: self.availableReactions)
         }
         let params = ListViewItemLayoutParams(width: width, leftInset: 0.0, rightInset: 0.0, availableHeight: 10000.0)
         var nodes: [ListViewItemNode] = []

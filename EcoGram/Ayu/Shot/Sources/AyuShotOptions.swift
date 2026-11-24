@@ -15,6 +15,7 @@ struct AyuShotOptions: Hashable {
         case showEdited
         case ownOnRight
         case anonymous
+        case hideBadges
 
         var name: String {
             return "ecogram.shot." + self.rawValue
@@ -28,6 +29,7 @@ struct AyuShotOptions: Hashable {
     var showEdited: Bool
     var ownOnRight: Bool
     var anonymous: Bool
+    var hideBadges: Bool
 
     static var stored: AyuShotOptions {
         let defaults = UserDefaults.standard
@@ -41,7 +43,8 @@ struct AyuShotOptions: Hashable {
             showReactions: value(.showReactions, true),
             showEdited: value(.showEdited, true),
             ownOnRight: value(.ownOnRight, false),
-            anonymous: value(.anonymous, false)
+            anonymous: value(.anonymous, false),
+            hideBadges: value(.hideBadges, false)
         )
     }
 
@@ -54,5 +57,6 @@ struct AyuShotOptions: Hashable {
         defaults.set(self.showEdited, forKey: Key.showEdited.name)
         defaults.set(self.ownOnRight, forKey: Key.ownOnRight.name)
         defaults.set(self.anonymous, forKey: Key.anonymous.name)
+        defaults.set(self.hideBadges, forKey: Key.hideBadges.name)
     }
 }

@@ -31,6 +31,7 @@ private enum AyuShotOption: Int {
     case edited
     case ownOnRight
     case anonymous
+    case hideBadges
 }
 
 private final class AyuShotArguments {
@@ -215,6 +216,8 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
                 state.options.ownOnRight = value
             case .anonymous:
                 state.options.anonymous = value
+            case .hideBadges:
+                state.options.hideBadges = value
             }
             state.options.store()
         }
@@ -292,6 +295,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
             .option(.reactions, section: .preferences, title: strings.get(.shotShowReactions), value: options.showReactions),
             .option(.edited, section: .preferences, title: strings.get(.shotShowEdited), value: options.showEdited),
             .option(.ownOnRight, section: .preferences, title: strings.get(.shotOwnOnRight), value: options.ownOnRight),
+            .option(.hideBadges, section: .preferences, title: strings.get(.shotHideBadges), value: options.hideBadges),
             .option(.anonymous, section: .privacy, title: strings.get(.shotAnonymize), value: options.anonymous),
             .footer(.privacy, strings.get(.shotAnonymizeFooter))
         ])

@@ -3,6 +3,7 @@ import TelegramCore
 import EcoBadges
 
 private let ayuShotOwnAliasOffset: Int64 = 1 << 48
+private let ayuShotBadgeFreeOffset: Int64 = 1 << 47
 private let ayuShotAnonymousOffset: Int64 = 1 << 49
 
 private enum AyuShotIdentity: Hashable {
@@ -61,6 +62,43 @@ private final class AyuShotAnonymizer {
     }
 }
 
+private final class AyuShotAliases {
+    private let accountPeerId: EnginePeer.Id
+    private let hidesBadges: Bool
+    private var users: [EnginePeer.Id: TelegramUser] = [:]
+
+    init?(accountPeerId: EnginePeer.Id, hidesBadges: Bool, aliasesOwn: Bool) {
+        guard hidesBadges || aliasesOwn else {
+            return nil
+        }
+        self.accountPeerId = accountPeerId
+        self.hidesBadges = hidesBadges
+    }
+
+    func author(_ peer: EngineRawPeer?) -> TelegramUser? {
+        guard let user = peer as? TelegramUser, self.hidesBadges || user.id == self.accountPeerId else {
+            return nil
+        }
+        if let alias = self.users[user.id] {
+            return alias
+        }
+        let rawId = user.id.id._internalGetInt64Value()
+        let aliasRawId: Int64
+        if self.hidesBadges {
+            aliasRawId = rawId + ayuShotBadgeFreeOffset
+        } else {
+            aliasRawId = rawId + ayuShotOwnAliasOffset
+            EcoTitleBadges.registerAlias(aliasRawId, for: rawId)
+        }
+        let aliasId = EnginePeer.Id(namespace: user.id.namespace, id: EnginePeer.Id.Id._internalFromInt64Value(aliasRawId))
+        let flags = self.hidesBadges ? user.flags.subtracting([.isVerified, .isPremium]) : user.flags
+        let nameColor = user.nameColor ?? .preset(PeerNameColor(rawValue: Int32(rawId % 7)))
+        let alias = TelegramUser(id: aliasId, accessHash: user.accessHash, firstName: user.firstName, lastName: user.lastName, username: user.username, phone: nil, photo: user.photo, botInfo: user.botInfo, restrictionInfo: nil, flags: flags, emojiStatus: self.hidesBadges ? nil : user.emojiStatus, usernames: user.usernames, storiesHidden: user.storiesHidden, nameColor: nameColor, backgroundEmojiId: user.backgroundEmojiId, profileColor: user.profileColor, profileBackgroundEmojiId: user.profileBackgroundEmojiId, subscriberCount: nil, verificationIconFileId: self.hidesBadges ? nil : user.verificationIconFileId)
+        self.users[user.id] = alias
+        return alias
+    }
+}
+
 struct AyuShotPreparation {
     let accountPeerId: EnginePeer.Id
     let revealsProtectedContent: Bool
@@ -69,28 +107,13 @@ struct AyuShotPreparation {
 
     func prepare(_ groups: [[EngineMessage]]) -> [[EngineMessage]] {
         let anonymizer = self.options.anonymous ? AyuShotAnonymizer(title: self.anonymousTitle) : nil
-        let ownAlias = anonymizer == nil && !self.options.ownOnRight ? self.ownAlias(groups) : nil
+        let aliases = anonymizer == nil ? AyuShotAliases(accountPeerId: self.accountPeerId, hidesBadges: self.options.hideBadges, aliasesOwn: !self.options.ownOnRight) : nil
         return groups.map { messages in
-            return messages.map { EngineMessage(self.prepare($0._asMessage(), anonymizer: anonymizer, ownAlias: ownAlias)) }
+            return messages.map { EngineMessage(self.prepare($0._asMessage(), anonymizer: anonymizer, aliases: aliases)) }
         }
     }
 
-    private func ownAlias(_ groups: [[EngineMessage]]) -> TelegramUser? {
-        for messages in groups {
-            for message in messages {
-                if let author = message._asMessage().author as? TelegramUser, author.id == self.accountPeerId {
-                    let rawId = author.id.id._internalGetInt64Value()
-                    let aliasRawId = rawId + ayuShotOwnAliasOffset
-                    EcoTitleBadges.registerAlias(aliasRawId, for: rawId)
-                    let aliasId = EnginePeer.Id(namespace: author.id.namespace, id: EnginePeer.Id.Id._internalFromInt64Value(aliasRawId))
-                    return TelegramUser(id: aliasId, accessHash: author.accessHash, firstName: author.firstName, lastName: author.lastName, username: author.username, phone: nil, photo: author.photo, botInfo: nil, restrictionInfo: nil, flags: author.flags, emojiStatus: author.emojiStatus, usernames: author.usernames, storiesHidden: author.storiesHidden, nameColor: author.nameColor, backgroundEmojiId: author.backgroundEmojiId, profileColor: author.profileColor, profileBackgroundEmojiId: author.profileBackgroundEmojiId, subscriberCount: nil, verificationIconFileId: author.verificationIconFileId)
-                }
-            }
-        }
-        return nil
-    }
-
-    private func prepare(_ message: EngineRawMessage, anonymizer: AyuShotAnonymizer?, ownAlias: TelegramUser?) -> EngineRawMessage {
+    private func prepare(_ message: EngineRawMessage, anonymizer: AyuShotAnonymizer?, aliases: AyuShotAliases?) -> EngineRawMessage {
         var raw = message
         var peers = raw.peers
         let chatPeerId = raw.id.peerId
@@ -124,9 +147,9 @@ struct AyuShotPreparation {
             }
             raw = raw.withUpdatedForwardInfo(anonymizer.forwardInfo(raw.forwardInfo))
             raw = self.anonymizeReplies(raw, anonymizer: anonymizer)
-        } else if let ownAlias, isOwn {
-            peers[ownAlias.id] = ownAlias
-            raw = raw.withUpdatedAuthor(ownAlias)
+        } else if let author = aliases?.author(raw.author) {
+            peers[author.id] = author
+            raw = raw.withUpdatedAuthor(author)
         }
 
         if isOwn && !self.options.ownOnRight {
