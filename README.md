@@ -43,7 +43,7 @@
 - Selection bar: choose and reorder its buttons
 - Message menu: choose and reorder its actions
 - <img src="Branding/Readme/ayugram.svg" width="14" height="14"> Shot: share messages as an image, from the selection bar or the message menu
-- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> Shot options: theme, reactions, edited marks, your messages on either side, hidden names and photos, hidden badges, Shot from Here, up to 100 messages
+- <img src="Branding/Readme/ecogram.svg" width="14" height="14"> Shot options: theme, message tails, reactions, edited marks, your messages on either side, hidden names and photos, hidden badges, Shot from Here, up to 100 messages
 
 ### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Notifications
 

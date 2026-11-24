@@ -101,17 +101,19 @@ private final class AyuShotRenderPass {
     func render(in parentView: UIView, width: CGFloat, completion: @escaping (UIImage?) -> Void) {
         let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
         let theme = self.appearance.theme.withUpdated(preview: true)
+        var bubbleCorners = presentationData.chatBubbleCorners
+        bubbleCorners.hidesTails = !self.options.showTails
         if self.options.showBackground {
             let wallpaperNode = createWallpaperBackgroundNode(context: self.context, forChatDisplay: false)
             wallpaperNode.update(wallpaper: self.appearance.wallpaper, animated: false)
-            wallpaperNode.updateBubbleTheme(bubbleTheme: theme, bubbleCorners: presentationData.chatBubbleCorners)
+            wallpaperNode.updateBubbleTheme(bubbleTheme: theme, bubbleCorners: bubbleCorners)
             self.wallpaperNode = wallpaperNode
             self.containerNode.addSubnode(wallpaperNode)
         }
         self.containerNode.addSubnode(self.messagesNode)
         parentView.addSubview(self.containerNode.view)
 
-        let size = self.layout(presentationData: presentationData, theme: theme, width: width)
+        let size = self.layout(presentationData: presentationData, theme: theme, bubbleCorners: bubbleCorners, width: width)
         guard size.height > 0.0 else {
             self.containerNode.view.removeFromSuperview()
             completion(nil)
@@ -157,10 +159,10 @@ private final class AyuShotRenderPass {
         self.containerNode.view.removeFromSuperview()
     }
 
-    private func layout(presentationData: PresentationData, theme: PresentationTheme, width: CGFloat) -> CGSize {
+    private func layout(presentationData: PresentationData, theme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners, width: CGFloat) -> CGSize {
         let accountPeerId = self.context.account.peerId
         let items: [ListViewItem] = self.groups.map { messages in
-            return self.context.sharedContext.makeChatMessageSnapshotItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, backgroundNode: self.wallpaperNode, availableReactions: self.availableReactions)
+            return self.context.sharedContext.makeChatMessageSnapshotItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: bubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, backgroundNode: self.wallpaperNode, availableReactions: self.availableReactions)
         }
         let params = ListViewItemLayoutParams(width: width, leftInset: 0.0, rightInset: 0.0, availableHeight: 10000.0)
         var nodes: [ListViewItemNode] = []
@@ -194,7 +196,7 @@ private final class AyuShotRenderPass {
                 if index > 0, let previous = self.groups[index - 1].first, calendar.isDate(date, inSameDayAs: Date(timeIntervalSince1970: TimeInterval(previous.timestamp))) {
                     continue
                 }
-                let header = self.context.sharedContext.makeChatMessageDateHeaderItem(context: self.context, timestamp: message.timestamp, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
+                let header = self.context.sharedContext.makeChatMessageDateHeaderItem(context: self.context, timestamp: message.timestamp, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: bubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
                 dateHeaders.append((index, header))
             }
         }
@@ -237,7 +239,7 @@ private final class AyuShotRenderPass {
             if let nextMessage, nextMessage.author?.id == author.id, dateFrames[index + 1] == nil {
                 continue
             }
-            let header = self.context.sharedContext.makeChatMessageAvatarHeaderItem(context: self.context, timestamp: message.timestamp, peer: author, message: message, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: presentationData.chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
+            let header = self.context.sharedContext.makeChatMessageAvatarHeaderItem(context: self.context, timestamp: message.timestamp, peer: author, message: message, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: bubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
             let headerNode = header.node(synchronousLoad: true)
             headerNode.subnodeTransform = CATransform3DMakeScale(-1.0, 1.0, 1.0)
             self.messagesNode.addSubnode(headerNode)

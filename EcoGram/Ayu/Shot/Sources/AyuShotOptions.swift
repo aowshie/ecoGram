@@ -10,6 +10,7 @@ struct AyuShotOptions: Hashable {
     private enum Key: String {
         case theme
         case showBackground
+        case showTails
         case showDate
         case showReactions
         case showEdited
@@ -24,6 +25,7 @@ struct AyuShotOptions: Hashable {
 
     var theme: AyuShotTheme
     var showBackground: Bool
+    var showTails: Bool
     var showDate: Bool
     var showReactions: Bool
     var showEdited: Bool
@@ -39,6 +41,7 @@ struct AyuShotOptions: Hashable {
         return AyuShotOptions(
             theme: defaults.string(forKey: Key.theme.name).flatMap(AyuShotTheme.init(rawValue:)) ?? .app,
             showBackground: value(.showBackground, true),
+            showTails: value(.showTails, true),
             showDate: value(.showDate, false),
             showReactions: value(.showReactions, true),
             showEdited: value(.showEdited, true),
@@ -52,6 +55,7 @@ struct AyuShotOptions: Hashable {
         let defaults = UserDefaults.standard
         defaults.set(self.theme.rawValue, forKey: Key.theme.name)
         defaults.set(self.showBackground, forKey: Key.showBackground.name)
+        defaults.set(self.showTails, forKey: Key.showTails.name)
         defaults.set(self.showDate, forKey: Key.showDate.name)
         defaults.set(self.showReactions, forKey: Key.showReactions.name)
         defaults.set(self.showEdited, forKey: Key.showEdited.name)

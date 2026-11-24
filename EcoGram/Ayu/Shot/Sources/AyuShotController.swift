@@ -26,6 +26,7 @@ private enum AyuShotSection: Int32 {
 
 private enum AyuShotOption: Int {
     case background
+    case tails
     case date
     case reactions
     case edited
@@ -206,6 +207,8 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
             switch option {
             case .background:
                 state.options.showBackground = value
+            case .tails:
+                state.options.showTails = value
             case .date:
                 state.options.showDate = value
             case .reactions:
@@ -291,6 +294,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         entries.append(contentsOf: [
             .header(.preferences, strings.get(.shotPreferences).uppercased()),
             .option(.background, section: .preferences, title: strings.get(.shotShowBackground), value: options.showBackground),
+            .option(.tails, section: .preferences, title: strings.get(.shotShowTails), value: options.showTails),
             .option(.date, section: .preferences, title: strings.get(.shotShowDate), value: options.showDate),
             .option(.reactions, section: .preferences, title: strings.get(.shotShowReactions), value: options.showReactions),
             .option(.edited, section: .preferences, title: strings.get(.shotShowEdited), value: options.showEdited),
