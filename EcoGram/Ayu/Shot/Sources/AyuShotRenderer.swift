@@ -68,7 +68,6 @@ final class AyuShotRenderer {
 
 private final class AyuShotRenderPass {
     private static let padding: CGFloat = 12.0
-    private static let spacing: CGFloat = 2.0
     private static let maximumPixelCount: CGFloat = 32_000_000.0
 
     private let context: AccountContext
@@ -167,8 +166,8 @@ private final class AyuShotRenderPass {
         let params = ListViewItemLayoutParams(width: width, leftInset: 0.0, rightInset: 0.0, availableHeight: 10000.0)
         var nodes: [ListViewItemNode] = []
         for (index, item) in items.enumerated() {
-            let previous = index == 0 ? nil : items[index - 1].neighborDescriptor
-            let next = index == items.count - 1 ? nil : items[index + 1].neighborDescriptor
+            let previous = index == items.count - 1 ? nil : items[index + 1].neighborDescriptor
+            let next = index == 0 ? nil : items[index - 1].neighborDescriptor
             var itemNode: ListViewItemNode?
             item.nodeConfiguredForParams(async: { $0() }, params: params, synchronousLoads: true, neighbors: ListViewItemNeighbors(previous: previous, next: next), completion: { node, apply in
                 itemNode = node
@@ -208,13 +207,13 @@ private final class AyuShotRenderPass {
             let itemNode = nodes[index]
             let height = itemNode.contentSize.height + itemNode.insets.top + itemNode.insets.bottom
             frames[index] = CGRect(origin: CGPoint(x: 0.0, y: offset), size: CGSize(width: width, height: height))
-            offset += height + AyuShotRenderPass.spacing
+            offset += height
             if let dateHeader = dateHeaders.first(where: { $0.index == index }) {
                 dateFrames[index] = CGRect(origin: CGPoint(x: 0.0, y: offset), size: CGSize(width: width, height: dateHeader.header.height))
-                offset += dateHeader.header.height + AyuShotRenderPass.spacing
+                offset += dateHeader.header.height
             }
         }
-        let size = CGSize(width: width, height: offset - AyuShotRenderPass.spacing + AyuShotRenderPass.padding)
+        let size = CGSize(width: width, height: offset + AyuShotRenderPass.padding)
         for (index, itemNode) in nodes.enumerated() {
             itemNode.frame = frames[index]
             itemNode.updateFrame(itemNode.frame, within: size)
@@ -243,8 +242,9 @@ private final class AyuShotRenderPass {
             let headerNode = header.node(synchronousLoad: true)
             headerNode.subnodeTransform = CATransform3DMakeScale(-1.0, 1.0, 1.0)
             self.messagesNode.addSubnode(headerNode)
-            headerNode.frame = CGRect(origin: CGPoint(x: 0.0, y: frames[index].minY + 3.0), size: CGSize(width: width, height: header.height))
-            headerNode.updateLayout(size: size, leftInset: 0.0, rightInset: 0.0, transition: .immediate)
+            let headerFrame = CGRect(origin: CGPoint(x: 0.0, y: frames[index].minY), size: CGSize(width: width, height: header.height))
+            headerNode.frame = headerFrame
+            headerNode.updateLayout(size: headerFrame.size, leftInset: 0.0, rightInset: 0.0, transition: .immediate)
         }
 
         self.containerNode.frame = CGRect(origin: CGPoint(x: -10000.0, y: 0.0), size: size)
