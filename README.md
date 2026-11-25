@@ -50,6 +50,12 @@
 - Local notifications while ecoGram stays in the background
 - Cleared once the chat is read on another device
 
+### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Storage
+
+- ecoGram Usage in Data and Storage: what deleted messages, their media, disappearing media and edit history take up, cleared like Telegram's cache
+- Delete saved data older than a chosen period, from one day to a year
+- Clear everything ecoGram saved on each cold launch
+
 ### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Appearance
 
 - Dynamic Island profile animation on any iPhone

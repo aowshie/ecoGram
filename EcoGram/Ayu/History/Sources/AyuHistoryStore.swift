@@ -1,7 +1,8 @@
 import Foundation
-import AyuSettings
 
 public final class AyuHistoryStore {
+    public static let didChange = Notification.Name("ecogram.ayu.historyDidChange")
+
     private static let registryLock = NSLock()
     private static var registry: [String: AyuHistoryStore] = [:]
     private static let newline = UInt8(ascii: "\n")
@@ -54,6 +55,33 @@ public final class AyuHistoryStore {
                     self.indexLock.unlock()
                 }
             }
+            self.notifyChanged()
+        }
+    }
+
+    public func load(completion: @escaping ([AyuHistoryRecord]) -> Void) {
+        self.queue.async {
+            completion(self.storedPeerIds().flatMap { self.readRecords(peerId: $0) })
+        }
+    }
+
+    public func remove(ids: Set<String>, completion: @escaping () -> Void) {
+        guard !ids.isEmpty else {
+            completion()
+            return
+        }
+        self.queue.async {
+            for peerId in self.storedPeerIds() {
+                let records = self.readRecords(peerId: peerId)
+                let kept = records.filter { !ids.contains($0.id) }
+                guard kept.count != records.count else {
+                    continue
+                }
+                self.writeRecords(kept, peerId: peerId)
+                self.updateEditIndex(peerId: peerId, records: kept)
+            }
+            self.notifyChanged()
+            completion()
         }
     }
 
@@ -74,37 +102,8 @@ public final class AyuHistoryStore {
         }
     }
 
-    public func remove(kind: AyuHistoryRecord.Kind, completion: @escaping ([AyuHistoryRecord]) -> Void) {
-        self.removeRecords(where: { $0.kind == kind }, completion: completion)
-    }
-
-    public func expire(completion: @escaping ([AyuHistoryRecord]) -> Void) {
-        let days = AyuSettings.shared.historyCleanupDays
-        guard days > 0 else {
-            return
-        }
-        let threshold = Int32(Date().timeIntervalSince1970) - Int32(days * 24 * 60 * 60)
-        self.removeRecords(where: { $0.savedAt < threshold }, completion: completion)
-    }
-
-    private func removeRecords(where isRemoved: @escaping (AyuHistoryRecord) -> Bool, completion: @escaping ([AyuHistoryRecord]) -> Void) {
-        self.queue.async {
-            var removed: [AyuHistoryRecord] = []
-            for peerId in self.storedPeerIds() {
-                let records = self.readRecords(peerId: peerId)
-                let matching = records.filter(isRemoved)
-                guard !matching.isEmpty else {
-                    continue
-                }
-                let kept = records.filter { !isRemoved($0) }
-                self.writeRecords(kept, peerId: peerId)
-                self.updateEditIndex(peerId: peerId, records: kept)
-                removed.append(contentsOf: matching)
-            }
-            DispatchQueue.main.async {
-                completion(removed)
-            }
-        }
+    private func notifyChanged() {
+        NotificationCenter.default.post(name: AyuHistoryStore.didChange, object: self)
     }
 
     private func updateEditIndex(peerId: Int64, records: [AyuHistoryRecord]) {

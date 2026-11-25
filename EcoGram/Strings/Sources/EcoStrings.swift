@@ -4,7 +4,6 @@ public struct EcoStrings {
     public enum Key: CaseIterable {
         case settingsTitle
         case ayuTitle
-        case ghostHeader
         case ghostMode
         case ghostHideRead
         case ghostHideOnline
@@ -18,7 +17,6 @@ public struct EcoStrings {
         case ghostEnabledCount
         case historyTitle
         case exceptionsFooter
-        case historyHeader
         case historySaveDeleted
         case historySaveSelfDestructing
         case historySaveEdited
@@ -26,10 +24,25 @@ public struct EcoStrings {
         case historyMediaLimit
         case historyMediaOff
         case historyCleanup
-        case historyCleanupNever
-        case historyClearDeleted
-        case historyClearDeletedConfirm
         case historyFooter
+        case storageHeader
+        case manageStorage
+        case usageTitle
+        case usageDescription
+        case usageEmpty
+        case usageMessages
+        case usageMedia
+        case usageDisappearing
+        case usageEdits
+        case usageCategoriesFooter
+        case usageClearAll
+        case usageClearTitle
+        case usageClearText
+        case usageKeptItem
+        case usageCleanupFooter
+        case usageMediaFooter
+        case usageLaunchClear
+        case usageLaunchFooter
         case badgesHeader
         case badgesShow
         case ayuBadgesFooter
@@ -104,17 +117,11 @@ public struct EcoStrings {
         case shotSaved
         case shotFailed
         case shotClose
-        case unitMegabytes
-        case unitDays
-        case unitMonth
-        case unitMonths
-        case unitYear
     }
 
     private static let table: [Key: (en: String, ru: String, ja: String)] = [
         .settingsTitle: ("ecoGram", "ecoGram", "ecoGram"),
         .ayuTitle: ("AyuGram", "AyuGram", "AyuGram"),
-        .ghostHeader: ("GHOST MODE", "РЕЖИМ ПРИЗРАКА", "ゴーストモード"),
         .ghostMode: ("Ghost Mode", "Режим призрака", "ゴーストモード"),
         .ghostHideRead: ("Don't Read Messages", "Не читать сообщения", "メッセージを既読にしない"),
         .ghostHideOnline: ("Don't Send Online", "Не отправлять онлайн", "オンラインを送信しない"),
@@ -128,7 +135,6 @@ public struct EcoStrings {
         .ghostEnabledCount: ("%d of %d enabled", "Включено %d из %d", "%d / %d 有効"),
         .historyTitle: ("Message History", "История сообщений", "メッセージ履歴"),
         .exceptionsFooter: ("Online status is shared by all chats and can only be changed in Ghost Mode settings.", "Онлайн-статус общий для всех чатов, он меняется только в настройках режима призрака.", "オンライン状態はすべてのチャット共通で、ゴーストモードの設定でのみ変更できます。"),
-        .historyHeader: ("MESSAGE HISTORY", "ИСТОРИЯ СООБЩЕНИЙ", "メッセージ履歴"),
         .historySaveDeleted: ("Save Deleted Messages", "Сохранять удалённые", "削除されたメッセージを保存"),
         .historySaveSelfDestructing: ("Save Self-Destructing Messages", "Сохранять самоудаляющиеся", "自動削除メッセージを保存"),
         .historySaveEdited: ("Save Edit History", "Сохранять историю изменений", "編集履歴を保存"),
@@ -136,10 +142,25 @@ public struct EcoStrings {
         .historyMediaLimit: ("Keep Media up To", "Сохранять медиа до", "メディアの保存上限"),
         .historyMediaOff: ("Don't Keep", "Не сохранять", "保存しない"),
         .historyCleanup: ("Delete Older Than", "Удалять старше", "古い履歴を削除"),
-        .historyCleanupNever: ("Never", "Никогда", "削除しない"),
-        .historyClearDeleted: ("Clear Deleted Messages", "Очистить удалённые сообщения", "削除されたメッセージを消去"),
-        .historyClearDeletedConfirm: ("Remove all saved deleted messages from your chats?", "Убрать все сохранённые удалённые сообщения из чатов?", "保存された削除済みメッセージをすべてチャットから消去しますか？"),
         .historyFooter: ("Deleted and self-destructing messages stay in the chat, slightly faded and marked as deleted or expired. One-time media arrives under a spoiler and can be opened any number of times. Hold an edited message to see its previous versions. Everything is kept only on this device.", "Удалённые и самоудаляющиеся сообщения остаются в чате: они полупрозрачные и подписаны «удалено» или «истекло». Одноразовые фото и видео приходят под спойлером и открываются сколько угодно раз. Прошлые версии изменённого сообщения видны в его меню. Всё хранится только на этом устройстве.", "削除・自動削除されたメッセージは半透明で「削除済み」「期限切れ」と表示されたままチャットに残ります。1回表示のメディアはスポイラー付きで届き、何度でも開けます。編集されたメッセージを長押しすると以前の版を確認できます。すべてこの端末にのみ保存されます。"),
+        .storageHeader: ("STORAGE", "ПАМЯТЬ", "ストレージ"),
+        .manageStorage: ("Manage Storage", "Управление памятью", "ストレージを管理"),
+        .usageTitle: ("ecoGram Usage", "Память ecoGram", "ecoGramの使用量"),
+        .usageDescription: ("ecoGram uses **%@%** of your free disk space.", "ecoGram занимает **%@%** свободного места на устройстве.", "ecoGramは空き容量の**%@%**を使用しています。"),
+        .usageEmpty: ("Deleted and edited messages saved by ecoGram will appear here.", "Здесь появятся удалённые и изменённые сообщения, которые сохранит ecoGram.", "ecoGramが保存した削除済み・編集済みメッセージがここに表示されます。"),
+        .usageMessages: ("Deleted Messages", "Удалённые сообщения", "削除されたメッセージ"),
+        .usageMedia: ("Media of Deleted", "Медиа удалённых", "削除されたメディア"),
+        .usageDisappearing: ("Disappearing Media", "Исчезающие медиа", "消えるメディア"),
+        .usageEdits: ("Edit History", "История правок", "編集履歴"),
+        .usageCategoriesFooter: ("Clearing messages also clears their media. Cleared data can't be restored.", "Вместе с сообщениями очищаются и их медиа. Очищенное восстановить нельзя.", "メッセージを消去すると、そのメディアも消去されます。消去したデータは復元できません。"),
+        .usageClearAll: ("Clear All", "Очистить всё", "すべて消去"),
+        .usageClearTitle: ("Clear Saved Data?", "Очистить сохранённое?", "保存データを消去しますか？"),
+        .usageClearText: ("The selected deleted messages, media and edits will be removed from this device for good.", "Выбранные удалённые сообщения, медиа и правки исчезнут с устройства навсегда.", "選択した削除済みメッセージ、メディア、編集履歴はこの端末から完全に削除されます。"),
+        .usageKeptItem: ("Deleted and Edited", "Удалённые и изменённые", "削除済み・編集済み"),
+        .usageCleanupFooter: ("Saved messages, media and edits older than this are removed automatically.", "Сохранённые сообщения, медиа и правки старше этого срока удаляются автоматически.", "この期間より古い保存済みメッセージ、メディア、編集履歴は自動的に削除されます。"),
+        .usageMediaFooter: ("Media larger than this isn't kept when a message is deleted.", "Медиа больше этого размера не сохраняются при удалении сообщения.", "メッセージが削除されたとき、これより大きいメディアは保存されません。"),
+        .usageLaunchClear: ("Clear on Launch", "Очищать при запуске", "起動時に消去"),
+        .usageLaunchFooter: ("Each time ecoGram is fully closed and opened again, it clears everything it saved: deleted messages, their media, disappearing media and edit history.", "Каждый раз, когда ecoGram полностью закрывают и открывают снова, он очищает всё сохранённое: удалённые сообщения, их медиа, исчезающие медиа и историю правок.", "ecoGramを完全に終了して再び開くたびに、保存したすべてのデータ（削除されたメッセージ、そのメディア、消えるメディア、編集履歴）を消去します。"),
         .badgesHeader: ("BADGES", "ЗНАЧКИ", "バッジ"),
         .badgesShow: ("AyuGram Badges", "Значки AyuGram", "AyuGramバッジ"),
         .ayuBadgesFooter: ("Shows the badges of AyuGram developers and supporters next to their names. Badge order and ecoGram badges are in [ecoGram Settings].", "Показывает значки разработчиков и поддержавших AyuGram рядом с именем. Порядок значков и значки ecoGram — в [настройках ecoGram].", "AyuGramの開発者と支援者のバッジを名前の横に表示します。バッジの順番とecoGramのバッジは[ecoGramの設定]で変更できます。"),
@@ -213,12 +234,7 @@ public struct EcoStrings {
         .shotSave: ("Save", "Сохранить", "保存"),
         .shotSaved: ("Saved to Photos", "Сохранено в Фото", "写真に保存しました"),
         .shotFailed: ("Couldn't create the shot", "Не удалось сделать снимок", "スクリーンショットを作成できませんでした"),
-        .shotClose: ("Close", "Закрыть", "閉じる"),
-        .unitMegabytes: ("MB", "МБ", "MB"),
-        .unitDays: ("days", "дней", "日"),
-        .unitMonth: ("1 month", "1 месяц", "1か月"),
-        .unitMonths: ("3 months", "3 месяца", "3か月"),
-        .unitYear: ("1 year", "1 год", "1年")
+        .shotClose: ("Close", "Закрыть", "閉じる")
     ]
 
     public let languageCode: String
@@ -264,27 +280,5 @@ public struct EcoStrings {
         let value = timeout >= 60 && timeout % 60 == 0 ? "\(timeout / 60)\(units.minute)" : "\(timeout)\(units.second)"
         let separator = self.languageCode == "ja" ? "" : " "
         return "\(self.get(.labelTimer))\(separator)\(value)"
-    }
-
-    public func mediaLimit(_ megabytes: Int) -> String {
-        if megabytes <= 0 {
-            return self.get(.historyMediaOff)
-        }
-        return "\(megabytes) \(self.get(.unitMegabytes))"
-    }
-
-    public func cleanupPeriod(_ days: Int) -> String {
-        switch days {
-        case ..<1:
-            return self.get(.historyCleanupNever)
-        case 30:
-            return self.get(.unitMonth)
-        case 90:
-            return self.get(.unitMonths)
-        case 365:
-            return self.get(.unitYear)
-        default:
-            return "\(days) \(self.get(.unitDays))"
-        }
     }
 }

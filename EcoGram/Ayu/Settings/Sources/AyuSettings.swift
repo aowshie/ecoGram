@@ -4,8 +4,8 @@ public final class AyuSettings {
     public static let shared = AyuSettings()
     public static let didChange = Notification.Name("ecogram.ayu.settingsDidChange")
 
-    public static let mediaLimitOptions: [Int] = [0, 5, 20, 50, 200]
-    public static let cleanupOptions: [Int] = [0, 7, 30, 90, 365]
+    public static let mediaLimitOptions: [Int] = [0, 20, 100, 500, 1024]
+    public static let cleanupOptions: [Int] = [0, 365, 180, 90, 30, 14, 7, 3, 1]
 
     private enum Key: String {
         case ghostMode
@@ -23,6 +23,7 @@ public final class AyuSettings {
         case saveSelfDestructing
         case historyMediaLimitMegabytes
         case historyCleanupDays
+        case clearHistoryOnLaunch
         case showAyuBadges
 
         var name: String {
@@ -51,9 +52,11 @@ public final class AyuSettings {
             Key.saveSelfDestructing.name: true,
             Key.historyMediaLimitMegabytes.name: 20,
             Key.historyCleanupDays.name: 0,
+            Key.clearHistoryOnLaunch.name: false,
             Key.showAyuBadges.name: true
         ])
         self.migrateGhostExceptions()
+        self.migrateMediaLimit()
     }
 
     private func migrateGhostMode() {
@@ -67,6 +70,15 @@ public final class AyuSettings {
         }
         self.defaults.removeObject(forKey: Key.ghostMode.name)
         self.defaults.set(true, forKey: Key.ghostMigrated.name)
+    }
+
+    private func migrateMediaLimit() {
+        let stored = self.defaults.integer(forKey: Key.historyMediaLimitMegabytes.name)
+        guard !AyuSettings.mediaLimitOptions.contains(stored) else {
+            return
+        }
+        let value = AyuSettings.mediaLimitOptions.first(where: { $0 >= stored }) ?? AyuSettings.mediaLimitOptions[AyuSettings.mediaLimitOptions.count - 1]
+        self.defaults.set(value, forKey: Key.historyMediaLimitMegabytes.name)
     }
 
     private func migrateGhostExceptions() {
@@ -210,6 +222,11 @@ public final class AyuSettings {
     public var historyCleanupDays: Int {
         get { return self.defaults.integer(forKey: Key.historyCleanupDays.name) }
         set { self.set(newValue, .historyCleanupDays) }
+    }
+
+    public var clearHistoryOnLaunch: Bool {
+        get { return self.bool(.clearHistoryOnLaunch) }
+        set { self.set(newValue, .clearHistoryOnLaunch) }
     }
 
     public var showAyuBadges: Bool {

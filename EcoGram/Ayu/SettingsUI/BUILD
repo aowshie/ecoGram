@@ -11,6 +11,7 @@ swift_library(
         "//EcoGram/Ayu/History:AyuHistory",
         "//EcoGram/Strings:EcoStrings",
         "//EcoGram/ListUI:EcoListUI",
+        "//EcoGram/Storage:EcoStorage",
         "//Swiftgram/SGItemListUI:SGItemListUI",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/Display:Display",

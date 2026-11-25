@@ -6,9 +6,6 @@ swift_library(
     srcs = glob([
         "Sources/**/*.swift",
     ]),
-    deps = [
-        "//EcoGram/Ayu/Settings:AyuSettings",
-    ],
     visibility = [
         "//visibility:public",
     ],

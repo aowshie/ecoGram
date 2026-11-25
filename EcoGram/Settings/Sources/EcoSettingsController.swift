@@ -7,6 +7,7 @@ import TelegramPresentationData
 import ItemListUI
 import AccountContext
 import PresentationDataUtils
+import TelegramStringFormatting
 import SettingsUI
 import AyuSettings
 import AyuSettingsUI
@@ -19,6 +20,7 @@ private let ecoHasDynamicIsland = DeviceMetrics(screenSize: UIScreen.main.bounds
 
 enum EcoSettingsAction: Hashable {
     case notificationSettings
+    case dataAndStorage
     case selectionPanel
     case contextMenu
     case appearance
@@ -30,6 +32,7 @@ enum EcoSettingsAction: Hashable {
 
 private enum EcoSettingsSection: Int32 {
     case notifications
+    case storage
     case chat
     case appearance
     case spy
@@ -75,7 +78,7 @@ func ecoSettingsChanges() -> Signal<Void, NoError> {
     }
 }
 
-private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme) -> [EcoSettingsEntry] {
+private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme, keptSize: String) -> [EcoSettingsEntry] {
     let preferences = EcoPreferences.shared
     let iconColor = theme.list.itemAccentColor
     var entries: [EcoSettingsEntry] = []
@@ -90,6 +93,10 @@ private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: Presen
     entries.append(.toggle(section: notifications, order: next(), key: EcoToggle.localNotifications.rawValue, title: strings.get(.notificationsBackground), value: preferences.backgroundNotifications, enabled: true))
     entries.append(.disclosure(section: notifications, order: next(), action: .notificationSettings, title: strings.get(.notificationSettings), label: ""))
     entries.append(.notice(section: notifications, order: next(), text: strings.get(.notificationsFooter)))
+
+    let storage = EcoSettingsSection.storage.rawValue
+    entries.append(.header(section: storage, order: next(), text: strings.get(.storageHeader)))
+    entries.append(.category(section: storage, order: next(), action: .dataAndStorage, icon: ecoOutlineIcon("Item List/Icons/Data", color: iconColor), title: presentationStrings.ChatSettings_Title, subtitle: "\(strings.get(.usageTitle)): \(keptSize)", label: ""))
 
     let chat = EcoSettingsSection.chat.rawValue
     let selectionEnabled = preferences.enabledSelectionActions.count
@@ -168,6 +175,8 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
         switch action {
         case .notificationSettings:
             pushControllerImpl?(notificationsAndSoundsController(context: context, exceptionsList: nil))
+        case .dataAndStorage:
+            pushControllerImpl?(dataAndStorageController(context: context))
         case .selectionPanel:
             pushControllerImpl?(ecoSelectionPanelController(context: context))
         case .contextMenu:
@@ -185,11 +194,12 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
         }
     })
 
-    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData)
-    |> map { _, presentationData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData, context.engine.messages.ayuKeptStorageUpdates())
+    |> map { _, presentationData, keptStorage -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
+        let keptSize = dataSizeString(keptStorage.total, compact: true, formatting: DataSizeStringFormatting(presentationData: presentationData))
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.settingsTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSettingsEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSettingsEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme, keptSize: keptSize), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
         return (controllerState, (listState, arguments))
     }
 

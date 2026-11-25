@@ -1,6 +1,5 @@
 import Foundation
 import Postbox
-import SwiftSignalKit
 import AyuSettings
 
 public final class AyuDeletedMessageAttribute: MessageAttribute {
@@ -51,15 +50,5 @@ public extension Message {
 
     var ayuRevealsSelfDestructingMedia: Bool {
         return AyuSettings.shared.keepsSelfDestructingMedia && self.flags.contains(.Incoming) && self.id.peerId.namespace != Namespaces.Peer.SecretChat
-    }
-}
-
-public extension TelegramEngine.Messages {
-    func ayuDeleteKeptMessages(ids: [EngineMessage.Id]) -> Signal<Never, NoError> {
-        let mediaBox = self.account.postbox.mediaBox
-        return self.account.postbox.transaction { transaction -> Void in
-            AyuHistoryCapture.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: ids)
-        }
-        |> ignoreValues
     }
 }
