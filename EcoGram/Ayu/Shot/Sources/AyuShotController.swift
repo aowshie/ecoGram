@@ -442,10 +442,8 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         }
     }
 
-    controller.didAppear = { firstTime in
-        if firstTime {
-            renderLoop.run()
-        }
+    controller.didAppear = { _ in
+        renderLoop.run()
     }
 
     return controller

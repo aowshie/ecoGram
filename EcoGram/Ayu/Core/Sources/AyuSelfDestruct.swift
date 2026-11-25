@@ -191,14 +191,15 @@ extension AyuHistoryCapture {
         })
     }
 
-    static func recordExpired(mediaBox: MediaBox, id: MessageId, sentAt: Int32) {
+    static func recordExpired(mediaBox: MediaBox, message: Message) {
         let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
-        store.append([AyuHistoryRecord(kind: .expired, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: sentAt, savedAt: Int32(Date().timeIntervalSince1970), text: "", replacementText: nil)])
+        store.append([AyuHistoryRecord(kind: .expired, peerId: message.id.peerId.toInt64(), messageId: message.id.id, sentAt: message.timestamp, savedAt: Int32(Date().timeIntervalSince1970), text: "", replacementText: nil)])
+        store.appendMedia(ayuKeptMediaEntries(message, kind: .expired))
     }
 
     static func expireSelfDestructing(transaction: Transaction, mediaBox: MediaBox, message: Message, timeout: Int32) {
         if !message.ayuIsMediaExpired {
-            self.recordExpired(mediaBox: mediaBox, id: message.id, sentAt: message.timestamp)
+            self.recordExpired(mediaBox: mediaBox, message: message)
         }
         transaction.updateMessage(message.id, update: { currentMessage in
             var attributes: [MessageAttribute] = currentMessage.attributes.compactMap { attribute -> MessageAttribute? in
@@ -240,7 +241,7 @@ extension AyuHistoryCapture {
         }
         let timeout = current.ayuSelfDestructTimeout ?? current.attributes.compactMap({ ($0 as? AyuExpiredMediaAttribute)?.timeout }).first ?? 0
         if !current.ayuIsMediaExpired {
-            self.recordExpired(mediaBox: mediaBox, id: id, sentAt: current.timestamp)
+            self.recordExpired(mediaBox: mediaBox, message: current)
         }
         var attributes = updated.attributes.filter { attribute in
             return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute) && !(attribute is AyuExpiredMediaAttribute)

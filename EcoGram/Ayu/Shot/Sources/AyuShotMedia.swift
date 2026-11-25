@@ -13,6 +13,9 @@ private struct AyuShotMediaResource {
 }
 
 private func ayuShotMediaResources(_ message: EngineRawMessage) -> [AyuShotMediaResource] {
+    if message.ayuIsDeleted {
+        return []
+    }
     let messageReference = MessageReference(message)
     var result: [AyuShotMediaResource] = []
     func append(_ media: EngineRawMedia, _ representations: [TelegramMediaImageRepresentation], _ contentType: MediaResourceUserContentType) {
@@ -24,7 +27,7 @@ private func ayuShotMediaResources(_ message: EngineRawMessage) -> [AyuShotMedia
         if let image = media as? TelegramMediaImage {
             append(image, image.representations, .image)
         } else if let file = media as? TelegramMediaFile {
-            if file.isSticker || file.isAnimatedSticker || file.isCustomEmoji {
+            if file.isSticker || file.isAnimatedSticker || file.isVideoSticker || file.isCustomEmoji {
                 result.append(AyuShotMediaResource(peerId: message.id.peerId, reference: AnyMediaReference.message(message: messageReference, media: file).resourceReference(file.resource), resource: EngineMediaResource(file.resource), contentType: .sticker))
             } else {
                 append(file, file.previewRepresentations, MediaResourceUserContentType(file: file))

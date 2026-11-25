@@ -18,48 +18,7 @@ public struct AyuKeptStorage: Equatable {
     }
 }
 
-private struct AyuKeptIndex {
-    var messageIds: [MessageId] = []
-    var messageRecordIds = Set<String>()
-    var messageBytes: Int64 = 0
-    var mediaResources = Set<MediaResourceId>()
-    var disappearingIds: [MessageId] = []
-    var disappearingRecordIds = Set<String>()
-    var disappearingResources = Set<MediaResourceId>()
-    var disappearingBytes: Int64 = 0
-
-    init(transaction: Transaction, records: [AyuStoredRecord]) {
-        for stored in records {
-            let record = stored.record
-            let recordBytes = stored.size
-            switch record.kind {
-            case .edited:
-                break
-            case .deleted, .expired:
-                let id = MessageId(peerId: PeerId(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
-                let message = transaction.getMessage(id)
-                if record.kind == .deleted, message?.ayuDeletedAttribute?.isExpired != true {
-                    self.messageIds.append(id)
-                    self.messageRecordIds.insert(record.id)
-                    self.messageBytes += recordBytes
-                    if let message {
-                        self.messageBytes += Int64(message.text.utf8.count)
-                        self.mediaResources.formUnion(ayuKeptResourceIds(message))
-                    }
-                } else {
-                    self.disappearingIds.append(id)
-                    self.disappearingRecordIds.insert(record.id)
-                    self.disappearingBytes += recordBytes
-                    if let message, message.ayuIsDeleted || message.ayuIsMediaExpired {
-                        self.disappearingResources.formUnion(ayuKeptResourceIds(message))
-                    }
-                }
-            }
-        }
-    }
-}
-
-private func ayuKeptResourceIds(_ message: Message) -> [MediaResourceId] {
+func ayuKeptResourceIds(_ message: Message) -> [MediaResourceId] {
     var resourceIds: [MediaResourceId] = []
     for media in message.media {
         if let file = media as? TelegramMediaFile, file.isSticker || file.isAnimatedSticker || file.isVideoSticker || file.isCustomEmoji {
@@ -70,20 +29,18 @@ private func ayuKeptResourceIds(_ message: Message) -> [MediaResourceId] {
     return resourceIds
 }
 
-private func ayuResourcesSize(_ resourceIds: Set<MediaResourceId>, mediaBox: MediaBox) -> Int64 {
-    return resourceIds.reduce(Int64(0)) { result, id in
-        return result + mediaBox.resourceUsage(id: id)
-    }
+func ayuKeptMediaEntries(_ message: Message, kind: AyuMediaKind) -> [AyuMediaEntry] {
+    return ayuKeptResourceIds(message).map { AyuMediaEntry(kind: kind, resourceId: $0.stringRepresentation) }
 }
 
 public extension TelegramEngine.Messages {
     func ayuKeptStorage() -> Signal<AyuKeptStorage, NoError> {
-        return ayuComputeKeptStorage(postbox: self.account.postbox)
+        return ayuComputeKeptStorage(mediaBox: self.account.postbox.mediaBox)
     }
 
     func ayuKeptStorageUpdates() -> Signal<AyuKeptStorage, NoError> {
-        let postbox = self.account.postbox
-        let store = AyuHistoryStore.store(mediaBoxBasePath: postbox.mediaBox.basePath)
+        let mediaBox = self.account.postbox.mediaBox
+        let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
         let changes = Signal<Void, NoError> { subscriber in
             subscriber.putNext(Void())
             let observer = NotificationCenter.default.addObserver(forName: AyuHistoryStore.didRemove, object: store, queue: nil, using: { _ in
@@ -95,94 +52,145 @@ public extension TelegramEngine.Messages {
         }
         return changes
         |> mapToSignal { _ -> Signal<AyuKeptStorage, NoError> in
-            return ayuComputeKeptStorage(postbox: postbox)
+            return ayuComputeKeptStorage(mediaBox: mediaBox)
         }
         |> distinctUntilChanged
     }
 
     func ayuClearKept(categories: Set<AyuKeptCategory>) -> Signal<Float, NoError> {
         let postbox = self.account.postbox
-        return ayuHistoryRecords(mediaBox: postbox.mediaBox)
-        |> mapToSignal { records, _ -> Signal<Float, NoError> in
-            return ayuRelease(postbox: postbox, records: records, categories: categories, editsThreshold: nil)
+        return ayuKeptRecords(mediaBox: postbox.mediaBox)
+        |> mapToSignal { records -> Signal<Float, NoError> in
+            return ayuRelease(postbox: postbox, records: records, categories: categories, editsThreshold: nil, clearsIndex: true)
         }
     }
 
     func ayuExpireKept(olderThan threshold: Int32) -> Signal<Never, NoError> {
         let postbox = self.account.postbox
-        return ayuHistoryRecords(mediaBox: postbox.mediaBox)
-        |> mapToSignal { records, _ -> Signal<Float, NoError> in
-            return ayuRelease(postbox: postbox, records: records.filter { $0.record.savedAt < threshold }, categories: Set(AyuKeptCategory.allCases), editsThreshold: threshold)
+        return ayuKeptRecords(mediaBox: postbox.mediaBox)
+        |> mapToSignal { records -> Signal<Float, NoError> in
+            return ayuRelease(postbox: postbox, records: records.filter { $0.record.savedAt < threshold }, categories: Set(AyuKeptCategory.allCases), editsThreshold: threshold, clearsIndex: false)
         }
         |> ignoreValues
     }
 }
 
-private func ayuComputeKeptStorage(postbox: Postbox) -> Signal<AyuKeptStorage, NoError> {
-    let mediaBox = postbox.mediaBox
-    return ayuHistoryRecords(mediaBox: mediaBox)
-    |> mapToSignal { records, editsSize -> Signal<(AyuKeptIndex, Int64), NoError> in
-        return postbox.transaction { transaction -> (AyuKeptIndex, Int64) in
-            return (AyuKeptIndex(transaction: transaction, records: records), editsSize)
+private func ayuComputeKeptStorage(mediaBox: MediaBox) -> Signal<AyuKeptStorage, NoError> {
+    let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
+    return Signal { subscriber in
+        Queue.concurrentDefaultQueue().async {
+            let usage = store.diskUsage()
+            var deleted = Set<String>()
+            var expired = Set<String>()
+            for entry in usage.media {
+                switch entry.kind {
+                case .deleted:
+                    deleted.insert(entry.resourceId)
+                case .expired:
+                    expired.insert(entry.resourceId)
+                }
+            }
+            subscriber.putNext(AyuKeptStorage(sizes: [
+                .messages: usage.keptBytes,
+                .media: ayuResourcesSize(deleted, mediaBox: mediaBox),
+                .disappearing: ayuResourcesSize(expired, mediaBox: mediaBox),
+                .edits: usage.editsBytes
+            ]))
+            subscriber.putCompletion()
         }
-    }
-    |> deliverOn(Queue.concurrentDefaultQueue())
-    |> map { index, editsSize -> AyuKeptStorage in
-        return AyuKeptStorage(sizes: [
-            .messages: index.messageBytes,
-            .media: ayuResourcesSize(index.mediaResources, mediaBox: mediaBox),
-            .disappearing: index.disappearingBytes + ayuResourcesSize(index.disappearingResources, mediaBox: mediaBox),
-            .edits: editsSize
-        ])
+        return EmptyDisposable
     }
 }
 
-private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories: Set<AyuKeptCategory>, editsThreshold: Int32?) -> Signal<Float, NoError> {
+private func ayuResourcesSize(_ resourceIds: Set<String>, mediaBox: MediaBox) -> Int64 {
+    return resourceIds.reduce(Int64(0)) { result, id in
+        return result + mediaBox.resourceUsage(id: MediaResourceId(id))
+    }
+}
+
+private final class AyuReleaseResult {
+    var recordIds = Set<String>()
+    var resourceIds = Set<MediaResourceId>()
+}
+
+private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories: Set<AyuKeptCategory>, editsThreshold: Int32?, clearsIndex: Bool) -> Signal<Float, NoError> {
     let mediaBox = postbox.mediaBox
     let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
-    return postbox.transaction { transaction -> (Set<String>, Set<MediaResourceId>) in
-        let index = AyuKeptIndex(transaction: transaction, records: records)
-        var releasedIds: [MessageId] = []
-        var recordIds = Set<String>()
-        var resourceIds = Set<MediaResourceId>()
-        if categories.contains(.messages) {
-            releasedIds.append(contentsOf: index.messageIds)
-            recordIds.formUnion(index.messageRecordIds)
-            resourceIds.formUnion(index.mediaResources)
-        } else if categories.contains(.media) {
-            resourceIds.formUnion(index.mediaResources)
+    let result = AyuReleaseResult()
+    let releasesMessages = categories.contains(.messages)
+    let releasesDisappearing = categories.contains(.disappearing)
+    let keptRecords = (releasesMessages || releasesDisappearing) ? records.filter { $0.record.kind != .edited } : []
+    let chunkSize = 300
+    let chunkCount = (keptRecords.count + chunkSize - 1) / chunkSize
+
+    var releaseSignal: Signal<Float, NoError> = .complete()
+    for chunkIndex in 0 ..< chunkCount {
+        let chunk = Array(keptRecords[chunkIndex * chunkSize ..< min((chunkIndex + 1) * chunkSize, keptRecords.count)])
+        let step = postbox.transaction { transaction -> Float in
+            var releasedIds: [MessageId] = []
+            for stored in chunk {
+                let record = stored.record
+                let id = MessageId(peerId: PeerId(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
+                let message = transaction.getMessage(id)
+                let isMessage = record.kind == .deleted && message?.ayuDeletedAttribute?.isExpired != true
+                guard isMessage ? releasesMessages : releasesDisappearing else {
+                    continue
+                }
+                releasedIds.append(id)
+                result.recordIds.insert(record.id)
+                if let message {
+                    result.resourceIds.formUnion(ayuKeptResourceIds(message))
+                }
+            }
+            AyuHistoryCapture.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: releasedIds)
+            return Float(chunkIndex + 1) / Float(chunkCount) * 0.5
         }
-        if categories.contains(.disappearing) {
-            releasedIds.append(contentsOf: index.disappearingIds)
-            recordIds.formUnion(index.disappearingRecordIds)
-            resourceIds.formUnion(index.disappearingResources)
-        }
-        AyuHistoryCapture.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: releasedIds)
-        return (recordIds, resourceIds)
+        releaseSignal = releaseSignal |> then(step)
     }
-    |> mapToSignal { recordIds, resourceIds -> Signal<Float, NoError> in
+
+    var indexKinds = Set<AyuMediaKind>()
+    if clearsIndex {
+        if releasesMessages || categories.contains(.media) {
+            indexKinds.insert(.deleted)
+        }
+        if releasesDisappearing {
+            indexKinds.insert(.expired)
+        }
+    }
+
+    let finish: Signal<Float, NoError> = deferred {
+        var resourceIds = result.resourceIds
+        for entry in store.diskUsage().media where indexKinds.contains(entry.kind) {
+            resourceIds.insert(MediaResourceId(entry.resourceId))
+        }
+        let recordIds = result.recordIds
+        let resourceStrings = Set(resourceIds.map(\.stringRepresentation))
         let removeRecords = Signal<Never, NoError> { subscriber in
             store.remove(ids: recordIds, completion: {
-                if categories.contains(.edits) {
-                    store.removeEdits(olderThan: editsThreshold, completion: {
+                store.removeMedia(kinds: indexKinds, resourceIds: resourceStrings, completion: {
+                    if categories.contains(.edits) {
+                        store.removeEdits(olderThan: editsThreshold, completion: {
+                            subscriber.putCompletion()
+                        })
+                    } else {
+                        NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: store)
                         subscriber.putCompletion()
-                    })
-                } else {
-                    subscriber.putCompletion()
-                }
+                    }
+                })
             })
             return EmptyDisposable
         }
-        let removeResources: Signal<Float, NoError> = resourceIds.isEmpty ? .single(1.0) : mediaBox.removeCachedResources(Array(resourceIds), force: true)
+        let removeResources: Signal<Float, NoError> = resourceIds.isEmpty ? .single(1.0) : (mediaBox.removeCachedResources(Array(resourceIds), force: true) |> map { 0.5 + $0 * 0.5 })
         return (removeRecords |> map { _ -> Float in }) |> then(removeResources)
     }
+    return releaseSignal |> then(finish)
 }
 
-private func ayuHistoryRecords(mediaBox: MediaBox) -> Signal<([AyuStoredRecord], Int64), NoError> {
+private func ayuKeptRecords(mediaBox: MediaBox) -> Signal<[AyuStoredRecord], NoError> {
     let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
     return Signal { subscriber in
-        store.loadKept(completion: { records, editsSize in
-            subscriber.putNext((records, editsSize))
+        store.loadKept(completion: { records in
+            subscriber.putNext(records)
             subscriber.putCompletion()
         })
         return EmptyDisposable

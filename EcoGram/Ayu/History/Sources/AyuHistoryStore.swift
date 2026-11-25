@@ -9,6 +9,16 @@ public final class AyuHistoryStore {
     private static let keptSuffix = ".jsonl"
     private static let editsSuffix = ".edits.jsonl"
     private static let layoutMarker = "layout.v2"
+    private static let mediaIndexName = "media.idx"
+    private static let tab = UInt8(ascii: "\t")
+
+    private static func mediaLine(_ entry: AyuMediaEntry) -> Data {
+        var data = Data(entry.kind.rawValue.utf8)
+        data.append(AyuHistoryStore.tab)
+        data.append(contentsOf: Array(entry.resourceId.utf8))
+        data.append(AyuHistoryStore.newline)
+        return data
+    }
 
     public static func store(mediaBoxBasePath: String) -> AyuHistoryStore {
         let accountUrl = URL(fileURLWithPath: mediaBoxBasePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -73,13 +83,57 @@ public final class AyuHistoryStore {
         }
     }
 
-    public func loadKept(completion: @escaping ([AyuStoredRecord], Int64) -> Void) {
+    public func appendMedia(_ entries: [AyuMediaEntry]) {
+        guard !entries.isEmpty else {
+            return
+        }
+        var data = Data()
+        for entry in entries {
+            data.append(AyuHistoryStore.mediaLine(entry))
+        }
         self.queue.async {
-            let records = self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix).flatMap { self.readStoredRecords(url: self.keptUrl(peerId: $0), decoder: self.decoder) }
-            let editsSize = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix).reduce(Int64(0)) { result, peerId in
-                return result + self.fileSize(self.editsUrl(peerId: peerId))
+            self.appendData(data, url: self.mediaIndexUrl)
+        }
+    }
+
+    public func diskUsage() -> AyuDiskUsage {
+        let fileManager = FileManager()
+        let names = (try? fileManager.contentsOfDirectory(atPath: self.rootUrl.path)) ?? []
+        var keptBytes: Int64 = 0
+        var editsBytes: Int64 = 0
+        for name in names {
+            let size = self.fileSize(self.rootUrl.appendingPathComponent(name), fileManager: fileManager)
+            if name.hasSuffix(AyuHistoryStore.editsSuffix) {
+                editsBytes += size
+            } else if name.hasSuffix(AyuHistoryStore.keptSuffix) {
+                keptBytes += size
             }
-            completion(records, editsSize)
+        }
+        return AyuDiskUsage(keptBytes: keptBytes, editsBytes: editsBytes, media: self.readMediaIndex())
+    }
+
+    public func removeMedia(kinds: Set<AyuMediaKind>, resourceIds: Set<String>, completion: @escaping () -> Void) {
+        self.queue.async {
+            let entries = self.readMediaIndex()
+            let kept = entries.filter { !kinds.contains($0.kind) && !resourceIds.contains($0.resourceId) }
+            if kept.count != entries.count {
+                if kept.isEmpty {
+                    try? self.fileManager.removeItem(at: self.mediaIndexUrl)
+                } else {
+                    var data = Data()
+                    for entry in kept {
+                        data.append(AyuHistoryStore.mediaLine(entry))
+                    }
+                    try? data.write(to: self.mediaIndexUrl, options: .atomic)
+                }
+            }
+            completion()
+        }
+    }
+
+    public func loadKept(completion: @escaping ([AyuStoredRecord]) -> Void) {
+        self.queue.async {
+            completion(self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix).flatMap { self.readStoredRecords(url: self.keptUrl(peerId: $0), decoder: self.decoder) })
         }
     }
 
@@ -178,9 +232,26 @@ public final class AyuHistoryStore {
         }
     }
 
-    private func fileSize(_ url: URL) -> Int64 {
-        let attributes = try? self.fileManager.attributesOfItem(atPath: url.path)
+    private var mediaIndexUrl: URL {
+        return self.rootUrl.appendingPathComponent(AyuHistoryStore.mediaIndexName)
+    }
+
+    private func fileSize(_ url: URL, fileManager: FileManager) -> Int64 {
+        let attributes = try? fileManager.attributesOfItem(atPath: url.path)
         return (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    private func readMediaIndex() -> [AyuMediaEntry] {
+        guard let data = try? Data(contentsOf: self.mediaIndexUrl) else {
+            return []
+        }
+        return data.split(separator: AyuHistoryStore.newline).compactMap { line -> AyuMediaEntry? in
+            let parts = line.split(separator: AyuHistoryStore.tab, maxSplits: 1)
+            guard parts.count == 2, let kind = AyuMediaKind(rawValue: String(decoding: parts[0], as: UTF8.self)) else {
+                return nil
+            }
+            return AyuMediaEntry(kind: kind, resourceId: String(decoding: parts[1], as: UTF8.self))
+        }
     }
 
     private func readStoredRecords(url: URL, decoder: JSONDecoder) -> [AyuStoredRecord] {
@@ -208,7 +279,11 @@ public final class AyuHistoryStore {
     }
 
     private func appendLines(_ records: [AyuHistoryRecord], url: URL) {
-        var data = self.encodedLines(records)
+        self.appendData(self.encodedLines(records), url: url)
+    }
+
+    private func appendData(_ data: Data, url: URL) {
+        var data = data
         guard let handle = try? FileHandle(forUpdating: url) else {
             try? data.write(to: url, options: .atomic)
             return
@@ -242,4 +317,25 @@ public final class AyuHistoryStore {
 public struct AyuStoredRecord {
     public let record: AyuHistoryRecord
     public let size: Int64
+}
+
+public enum AyuMediaKind: String {
+    case deleted = "d"
+    case expired = "e"
+}
+
+public struct AyuMediaEntry: Hashable {
+    public let kind: AyuMediaKind
+    public let resourceId: String
+
+    public init(kind: AyuMediaKind, resourceId: String) {
+        self.kind = kind
+        self.resourceId = resourceId
+    }
+}
+
+public struct AyuDiskUsage {
+    public let keptBytes: Int64
+    public let editsBytes: Int64
+    public let media: [AyuMediaEntry]
 }

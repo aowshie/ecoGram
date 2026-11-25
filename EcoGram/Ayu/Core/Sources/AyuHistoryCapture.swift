@@ -76,6 +76,7 @@ enum AyuHistoryCapture {
         let now = Int32(Date().timeIntervalSince1970)
         let mediaLimit = AyuSettings.shared.historyMediaLimitBytes
         var records: [AyuHistoryRecord] = []
+        var mediaEntries: [AyuMediaEntry] = []
         var retained: [StoreMessage] = []
         var protectedMediaIds = Set<MediaId>()
         for id in ids where !keptIds.contains(id) {
@@ -87,6 +88,7 @@ enum AyuHistoryCapture {
             }
             records.append(AyuHistoryRecord(kind: .deleted, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: now, text: message.text, replacementText: nil))
             retained.append(self.retainedMessage(message, deletedAt: now, isExpired: isExpired))
+            mediaEntries.append(contentsOf: ayuKeptMediaEntries(message, kind: isExpired ? .expired : .deleted))
             for media in message.media {
                 if let mediaId = media.id, mediaLimit > 0, self.size(of: media, mediaBox: mediaBox) <= mediaLimit {
                     protectedMediaIds.insert(mediaId)
@@ -94,6 +96,7 @@ enum AyuHistoryCapture {
             }
         }
         store.append(records)
+        store.appendMedia(mediaEntries)
         return AyuRetention(keptIds: keptIds, retained: retained, protectedMediaIds: protectedMediaIds)
     }
 
