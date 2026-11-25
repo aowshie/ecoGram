@@ -83,17 +83,27 @@ enum AyuHistoryCapture {
             guard let message = transaction.getMessage(id), self.isEligible(message: message, transaction: transaction) else {
                 continue
             }
-            if message.text.isEmpty && message.media.isEmpty {
-                continue
-            }
-            records.append(AyuHistoryRecord(kind: .deleted, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: now, text: message.text, replacementText: nil))
-            retained.append(self.retainedMessage(message, deletedAt: now, isExpired: isExpired))
-            mediaEntries.append(contentsOf: ayuKeptMediaEntries(message, kind: isExpired ? .expired : .deleted))
-            for media in message.media {
-                if let mediaId = media.id, mediaLimit > 0, self.size(of: media, mediaBox: mediaBox) <= mediaLimit {
+            let expires = isExpired || message.ayuIsSelfDestructing
+            var media: [Media] = []
+            for item in message.media {
+                let fits = expires || (mediaLimit > 0 && self.size(of: item, mediaBox: mediaBox) <= mediaLimit)
+                if fits, let mediaId = item.id {
                     protectedMediaIds.insert(mediaId)
                 }
+                if fits || !ayuIsKeptMedia(item) {
+                    media.append(item)
+                }
             }
+            if message.text.isEmpty && media.isEmpty {
+                continue
+            }
+            retained.append(self.retainedMessage(message, media: media, deletedAt: now, isExpired: expires))
+            if message.ayuIsMediaExpired {
+                continue
+            }
+            let kind: AyuMediaKind = expires ? .expired : .deleted
+            records.append(AyuHistoryRecord(kind: expires ? .expired : .deleted, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: now, text: message.text, replacementText: nil))
+            mediaEntries.append(contentsOf: media.flatMap { ayuKeptMediaEntries($0, kind: kind) })
         }
         store.append(records)
         store.appendMedia(mediaEntries)
@@ -151,7 +161,7 @@ enum AyuHistoryCapture {
         return transaction.getMessage(id)?.ayuIsDeleted == true
     }
 
-    private static func retainedMessage(_ message: Message, deletedAt: Int32, isExpired: Bool) -> StoreMessage {
+    private static func retainedMessage(_ message: Message, media: [Media], deletedAt: Int32, isExpired: Bool) -> StoreMessage {
         var attributes = message.attributes.filter { attribute in
             return !(attribute is AutoremoveTimeoutMessageAttribute) && !(attribute is AutoclearTimeoutMessageAttribute)
         }
@@ -177,7 +187,7 @@ enum AyuHistoryCapture {
             authorId: message.author?.id,
             text: message.text,
             attributes: attributes,
-            media: message.media
+            media: media
         )
     }
 

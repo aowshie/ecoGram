@@ -51,6 +51,10 @@ public extension Message {
         return self.attributes.contains(where: { $0 is AyuExpiredMediaAttribute })
     }
 
+    var ayuIsSelfDestructing: Bool {
+        return self.ayuIsMediaExpired || self.ayuIsViewOnce || self.attributes.contains(where: { $0 is AutoclearTimeoutMessageAttribute })
+    }
+
     var ayuOpensStandalone: Bool {
         return self.ayuIsDeleted || self.ayuIsMediaExpired || self.ayuSelfDestructTimeout != nil
     }
@@ -128,7 +132,6 @@ public extension TelegramEngine.Messages {
 extension AyuHistoryCapture {
     static func releaseKept(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId]) {
         var deleted: [MessageId] = []
-        var resourceIds: [MediaResourceId] = []
         for id in ids {
             guard let message = transaction.getMessage(id) else {
                 continue
@@ -136,18 +139,34 @@ extension AyuHistoryCapture {
             if message.ayuIsDeleted {
                 deleted.append(id)
             } else if message.ayuIsMediaExpired {
-                for media in message.media {
-                    addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
-                }
                 self.restoreExpiredContent(transaction: transaction, message: message)
             }
         }
         if !deleted.isEmpty {
             _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: deleted)
         }
-        if !resourceIds.isEmpty {
-            let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
-        }
+    }
+
+    static func stripKeptMedia(transaction: Transaction, message: Message) {
+        transaction.updateMessage(message.id, update: { currentMessage in
+            return .update(StoreMessage(
+                id: currentMessage.id,
+                customStableId: nil,
+                globallyUniqueId: currentMessage.globallyUniqueId,
+                groupingKey: currentMessage.groupingKey,
+                threadId: currentMessage.threadId,
+                timestamp: currentMessage.timestamp,
+                flags: StoreMessageFlags(currentMessage.flags),
+                tags: currentMessage.tags,
+                globalTags: currentMessage.globalTags,
+                localTags: currentMessage.localTags,
+                forwardInfo: currentMessage.forwardInfo.map(StoreMessageForwardInfo.init),
+                authorId: currentMessage.author?.id,
+                text: currentMessage.text,
+                attributes: currentMessage.attributes.filter { !($0 is MediaSpoilerMessageAttribute) },
+                media: currentMessage.media.filter { !ayuIsKeptMedia($0) }
+            ))
+        })
     }
 
     private static func expiredContentData(_ media: [Media]) -> TelegramMediaExpiredContentData {

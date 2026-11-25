@@ -154,7 +154,7 @@ public struct EcoStrings {
         .usageMedia: ("Media of Deleted", "Медиа удалённых", "削除されたメディア"),
         .usageDisappearing: ("Disappearing Media", "Исчезающие медиа", "消えるメディア"),
         .usageEdits: ("Edit History", "История правок", "編集履歴"),
-        .usageCategoriesFooter: ("Clearing messages also clears their media. Cleared data can't be restored.", "Вместе с сообщениями очищаются и их медиа. Очищенное восстановить нельзя.", "メッセージを消去すると、そのメディアも消去されます。消去したデータは復元できません。"),
+        .usageCategoriesFooter: ("Clearing messages also clears their media. Clearing media removes it from deleted messages, and those without text go with it. Cleared data can't be restored.", "Вместе с сообщениями очищаются и их медиа. При очистке медиа оно убирается из удалённых сообщений, а сообщения без текста исчезают целиком. Очищенное восстановить нельзя.", "メッセージを消去すると、そのメディアも消去されます。メディアを消去すると削除されたメッセージから取り除かれ、テキストのないメッセージはまとめて消えます。消去したデータは復元できません。"),
         .usageClearAll: ("Clear All", "Очистить всё", "すべて消去"),
         .usageClearTitle: ("Clear Saved Data?", "Очистить сохранённое?", "保存データを消去しますか？"),
         .usageClearText: ("The selected deleted messages, media and edits will be removed from this device for good.", "Выбранные удалённые сообщения, медиа и правки исчезнут с устройства навсегда.", "選択した削除済みメッセージ、メディア、編集履歴はこの端末から完全に削除されます。"),

@@ -7,8 +7,10 @@ public final class AyuHistoryStore {
     private static var registry: [String: AyuHistoryStore] = [:]
     private static let newline = UInt8(ascii: "\n")
     private static let keptSuffix = ".jsonl"
+    private static let expiredSuffix = ".expired.jsonl"
     private static let editsSuffix = ".edits.jsonl"
-    private static let layoutMarker = "layout.v2"
+    private static let legacyLayoutMarker = "layout.v2"
+    private static let layoutMarker = "layout.v3"
     private static let mediaIndexName = "media.idx"
     private static let tab = UInt8(ascii: "\t")
 
@@ -48,7 +50,7 @@ public final class AyuHistoryStore {
         self.rootUrl = rootUrl
         self.queue.async {
             try? self.fileManager.createDirectory(at: rootUrl, withIntermediateDirectories: true)
-            self.splitEditsIfNeeded()
+            self.splitKindsIfNeeded()
             let peerIds = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix)
             self.indexQueue.async {
                 let decoder = JSONDecoder()
@@ -68,13 +70,11 @@ public final class AyuHistoryStore {
         }
         self.queue.async {
             for (peerId, items) in Dictionary(grouping: records, by: { $0.peerId }) {
-                let edits = items.filter { $0.kind == .edited }
-                let kept = items.filter { $0.kind != .edited }
-                if !kept.isEmpty {
-                    self.appendLines(kept, url: self.keptUrl(peerId: peerId))
+                for (kind, kindItems) in Dictionary(grouping: items, by: { $0.kind }) {
+                    self.appendLines(kindItems, url: self.url(peerId: peerId, kind: kind))
                 }
+                let edits = items.filter { $0.kind == .edited }
                 if !edits.isEmpty {
-                    self.appendLines(edits, url: self.editsUrl(peerId: peerId))
                     self.indexLock.lock()
                     self.editedMessageIds[peerId, default: []].formUnion(edits.map(\.messageId))
                     self.indexLock.unlock()
@@ -99,24 +99,22 @@ public final class AyuHistoryStore {
     public func diskUsage() -> AyuDiskUsage {
         let fileManager = FileManager()
         let names = (try? fileManager.contentsOfDirectory(atPath: self.rootUrl.path)) ?? []
-        var keptBytes: Int64 = 0
-        var editsBytes: Int64 = 0
+        var recordBytes: [AyuHistoryRecord.Kind: Int64] = [:]
         for name in names {
-            let size = self.fileSize(self.rootUrl.appendingPathComponent(name), fileManager: fileManager)
-            if name.hasSuffix(AyuHistoryStore.editsSuffix) {
-                editsBytes += size
-            } else if name.hasSuffix(AyuHistoryStore.keptSuffix) {
-                keptBytes += size
+            guard let kind = AyuHistoryStore.kind(fileName: name) else {
+                continue
             }
+            recordBytes[kind, default: 0] += self.fileSize(self.rootUrl.appendingPathComponent(name), fileManager: fileManager)
         }
-        return AyuDiskUsage(keptBytes: keptBytes, editsBytes: editsBytes, media: self.readMediaIndex())
+        return AyuDiskUsage(recordBytes: recordBytes, media: self.readMediaIndex())
     }
 
-    public func removeMedia(kinds: Set<AyuMediaKind>, resourceIds: Set<String>, completion: @escaping () -> Void) {
+    public func removeMedia(kinds: Set<AyuMediaKind>, entries removing: Set<AyuMediaEntry>, completion: @escaping (_ removed: [AyuMediaEntry], _ remaining: [AyuMediaEntry]) -> Void) {
         self.queue.async {
             let entries = self.readMediaIndex()
-            let kept = entries.filter { !kinds.contains($0.kind) && !resourceIds.contains($0.resourceId) }
-            if kept.count != entries.count {
+            let removed = entries.filter { kinds.contains($0.kind) || removing.contains($0) }
+            let kept = entries.filter { !kinds.contains($0.kind) && !removing.contains($0) }
+            if !removed.isEmpty {
                 if kept.isEmpty {
                     try? self.fileManager.removeItem(at: self.mediaIndexUrl)
                 } else {
@@ -127,13 +125,13 @@ public final class AyuHistoryStore {
                     try? data.write(to: self.mediaIndexUrl, options: .atomic)
                 }
             }
-            completion()
+            completion(removed, kept)
         }
     }
 
     public func loadKept(completion: @escaping ([AyuStoredRecord]) -> Void) {
         self.queue.async {
-            completion(self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix).flatMap { self.readStoredRecords(url: self.keptUrl(peerId: $0), decoder: self.decoder) })
+            completion(self.keptUrls().flatMap { self.readStoredRecords(url: $0, decoder: self.decoder) })
         }
     }
 
@@ -143,8 +141,7 @@ public final class AyuHistoryStore {
             return
         }
         self.queue.async {
-            for peerId in self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix) {
-                let url = self.keptUrl(peerId: peerId)
+            for url in self.keptUrls() {
                 let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
                 let kept = records.filter { !ids.contains($0.id) }
                 if kept.count != records.count {
@@ -196,30 +193,60 @@ public final class AyuHistoryStore {
         }
     }
 
-    private func splitEditsIfNeeded() {
+    private func splitKindsIfNeeded() {
         let marker = self.rootUrl.appendingPathComponent(AyuHistoryStore.layoutMarker)
         guard !self.fileManager.fileExists(atPath: marker.path) else {
             return
         }
         for peerId in self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix) {
-            let url = self.keptUrl(peerId: peerId)
+            let url = self.url(peerId: peerId, kind: .deleted)
             let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
-            let edits = records.filter { $0.kind == .edited }
-            guard !edits.isEmpty else {
+            let moved = records.filter { $0.kind != .deleted }
+            guard !moved.isEmpty else {
                 continue
             }
-            self.appendLines(edits, url: self.editsUrl(peerId: peerId))
-            self.writeRecords(records.filter { $0.kind != .edited }, url: url)
+            for (kind, items) in Dictionary(grouping: moved, by: { $0.kind }) {
+                self.appendLines(items, url: self.url(peerId: peerId, kind: kind))
+            }
+            self.writeRecords(records.filter { $0.kind == .deleted }, url: url)
         }
+        try? self.fileManager.removeItem(at: self.rootUrl.appendingPathComponent(AyuHistoryStore.legacyLayoutMarker))
         self.fileManager.createFile(atPath: marker.path, contents: Data())
     }
 
-    private func keptUrl(peerId: Int64) -> URL {
-        return self.rootUrl.appendingPathComponent("\(peerId)\(AyuHistoryStore.keptSuffix)")
+    private static func suffix(kind: AyuHistoryRecord.Kind) -> String {
+        switch kind {
+        case .deleted:
+            return AyuHistoryStore.keptSuffix
+        case .expired:
+            return AyuHistoryStore.expiredSuffix
+        case .edited:
+            return AyuHistoryStore.editsSuffix
+        }
+    }
+
+    private static func kind(fileName: String) -> AyuHistoryRecord.Kind? {
+        for kind in [AyuHistoryRecord.Kind.edited, .expired, .deleted] {
+            let suffix = AyuHistoryStore.suffix(kind: kind)
+            if fileName.hasSuffix(suffix), Int64(fileName.dropLast(suffix.count)) != nil {
+                return kind
+            }
+        }
+        return nil
+    }
+
+    private func url(peerId: Int64, kind: AyuHistoryRecord.Kind) -> URL {
+        return self.rootUrl.appendingPathComponent("\(peerId)\(AyuHistoryStore.suffix(kind: kind))")
     }
 
     private func editsUrl(peerId: Int64) -> URL {
-        return self.rootUrl.appendingPathComponent("\(peerId)\(AyuHistoryStore.editsSuffix)")
+        return self.url(peerId: peerId, kind: .edited)
+    }
+
+    private func keptUrls() -> [URL] {
+        let deleted = self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix).map { self.url(peerId: $0, kind: .deleted) }
+        let expired = self.storedPeerIds(suffix: AyuHistoryStore.expiredSuffix).map { self.url(peerId: $0, kind: .expired) }
+        return deleted + expired
     }
 
     private func storedPeerIds(suffix: String) -> [Int64] {
@@ -335,7 +362,6 @@ public struct AyuMediaEntry: Hashable {
 }
 
 public struct AyuDiskUsage {
-    public let keptBytes: Int64
-    public let editsBytes: Int64
+    public let recordBytes: [AyuHistoryRecord.Kind: Int64]
     public let media: [AyuMediaEntry]
 }
