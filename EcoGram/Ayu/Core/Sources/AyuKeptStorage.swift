@@ -27,8 +27,6 @@ private struct AyuKeptIndex {
     var disappearingRecordIds = Set<String>()
     var disappearingResources = Set<MediaResourceId>()
     var disappearingBytes: Int64 = 0
-    var editRecordIds = Set<String>()
-    var editBytes: Int64 = 0
 
     init(transaction: Transaction, records: [AyuStoredRecord]) {
         for stored in records {
@@ -36,8 +34,7 @@ private struct AyuKeptIndex {
             let recordBytes = stored.size
             switch record.kind {
             case .edited:
-                self.editRecordIds.insert(record.id)
-                self.editBytes += recordBytes
+                break
             case .deleted, .expired:
                 let id = MessageId(peerId: PeerId(record.peerId), namespace: Namespaces.Message.Cloud, id: record.messageId)
                 let message = transaction.getMessage(id)
@@ -106,16 +103,16 @@ public extension TelegramEngine.Messages {
     func ayuClearKept(categories: Set<AyuKeptCategory>) -> Signal<Float, NoError> {
         let postbox = self.account.postbox
         return ayuHistoryRecords(mediaBox: postbox.mediaBox)
-        |> mapToSignal { records -> Signal<Float, NoError> in
-            return ayuRelease(postbox: postbox, records: records, categories: categories)
+        |> mapToSignal { records, _ -> Signal<Float, NoError> in
+            return ayuRelease(postbox: postbox, records: records, categories: categories, editsThreshold: nil)
         }
     }
 
     func ayuExpireKept(olderThan threshold: Int32) -> Signal<Never, NoError> {
         let postbox = self.account.postbox
         return ayuHistoryRecords(mediaBox: postbox.mediaBox)
-        |> mapToSignal { records -> Signal<Float, NoError> in
-            return ayuRelease(postbox: postbox, records: records.filter { $0.record.savedAt < threshold }, categories: Set(AyuKeptCategory.allCases))
+        |> mapToSignal { records, _ -> Signal<Float, NoError> in
+            return ayuRelease(postbox: postbox, records: records.filter { $0.record.savedAt < threshold }, categories: Set(AyuKeptCategory.allCases), editsThreshold: threshold)
         }
         |> ignoreValues
     }
@@ -124,23 +121,23 @@ public extension TelegramEngine.Messages {
 private func ayuComputeKeptStorage(postbox: Postbox) -> Signal<AyuKeptStorage, NoError> {
     let mediaBox = postbox.mediaBox
     return ayuHistoryRecords(mediaBox: mediaBox)
-    |> mapToSignal { records -> Signal<AyuKeptIndex, NoError> in
-        return postbox.transaction { transaction -> AyuKeptIndex in
-            return AyuKeptIndex(transaction: transaction, records: records)
+    |> mapToSignal { records, editsSize -> Signal<(AyuKeptIndex, Int64), NoError> in
+        return postbox.transaction { transaction -> (AyuKeptIndex, Int64) in
+            return (AyuKeptIndex(transaction: transaction, records: records), editsSize)
         }
     }
     |> deliverOn(Queue.concurrentDefaultQueue())
-    |> map { index -> AyuKeptStorage in
+    |> map { index, editsSize -> AyuKeptStorage in
         return AyuKeptStorage(sizes: [
             .messages: index.messageBytes,
             .media: ayuResourcesSize(index.mediaResources, mediaBox: mediaBox),
             .disappearing: index.disappearingBytes + ayuResourcesSize(index.disappearingResources, mediaBox: mediaBox),
-            .edits: index.editBytes
+            .edits: editsSize
         ])
     }
 }
 
-private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories: Set<AyuKeptCategory>) -> Signal<Float, NoError> {
+private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories: Set<AyuKeptCategory>, editsThreshold: Int32?) -> Signal<Float, NoError> {
     let mediaBox = postbox.mediaBox
     let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
     return postbox.transaction { transaction -> (Set<String>, Set<MediaResourceId>) in
@@ -160,16 +157,19 @@ private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories
             recordIds.formUnion(index.disappearingRecordIds)
             resourceIds.formUnion(index.disappearingResources)
         }
-        if categories.contains(.edits) {
-            recordIds.formUnion(index.editRecordIds)
-        }
         AyuHistoryCapture.releaseKept(transaction: transaction, mediaBox: mediaBox, ids: releasedIds)
         return (recordIds, resourceIds)
     }
     |> mapToSignal { recordIds, resourceIds -> Signal<Float, NoError> in
         let removeRecords = Signal<Never, NoError> { subscriber in
             store.remove(ids: recordIds, completion: {
-                subscriber.putCompletion()
+                if categories.contains(.edits) {
+                    store.removeEdits(olderThan: editsThreshold, completion: {
+                        subscriber.putCompletion()
+                    })
+                } else {
+                    subscriber.putCompletion()
+                }
             })
             return EmptyDisposable
         }
@@ -178,11 +178,11 @@ private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories
     }
 }
 
-private func ayuHistoryRecords(mediaBox: MediaBox) -> Signal<[AyuStoredRecord], NoError> {
+private func ayuHistoryRecords(mediaBox: MediaBox) -> Signal<([AyuStoredRecord], Int64), NoError> {
     let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
     return Signal { subscriber in
-        store.load(completion: { records in
-            subscriber.putNext(records)
+        store.loadKept(completion: { records, editsSize in
+            subscriber.putNext((records, editsSize))
             subscriber.putCompletion()
         })
         return EmptyDisposable

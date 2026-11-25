@@ -96,6 +96,7 @@ private enum AyuHistorySection: Int32, SGItemListSection {
 private enum AyuHistoryToggle: Hashable {
     case saveDeleted
     case saveEdited
+    case saveChannelEdits
     case saveSelfDestructing
     case saveBots
 }
@@ -114,6 +115,7 @@ private func ayuHistoryEntries(strings: EcoStrings) -> [AyuHistoryEntry] {
     entries.append(.toggle(id: id.count, section: .history, settingName: .saveDeleted, value: settings.saveDeletedMessages, text: strings.get(.historySaveDeleted), enabled: true))
     entries.append(.toggle(id: id.count, section: .history, settingName: .saveSelfDestructing, value: settings.saveSelfDestructing, text: strings.get(.historySaveSelfDestructing), enabled: settings.saveDeletedMessages))
     entries.append(.toggle(id: id.count, section: .history, settingName: .saveEdited, value: settings.saveEditedMessages, text: strings.get(.historySaveEdited), enabled: true))
+    entries.append(.toggle(id: id.count, section: .history, settingName: .saveChannelEdits, value: settings.saveChannelEdits, text: strings.get(.historySaveChannelEdits), enabled: settings.saveEditedMessages))
     entries.append(.toggle(id: id.count, section: .history, settingName: .saveBots, value: settings.saveInBots, text: strings.get(.historySaveBots), enabled: settings.saveDeletedMessages || settings.saveEditedMessages))
     entries.append(.notice(id: id.count, section: .history, text: strings.get(.historyFooter)))
     entries.append(.disclosure(id: id.count, section: .storage, link: .manageStorage, text: strings.get(.manageStorage)))
@@ -132,6 +134,8 @@ func ayuHistoryController(context: AccountContext) -> ViewController {
             settings.saveDeletedMessages = value
         case .saveEdited:
             settings.saveEditedMessages = value
+        case .saveChannelEdits:
+            settings.saveChannelEdits = value
         case .saveSelfDestructing:
             settings.saveSelfDestructing = value
         case .saveBots:

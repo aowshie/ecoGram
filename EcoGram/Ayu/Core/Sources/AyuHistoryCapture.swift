@@ -101,6 +101,9 @@ enum AyuHistoryCapture {
         guard AyuSettings.shared.saveEditedMessages, let message = transaction.getMessage(id), !message.ayuIsDeleted, !message.text.isEmpty, message.text != updated.text, self.isEligible(message: message, transaction: transaction) else {
             return
         }
+        if !AyuSettings.shared.saveChannelEdits, let channel = transaction.getPeer(id.peerId) as? TelegramChannel, case .broadcast = channel.info {
+            return
+        }
         let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
         store.append([AyuHistoryRecord(kind: .edited, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: Int32(Date().timeIntervalSince1970), text: message.text, replacementText: updated.text)])
     }

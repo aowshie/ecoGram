@@ -19,6 +19,7 @@ public final class AyuSettings {
         case ghostMigrated = "ghostMigrated.v2"
         case saveDeletedMessages
         case saveEditedMessages
+        case saveChannelEdits
         case saveInBots
         case saveSelfDestructing
         case historyMediaLimitMegabytes
@@ -48,6 +49,7 @@ public final class AyuSettings {
             Key.ghostReadOnInteract.name: true,
             Key.saveDeletedMessages.name: true,
             Key.saveEditedMessages.name: true,
+            Key.saveChannelEdits.name: false,
             Key.saveInBots.name: false,
             Key.saveSelfDestructing.name: true,
             Key.historyMediaLimitMegabytes.name: 20,
@@ -198,6 +200,11 @@ public final class AyuSettings {
     public var saveEditedMessages: Bool {
         get { return self.bool(.saveEditedMessages) }
         set { self.set(newValue, .saveEditedMessages) }
+    }
+
+    public var saveChannelEdits: Bool {
+        get { return self.bool(.saveChannelEdits) }
+        set { self.set(newValue, .saveChannelEdits) }
     }
 
     public var saveInBots: Bool {

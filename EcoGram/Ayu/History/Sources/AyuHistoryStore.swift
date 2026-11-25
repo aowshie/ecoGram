@@ -6,6 +6,9 @@ public final class AyuHistoryStore {
     private static let registryLock = NSLock()
     private static var registry: [String: AyuHistoryStore] = [:]
     private static let newline = UInt8(ascii: "\n")
+    private static let keptSuffix = ".jsonl"
+    private static let editsSuffix = ".edits.jsonl"
+    private static let layoutMarker = "layout.v2"
 
     public static func store(mediaBoxBasePath: String) -> AyuHistoryStore {
         let accountUrl = URL(fileURLWithPath: mediaBoxBasePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -24,6 +27,7 @@ public final class AyuHistoryStore {
 
     private let rootUrl: URL
     private let queue = DispatchQueue(label: "ecogram.ayu.history", qos: .utility)
+    private let indexQueue = DispatchQueue(label: "ecogram.ayu.history.index", qos: .utility)
     private let fileManager = FileManager()
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -34,8 +38,16 @@ public final class AyuHistoryStore {
         self.rootUrl = rootUrl
         self.queue.async {
             try? self.fileManager.createDirectory(at: rootUrl, withIntermediateDirectories: true)
-            for peerId in self.storedPeerIds() {
-                self.updateEditIndex(peerId: peerId, records: self.readRecords(peerId: peerId))
+            self.splitEditsIfNeeded()
+            let peerIds = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix)
+            self.indexQueue.async {
+                let decoder = JSONDecoder()
+                for peerId in peerIds {
+                    let messageIds = Set(self.readStoredRecords(url: self.editsUrl(peerId: peerId), decoder: decoder).map(\.record.messageId))
+                    self.indexLock.lock()
+                    self.editedMessageIds[peerId, default: []].formUnion(messageIds)
+                    self.indexLock.unlock()
+                }
             }
         }
     }
@@ -45,22 +57,29 @@ public final class AyuHistoryStore {
             return
         }
         self.queue.async {
-            let grouped = Dictionary(grouping: records, by: { $0.peerId })
-            for (peerId, items) in grouped {
-                self.appendLines(items, peerId: peerId)
-                let editedIds = items.filter { $0.kind == .edited }.map(\.messageId)
-                if !editedIds.isEmpty {
+            for (peerId, items) in Dictionary(grouping: records, by: { $0.peerId }) {
+                let edits = items.filter { $0.kind == .edited }
+                let kept = items.filter { $0.kind != .edited }
+                if !kept.isEmpty {
+                    self.appendLines(kept, url: self.keptUrl(peerId: peerId))
+                }
+                if !edits.isEmpty {
+                    self.appendLines(edits, url: self.editsUrl(peerId: peerId))
                     self.indexLock.lock()
-                    self.editedMessageIds[peerId, default: []].formUnion(editedIds)
+                    self.editedMessageIds[peerId, default: []].formUnion(edits.map(\.messageId))
                     self.indexLock.unlock()
                 }
             }
         }
     }
 
-    public func load(completion: @escaping ([AyuStoredRecord]) -> Void) {
+    public func loadKept(completion: @escaping ([AyuStoredRecord], Int64) -> Void) {
         self.queue.async {
-            completion(self.storedPeerIds().flatMap { self.readStoredRecords(peerId: $0) })
+            let records = self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix).flatMap { self.readStoredRecords(url: self.keptUrl(peerId: $0), decoder: self.decoder) }
+            let editsSize = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix).reduce(Int64(0)) { result, peerId in
+                return result + self.fileSize(self.editsUrl(peerId: peerId))
+            }
+            completion(records, editsSize)
         }
     }
 
@@ -70,14 +89,36 @@ public final class AyuHistoryStore {
             return
         }
         self.queue.async {
-            for peerId in self.storedPeerIds() {
-                let records = self.readRecords(peerId: peerId)
+            for peerId in self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix) {
+                let url = self.keptUrl(peerId: peerId)
+                let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
                 let kept = records.filter { !ids.contains($0.id) }
-                guard kept.count != records.count else {
-                    continue
+                if kept.count != records.count {
+                    self.writeRecords(kept, url: url)
                 }
-                self.writeRecords(kept, peerId: peerId)
-                self.updateEditIndex(peerId: peerId, records: kept)
+            }
+            NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: self)
+            completion()
+        }
+    }
+
+    public func removeEdits(olderThan threshold: Int32?, completion: @escaping () -> Void) {
+        self.queue.async {
+            for peerId in self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix) {
+                let url = self.editsUrl(peerId: peerId)
+                var kept: [AyuHistoryRecord] = []
+                if let threshold {
+                    let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
+                    kept = records.filter { $0.savedAt >= threshold }
+                    if kept.count == records.count {
+                        continue
+                    }
+                }
+                self.writeRecords(kept, url: url)
+                let messageIds = Set(kept.map(\.messageId))
+                self.indexLock.lock()
+                self.editedMessageIds[peerId] = messageIds.isEmpty ? nil : messageIds
+                self.indexLock.unlock()
             }
             NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: self)
             completion()
@@ -94,44 +135,60 @@ public final class AyuHistoryStore {
 
     public func loadEditRecords(peerId: Int64, messageId: Int32, completion: @escaping ([AyuHistoryRecord]) -> Void) {
         self.queue.async {
-            let records = self.readRecords(peerId: peerId).filter { $0.kind == .edited && $0.messageId == messageId }.sorted(by: { $0.savedAt < $1.savedAt })
+            let records = self.readStoredRecords(url: self.editsUrl(peerId: peerId), decoder: self.decoder).map(\.record).filter { $0.messageId == messageId }.sorted(by: { $0.savedAt < $1.savedAt })
             DispatchQueue.main.async {
                 completion(records)
             }
         }
     }
 
-    private func updateEditIndex(peerId: Int64, records: [AyuHistoryRecord]) {
-        let editedIds = Set(records.filter { $0.kind == .edited }.map(\.messageId))
-        self.indexLock.lock()
-        self.editedMessageIds[peerId] = editedIds.isEmpty ? nil : editedIds
-        self.indexLock.unlock()
+    private func splitEditsIfNeeded() {
+        let marker = self.rootUrl.appendingPathComponent(AyuHistoryStore.layoutMarker)
+        guard !self.fileManager.fileExists(atPath: marker.path) else {
+            return
+        }
+        for peerId in self.storedPeerIds(suffix: AyuHistoryStore.keptSuffix) {
+            let url = self.keptUrl(peerId: peerId)
+            let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
+            let edits = records.filter { $0.kind == .edited }
+            guard !edits.isEmpty else {
+                continue
+            }
+            self.appendLines(edits, url: self.editsUrl(peerId: peerId))
+            self.writeRecords(records.filter { $0.kind != .edited }, url: url)
+        }
+        self.fileManager.createFile(atPath: marker.path, contents: Data())
     }
 
-    private func chatUrl(peerId: Int64) -> URL {
-        return self.rootUrl.appendingPathComponent("\(peerId).jsonl")
+    private func keptUrl(peerId: Int64) -> URL {
+        return self.rootUrl.appendingPathComponent("\(peerId)\(AyuHistoryStore.keptSuffix)")
     }
 
-    private func storedPeerIds() -> [Int64] {
+    private func editsUrl(peerId: Int64) -> URL {
+        return self.rootUrl.appendingPathComponent("\(peerId)\(AyuHistoryStore.editsSuffix)")
+    }
+
+    private func storedPeerIds(suffix: String) -> [Int64] {
         let names = (try? self.fileManager.contentsOfDirectory(atPath: self.rootUrl.path)) ?? []
         return names.compactMap { name -> Int64? in
-            guard name.hasSuffix(".jsonl") else {
+            guard name.hasSuffix(suffix) else {
                 return nil
             }
-            return Int64(name.dropLast(".jsonl".count))
+            return Int64(name.dropLast(suffix.count))
         }
     }
 
-    private func readRecords(peerId: Int64) -> [AyuHistoryRecord] {
-        return self.readStoredRecords(peerId: peerId).map(\.record)
+    private func fileSize(_ url: URL) -> Int64 {
+        let attributes = try? self.fileManager.attributesOfItem(atPath: url.path)
+        return (attributes?[.size] as? NSNumber)?.int64Value ?? 0
     }
 
-    private func readStoredRecords(peerId: Int64) -> [AyuStoredRecord] {
-        guard let data = try? Data(contentsOf: self.chatUrl(peerId: peerId)) else {
+    private func readStoredRecords(url: URL, decoder: JSONDecoder) -> [AyuStoredRecord] {
+        guard let data = try? Data(contentsOf: url) else {
             return []
         }
         return data.split(separator: AyuHistoryStore.newline).compactMap { line in
-            guard let record = try? self.decoder.decode(AyuHistoryRecord.self, from: Data(line)) else {
+            guard let record = try? decoder.decode(AyuHistoryRecord.self, from: Data(line)) else {
                 return nil
             }
             return AyuStoredRecord(record: record, size: Int64(line.count + 1))
@@ -150,8 +207,7 @@ public final class AyuHistoryStore {
         return data
     }
 
-    private func appendLines(_ records: [AyuHistoryRecord], peerId: Int64) {
-        let url = self.chatUrl(peerId: peerId)
+    private func appendLines(_ records: [AyuHistoryRecord], url: URL) {
         var data = self.encodedLines(records)
         guard let handle = try? FileHandle(forUpdating: url) else {
             try? data.write(to: url, options: .atomic)
@@ -174,8 +230,7 @@ public final class AyuHistoryStore {
         }
     }
 
-    private func writeRecords(_ records: [AyuHistoryRecord], peerId: Int64) {
-        let url = self.chatUrl(peerId: peerId)
+    private func writeRecords(_ records: [AyuHistoryRecord], url: URL) {
         if records.isEmpty {
             try? self.fileManager.removeItem(at: url)
         } else {
