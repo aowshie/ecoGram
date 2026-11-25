@@ -184,7 +184,7 @@ private final class AyuShotContextReferenceContentSource: ContextReferenceConten
     }
 }
 
-private func ayuShotController(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat) -> AyuShotController {
+private func ayuShotController(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat, isSelectionTruncated: Bool) -> AyuShotController {
     let initialOptions = AyuShotOptions.stored
     let initialState = AyuShotState(options: initialOptions, image: nil, imageOptions: nil, renderingOptions: nil, failed: false)
     let stateValue = Atomic<AyuShotState>(value: initialState)
@@ -198,6 +198,7 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
     }
 
     let renderLoop = AyuShotRenderLoop()
+    let limitNoticeShown = Atomic<Bool>(value: false)
     var dismissImpl: (() -> Void)?
     var moreImpl: ((UIView) -> Void)?
 
@@ -311,18 +312,11 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
 
     let controller = AyuShotController(context: context, state: signal, hideNavigationBarBackground: true)
 
-    let presentToast: (UndoOverlayContent) -> Void = { [weak controller] content in
-        guard let controller else {
-            return
-        }
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        controller.present(UndoOverlayController(presentationData: presentationData, content: content, elevatedLayout: false, position: .top, action: { _ in
-            return false
-        }), in: .window(.root))
+    let presentToast: (UndoOverlayContent) -> Void = { content in
+        ayuPresentShotToast(context: context, content: content)
     }
     let presentFailure: () -> Void = {
-        let strings = EcoStrings(languageCode: context.sharedContext.currentPresentationData.with { $0 }.strings.baseLanguageCode)
-        presentToast(.info(title: nil, text: strings.get(.shotFailed), timeout: nil, customUndoText: nil))
+        ayuPresentShotToast(context: context, key: .shotFailed)
     }
 
     renderLoop.controller = controller
@@ -344,13 +338,14 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
         updateState {
             $0.renderingOptions = options
         }
-        renderer.render(in: controller.view, width: renderWidth, options: options, completion: { image in
+        renderer.render(in: controller.view, width: renderWidth, options: options, completion: { result in
             let isCurrent = stateValue.with { $0.options } == options
+            let hasImage = stateValue.with { $0.image != nil }
             updateState { state in
                 state.renderingOptions = nil
                 if isCurrent {
-                    if let image {
-                        state.image = image
+                    if let result {
+                        state.image = result.image
                         state.imageOptions = options
                     } else {
                         state.failed = true
@@ -359,7 +354,14 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
             }
             if !isCurrent {
                 loop.run()
-            } else if image == nil {
+            } else if let result {
+                if (isSelectionTruncated || result.isTruncated) && !limitNoticeShown.swap(true) {
+                    ayuPresentShotToast(context: context, key: .shotLimit)
+                }
+            } else {
+                if !hasImage {
+                    dismissImpl?()
+                }
                 presentFailure()
             }
         })
@@ -449,10 +451,10 @@ private func ayuShotController(context: AccountContext, renderer: AyuShotRendere
     return controller
 }
 
-func ayuShotScreen(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat) -> ViewController {
+func ayuShotScreen(context: AccountContext, renderer: AyuShotRenderer, renderWidth: CGFloat, isSelectionTruncated: Bool) -> ViewController {
     let controller = AttachmentController(context: context, style: .glass, chatLocation: nil, buttons: [.standalone], initialButton: .standalone, fromMenu: false, hasTextInput: false)
     controller.requestController = { _, present in
-        let shotController = ayuShotController(context: context, renderer: renderer, renderWidth: renderWidth)
+        let shotController = ayuShotController(context: context, renderer: renderer, renderWidth: renderWidth, isSelectionTruncated: isSelectionTruncated)
         present(shotController, shotController.mediaPickerContext)
         return true
     }

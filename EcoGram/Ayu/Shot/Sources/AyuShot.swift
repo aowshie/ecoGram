@@ -26,10 +26,7 @@ public func ayuPresentShot(context: AccountContext, messageIds: [EngineMessage.I
             return
         }
         let renderer = AyuShotRenderer(context: context, groups: selection.groups, revealsProtectedContent: !ecoCaptureProtection(true))
-        (context.sharedContext.mainWindow?.viewController as? NavigationController)?.pushViewController(ayuShotScreen(context: context, renderer: renderer, renderWidth: renderWidth))
-        if selection.isTruncated {
-            ayuPresentShotLimitToast(context: context)
-        }
+        (context.sharedContext.mainWindow?.viewController as? NavigationController)?.pushViewController(ayuShotScreen(context: context, renderer: renderer, renderWidth: renderWidth, isSelectionTruncated: selection.isTruncated))
     })
 }
 
@@ -40,15 +37,15 @@ public func ayuShotImage(context: AccountContext, messageIds: [EngineMessage.Id]
         guard let parentView, let window = parentView.window, !selection.groups.isEmpty else {
             return .single(nil)
         }
-        if selection.isTruncated {
-            ayuPresentShotLimitToast(context: context)
-        }
         return Signal { subscriber in
             let renderer = AyuShotRenderer(context: context, groups: selection.groups, revealsProtectedContent: !ecoCaptureProtection(true))
             var options = AyuShotOptions.stored
             options.showBackground = true
-            renderer.render(in: parentView, width: min(window.bounds.width, ayuShotMaximumWidth), options: options, completion: { image in
-                subscriber.putNext(image)
+            renderer.render(in: parentView, width: min(window.bounds.width, ayuShotMaximumWidth), options: options, completion: { result in
+                if let result, selection.isTruncated || result.isTruncated {
+                    ayuPresentShotToast(context: context, key: .shotLimit)
+                }
+                subscriber.putNext(result?.image)
                 subscriber.putCompletion()
             })
             return ActionDisposable {
@@ -60,10 +57,15 @@ public func ayuShotImage(context: AccountContext, messageIds: [EngineMessage.Id]
     }
 }
 
-private func ayuPresentShotLimitToast(context: AccountContext) {
+func ayuPresentShotToast(context: AccountContext, key: EcoStrings.Key) {
     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let text = String(format: EcoStrings(languageCode: presentationData.strings.baseLanguageCode).get(.shotLimit), ayuShotMessageLimit)
-    context.sharedContext.mainWindow?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, position: .top, action: { _ in
+    let text = EcoStrings(languageCode: presentationData.strings.baseLanguageCode).get(key)
+    ayuPresentShotToast(context: context, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil))
+}
+
+func ayuPresentShotToast(context: AccountContext, content: UndoOverlayContent) {
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    context.sharedContext.mainWindow?.present(UndoOverlayController(presentationData: presentationData, content: content, elevatedLayout: false, position: .top, action: { _ in
         return false
     }), on: .root)
 }

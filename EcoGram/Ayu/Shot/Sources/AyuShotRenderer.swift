@@ -9,6 +9,11 @@ import AccountContext
 import WallpaperBackgroundNode
 import EcoStrings
 
+struct AyuShotResult {
+    let image: UIImage
+    let isTruncated: Bool
+}
+
 final class AyuShotRenderer {
     private let context: AccountContext
     private let groups: [[EngineMessage]]
@@ -29,7 +34,7 @@ final class AyuShotRenderer {
         self.prerequisitesDisposable.dispose()
     }
 
-    func render(in parentView: UIView, width: CGFloat, options: AyuShotOptions, completion: @escaping (UIImage?) -> Void) {
+    func render(in parentView: UIView, width: CGFloat, options: AyuShotOptions, completion: @escaping (AyuShotResult?) -> Void) {
         guard !self.isRendering else {
             completion(nil)
             return
@@ -50,10 +55,10 @@ final class AyuShotRenderer {
             }
             let pass = AyuShotRenderPass(context: self.context, groups: groups, options: options, appearance: appearance, availableReactions: availableReactions)
             self.pass = pass
-            pass.render(in: parentView, width: width, completion: { [weak self] image in
+            pass.render(in: parentView, width: width, completion: { [weak self] result in
                 self?.pass = nil
                 self?.isRendering = false
-                completion(image)
+                completion(result)
             })
         }))
     }
@@ -68,7 +73,7 @@ final class AyuShotRenderer {
 
 private final class AyuShotRenderPass {
     private static let padding: CGFloat = 12.0
-    private static let maximumPixelCount: CGFloat = 32_000_000.0
+    private static let maximumPixelHeight: CGFloat = 16384.0
 
     private let context: AccountContext
     private let groups: [[EngineMessage]]
@@ -97,7 +102,7 @@ private final class AyuShotRenderPass {
         self.readyDisposable?.dispose()
     }
 
-    func render(in parentView: UIView, width: CGFloat, completion: @escaping (UIImage?) -> Void) {
+    func render(in parentView: UIView, width: CGFloat, completion: @escaping (AyuShotResult?) -> Void) {
         let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
         let theme = self.appearance.theme.withUpdated(preview: true)
         var bubbleCorners = presentationData.chatBubbleCorners
@@ -112,7 +117,7 @@ private final class AyuShotRenderPass {
         self.containerNode.addSubnode(self.messagesNode)
         parentView.addSubview(self.containerNode.view)
 
-        let size = self.layout(presentationData: presentationData, theme: theme, bubbleCorners: bubbleCorners, width: width)
+        let (size, isTruncated) = self.layoutFitting(presentationData: presentationData, theme: theme, bubbleCorners: bubbleCorners, width: width)
         guard size.height > 0.0 else {
             self.containerNode.view.removeFromSuperview()
             completion(nil)
@@ -140,7 +145,7 @@ private final class AyuShotRenderPass {
                 return
             }
             let format = UIGraphicsImageRendererFormat()
-            format.scale = min(UIScreen.main.scale, (AyuShotRenderPass.maximumPixelCount / max(size.width * size.height, 1.0)).squareRoot())
+            format.scale = UIScreen.main.scale
             format.opaque = opaque
             let bounds = CGRect(origin: .zero, size: size)
             var drawn = false
@@ -148,7 +153,7 @@ private final class AyuShotRenderPass {
                 drawn = self.containerNode.view.drawHierarchy(in: bounds, afterScreenUpdates: true)
             }
             self.containerNode.view.removeFromSuperview()
-            completion(drawn ? image : nil)
+            completion(drawn ? AyuShotResult(image: image, isTruncated: isTruncated) : nil)
         })
     }
 
@@ -158,9 +163,37 @@ private final class AyuShotRenderPass {
         self.containerNode.view.removeFromSuperview()
     }
 
-    private func layout(presentationData: PresentationData, theme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners, width: CGFloat) -> CGSize {
+    private func layoutFitting(presentationData: PresentationData, theme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners, width: CGFloat) -> (size: CGSize, isTruncated: Bool) {
+        var groups = self.groups
+        while true {
+            let result = self.layout(groups: groups, presentationData: presentationData, theme: theme, bubbleCorners: bubbleCorners, width: width)
+            if result.fittingCount >= groups.count {
+                return (result.size, groups.count < self.groups.count)
+            }
+            for subnode in self.messagesNode.subnodes ?? [] {
+                subnode.removeFromSupernode()
+            }
+            groups = Array(groups.prefix(result.fittingCount))
+        }
+    }
+
+    private static func fittingCount(frames: [CGRect], dateFrames: [Int: CGRect]) -> Int {
+        let maximumHeight = AyuShotRenderPass.maximumPixelHeight / UIScreen.main.scale
+        var height = AyuShotRenderPass.padding * 2.0
+        var count = 0
+        for index in 0 ..< frames.count {
+            height += frames[index].height + (dateFrames[index]?.height ?? 0.0)
+            if height > maximumHeight {
+                break
+            }
+            count = index + 1
+        }
+        return max(count, 1)
+    }
+
+    private func layout(groups: [[EngineMessage]], presentationData: PresentationData, theme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners, width: CGFloat) -> (size: CGSize, fittingCount: Int) {
         let accountPeerId = self.context.account.peerId
-        let items: [ListViewItem] = self.groups.map { messages in
+        let items: [ListViewItem] = groups.map { messages in
             return self.context.sharedContext.makeChatMessageSnapshotItem(context: self.context, messages: messages, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: bubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, backgroundNode: self.wallpaperNode, availableReactions: self.availableReactions)
         }
         let params = ListViewItemLayoutParams(width: width, leftInset: 0.0, rightInset: 0.0, availableHeight: 10000.0)
@@ -180,19 +213,19 @@ private final class AyuShotRenderPass {
                 self.messagesNode.addSubnode(itemNode)
             }
         }
-        guard nodes.count == self.groups.count else {
-            return .zero
+        guard nodes.count == groups.count else {
+            return (.zero, groups.count)
         }
 
         var dateHeaders: [(index: Int, header: ListViewItemHeader)] = []
         if self.options.showDate {
             let calendar = Calendar.current
-            for index in 0 ..< self.groups.count {
-                guard let message = self.groups[index].first else {
+            for index in 0 ..< groups.count {
+                guard let message = groups[index].first else {
                     continue
                 }
                 let date = Date(timeIntervalSince1970: TimeInterval(message.timestamp))
-                if index > 0, let previous = self.groups[index - 1].first, calendar.isDate(date, inSameDayAs: Date(timeIntervalSince1970: TimeInterval(previous.timestamp))) {
+                if index > 0, let previous = groups[index - 1].first, calendar.isDate(date, inSameDayAs: Date(timeIntervalSince1970: TimeInterval(previous.timestamp))) {
                     continue
                 }
                 let header = self.context.sharedContext.makeChatMessageDateHeaderItem(context: self.context, timestamp: message.timestamp, theme: theme, strings: presentationData.strings, wallpaper: self.appearance.wallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: bubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder)
@@ -214,6 +247,10 @@ private final class AyuShotRenderPass {
             }
         }
         let size = CGSize(width: width, height: offset + AyuShotRenderPass.padding)
+        let fittingCount = AyuShotRenderPass.fittingCount(frames: frames, dateFrames: dateFrames)
+        if fittingCount < nodes.count {
+            return (size, fittingCount)
+        }
         for (index, itemNode) in nodes.enumerated() {
             itemNode.frame = frames[index]
             itemNode.updateFrame(itemNode.frame, within: size)
@@ -230,11 +267,11 @@ private final class AyuShotRenderPass {
             headerNode.updateLayout(size: frame.size, leftInset: 0.0, rightInset: 0.0, transition: .immediate)
         }
 
-        for index in 0 ..< self.groups.count {
-            guard let message = self.groups[index].first, let author = message.author, message._asMessage().effectivelyIncoming(accountPeerId) else {
+        for index in 0 ..< groups.count {
+            guard let message = groups[index].first, let author = message.author, message._asMessage().effectivelyIncoming(accountPeerId) else {
                 continue
             }
-            let nextMessage = index + 1 < self.groups.count ? self.groups[index + 1].first : nil
+            let nextMessage = index + 1 < groups.count ? groups[index + 1].first : nil
             if let nextMessage, nextMessage.author?.id == author.id, dateFrames[index + 1] == nil {
                 continue
             }
@@ -249,6 +286,6 @@ private final class AyuShotRenderPass {
 
         self.containerNode.frame = CGRect(origin: CGPoint(x: -10000.0, y: 0.0), size: size)
         self.messagesNode.frame = CGRect(origin: .zero, size: size)
-        return size
+        return (size, nodes.count)
     }
 }
