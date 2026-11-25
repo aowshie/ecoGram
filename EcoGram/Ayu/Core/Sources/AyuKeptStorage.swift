@@ -30,10 +30,10 @@ private struct AyuKeptIndex {
     var editRecordIds = Set<String>()
     var editBytes: Int64 = 0
 
-    init(transaction: Transaction, records: [AyuHistoryRecord]) {
-        let encoder = JSONEncoder()
-        for record in records {
-            let recordBytes = Int64((try? encoder.encode(record).count) ?? 0) + 1
+    init(transaction: Transaction, records: [AyuStoredRecord]) {
+        for stored in records {
+            let record = stored.record
+            let recordBytes = stored.size
             switch record.kind {
             case .edited:
                 self.editRecordIds.insert(record.id)
@@ -89,7 +89,7 @@ public extension TelegramEngine.Messages {
         let store = AyuHistoryStore.store(mediaBoxBasePath: postbox.mediaBox.basePath)
         let changes = Signal<Void, NoError> { subscriber in
             subscriber.putNext(Void())
-            let observer = NotificationCenter.default.addObserver(forName: AyuHistoryStore.didChange, object: store, queue: nil, using: { _ in
+            let observer = NotificationCenter.default.addObserver(forName: AyuHistoryStore.didRemove, object: store, queue: nil, using: { _ in
                 subscriber.putNext(Void())
             })
             return ActionDisposable {
@@ -115,7 +115,7 @@ public extension TelegramEngine.Messages {
         let postbox = self.account.postbox
         return ayuHistoryRecords(mediaBox: postbox.mediaBox)
         |> mapToSignal { records -> Signal<Float, NoError> in
-            return ayuRelease(postbox: postbox, records: records.filter { $0.savedAt < threshold }, categories: Set(AyuKeptCategory.allCases))
+            return ayuRelease(postbox: postbox, records: records.filter { $0.record.savedAt < threshold }, categories: Set(AyuKeptCategory.allCases))
         }
         |> ignoreValues
     }
@@ -140,7 +140,7 @@ private func ayuComputeKeptStorage(postbox: Postbox) -> Signal<AyuKeptStorage, N
     }
 }
 
-private func ayuRelease(postbox: Postbox, records: [AyuHistoryRecord], categories: Set<AyuKeptCategory>) -> Signal<Float, NoError> {
+private func ayuRelease(postbox: Postbox, records: [AyuStoredRecord], categories: Set<AyuKeptCategory>) -> Signal<Float, NoError> {
     let mediaBox = postbox.mediaBox
     let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
     return postbox.transaction { transaction -> (Set<String>, Set<MediaResourceId>) in
@@ -178,7 +178,7 @@ private func ayuRelease(postbox: Postbox, records: [AyuHistoryRecord], categorie
     }
 }
 
-private func ayuHistoryRecords(mediaBox: MediaBox) -> Signal<[AyuHistoryRecord], NoError> {
+private func ayuHistoryRecords(mediaBox: MediaBox) -> Signal<[AyuStoredRecord], NoError> {
     let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
     return Signal { subscriber in
         store.load(completion: { records in

@@ -1,7 +1,7 @@
 import Foundation
 
 public final class AyuHistoryStore {
-    public static let didChange = Notification.Name("ecogram.ayu.historyDidChange")
+    public static let didRemove = Notification.Name("ecogram.ayu.historyDidRemove")
 
     private static let registryLock = NSLock()
     private static var registry: [String: AyuHistoryStore] = [:]
@@ -55,13 +55,12 @@ public final class AyuHistoryStore {
                     self.indexLock.unlock()
                 }
             }
-            self.notifyChanged()
         }
     }
 
-    public func load(completion: @escaping ([AyuHistoryRecord]) -> Void) {
+    public func load(completion: @escaping ([AyuStoredRecord]) -> Void) {
         self.queue.async {
-            completion(self.storedPeerIds().flatMap { self.readRecords(peerId: $0) })
+            completion(self.storedPeerIds().flatMap { self.readStoredRecords(peerId: $0) })
         }
     }
 
@@ -80,7 +79,7 @@ public final class AyuHistoryStore {
                 self.writeRecords(kept, peerId: peerId)
                 self.updateEditIndex(peerId: peerId, records: kept)
             }
-            self.notifyChanged()
+            NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: self)
             completion()
         }
     }
@@ -100,10 +99,6 @@ public final class AyuHistoryStore {
                 completion(records)
             }
         }
-    }
-
-    private func notifyChanged() {
-        NotificationCenter.default.post(name: AyuHistoryStore.didChange, object: self)
     }
 
     private func updateEditIndex(peerId: Int64, records: [AyuHistoryRecord]) {
@@ -128,11 +123,18 @@ public final class AyuHistoryStore {
     }
 
     private func readRecords(peerId: Int64) -> [AyuHistoryRecord] {
+        return self.readStoredRecords(peerId: peerId).map(\.record)
+    }
+
+    private func readStoredRecords(peerId: Int64) -> [AyuStoredRecord] {
         guard let data = try? Data(contentsOf: self.chatUrl(peerId: peerId)) else {
             return []
         }
         return data.split(separator: AyuHistoryStore.newline).compactMap { line in
-            return try? self.decoder.decode(AyuHistoryRecord.self, from: Data(line))
+            guard let record = try? self.decoder.decode(AyuHistoryRecord.self, from: Data(line)) else {
+                return nil
+            }
+            return AyuStoredRecord(record: record, size: Int64(line.count + 1))
         }
     }
 
@@ -180,4 +182,9 @@ public final class AyuHistoryStore {
             try? self.encodedLines(records).write(to: url, options: .atomic)
         }
     }
+}
+
+public struct AyuStoredRecord {
+    public let record: AyuHistoryRecord
+    public let size: Int64
 }

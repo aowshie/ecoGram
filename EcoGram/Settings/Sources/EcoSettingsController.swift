@@ -78,7 +78,7 @@ func ecoSettingsChanges() -> Signal<Void, NoError> {
     }
 }
 
-private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme, keptSize: String) -> [EcoSettingsEntry] {
+private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: PresentationStrings, theme: PresentationTheme, keptSize: String?) -> [EcoSettingsEntry] {
     let preferences = EcoPreferences.shared
     let iconColor = theme.list.itemAccentColor
     var entries: [EcoSettingsEntry] = []
@@ -96,7 +96,7 @@ private func ecoSettingsEntries(strings: EcoStrings, presentationStrings: Presen
 
     let storage = EcoSettingsSection.storage.rawValue
     entries.append(.header(section: storage, order: next(), text: strings.get(.storageHeader)))
-    entries.append(.category(section: storage, order: next(), action: .dataAndStorage, icon: ecoOutlineIcon("Item List/Icons/Data", color: iconColor), title: presentationStrings.ChatSettings_Title, subtitle: "\(strings.get(.usageTitle)): \(keptSize)", label: ""))
+    entries.append(.category(section: storage, order: next(), action: .dataAndStorage, icon: ecoOutlineIcon("Item List/Icons/Data", color: iconColor), title: presentationStrings.ChatSettings_Title, subtitle: keptSize.flatMap { "\(strings.get(.usageTitle)): \($0)" } ?? strings.get(.usageTitle), label: ""))
 
     let chat = EcoSettingsSection.chat.rawValue
     let selectionEnabled = preferences.enabledSelectionActions.count
@@ -194,10 +194,11 @@ public func ecoSettingsController(context: AccountContext) -> ViewController {
         }
     })
 
-    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData, context.engine.messages.ayuKeptStorageUpdates())
+    let keptStorage: Signal<AyuKeptStorage?, NoError> = .single(nil) |> then(context.engine.messages.ayuKeptStorageUpdates() |> map(Optional.init))
+    let signal = combineLatest(Signal<Void, NoError>.single(Void()) |> then(ecoSettingsChanges()), context.sharedContext.presentationData, keptStorage)
     |> map { _, presentationData, keptStorage -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
-        let keptSize = dataSizeString(keptStorage.total, compact: true, formatting: DataSizeStringFormatting(presentationData: presentationData))
+        let keptSize = keptStorage.flatMap { dataSizeString($0.total, compact: true, formatting: DataSizeStringFormatting(presentationData: presentationData)) }
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.get(.settingsTitle)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: ecoSettingsEntries(strings: strings, presentationStrings: presentationData.strings, theme: presentationData.theme, keptSize: keptSize), style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)
         return (controllerState, (listState, arguments))
