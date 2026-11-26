@@ -99,21 +99,34 @@ public final class AyuHistoryStore {
     public func diskUsage() -> AyuDiskUsage {
         let fileManager = FileManager()
         let names = (try? fileManager.contentsOfDirectory(atPath: self.rootUrl.path)) ?? []
-        var recordBytes: [AyuHistoryRecord.Kind: Int64] = [:]
+        var recordBytes: [Int64: [AyuHistoryRecord.Kind: Int64]] = [:]
         for name in names {
-            guard let kind = AyuHistoryStore.kind(fileName: name) else {
+            guard let parsed = AyuHistoryStore.parse(fileName: name) else {
                 continue
             }
-            recordBytes[kind, default: 0] += self.fileSize(self.rootUrl.appendingPathComponent(name), fileManager: fileManager)
+            recordBytes[parsed.peerId, default: [:]][parsed.kind, default: 0] += self.fileSize(self.rootUrl.appendingPathComponent(name), fileManager: fileManager)
         }
         return AyuDiskUsage(recordBytes: recordBytes, media: self.readMediaIndex())
     }
 
-    public func removeMedia(kinds: Set<AyuMediaKind>, entries removing: Set<AyuMediaEntry>, completion: @escaping (_ removed: [AyuMediaEntry], _ remaining: [AyuMediaEntry]) -> Void) {
+    public func removeMedia(kinds: Set<AyuMediaKind>, entries removing: [AyuMediaEntry], completion: @escaping (_ removed: [AyuMediaEntry], _ remaining: [AyuMediaEntry]) -> Void) {
         self.queue.async {
-            let entries = self.readMediaIndex()
-            let removed = entries.filter { kinds.contains($0.kind) || removing.contains($0) }
-            let kept = entries.filter { !kinds.contains($0.kind) && !removing.contains($0) }
+            var pending: [AyuMediaEntry: Int] = [:]
+            for entry in removing {
+                pending[entry, default: 0] += 1
+            }
+            var removed: [AyuMediaEntry] = []
+            var kept: [AyuMediaEntry] = []
+            for entry in self.readMediaIndex() {
+                if kinds.contains(entry.kind) {
+                    removed.append(entry)
+                } else if let count = pending[entry], count > 0 {
+                    pending[entry] = count - 1
+                    removed.append(entry)
+                } else {
+                    kept.append(entry)
+                }
+            }
             if !removed.isEmpty {
                 if kept.isEmpty {
                     try? self.fileManager.removeItem(at: self.mediaIndexUrl)
@@ -142,37 +155,60 @@ public final class AyuHistoryStore {
         }
         self.queue.async {
             for url in self.keptUrls() {
-                let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
+                guard let records = self.readRecords(url: url) else {
+                    continue
+                }
                 let kept = records.filter { !ids.contains($0.id) }
-                if kept.count != records.count {
+                if kept.isEmpty || kept.count != records.count {
                     self.writeRecords(kept, url: url)
                 }
             }
-            NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: self)
             completion()
         }
     }
 
-    public func removeEdits(olderThan threshold: Int32?, completion: @escaping () -> Void) {
+    public func removeEdits(olderThan threshold: Int32?, peerIds: Set<Int64>?, completion: @escaping () -> Void) {
         self.queue.async {
-            for peerId in self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix) {
-                let url = self.editsUrl(peerId: peerId)
-                var kept: [AyuHistoryRecord] = []
-                if let threshold {
-                    let records = self.readStoredRecords(url: url, decoder: self.decoder).map(\.record)
-                    kept = records.filter { $0.savedAt >= threshold }
-                    if kept.count == records.count {
-                        continue
-                    }
+            let storedPeerIds = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix).filter { peerIds?.contains($0) ?? true }
+            self.rewriteEdits(peerIds: storedPeerIds, isKept: { record in
+                guard let threshold else {
+                    return false
                 }
-                self.writeRecords(kept, url: url)
-                let messageIds = Set(kept.map(\.messageId))
-                self.indexLock.lock()
-                self.editedMessageIds[peerId] = messageIds.isEmpty ? nil : messageIds
-                self.indexLock.unlock()
-            }
-            NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: self)
+                return record.savedAt >= threshold
+            })
             completion()
+        }
+    }
+
+    public func removeEdits(messageIds: [Int64: Set<Int32>], completion: @escaping () -> Void) {
+        guard !messageIds.isEmpty else {
+            completion()
+            return
+        }
+        self.queue.async {
+            let peerIds = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix).filter { messageIds[$0] != nil }
+            self.rewriteEdits(peerIds: peerIds, isKept: { record in
+                return !(messageIds[record.peerId]?.contains(record.messageId) ?? false)
+            })
+            completion()
+        }
+    }
+
+    private func rewriteEdits(peerIds: [Int64], isKept: (AyuHistoryRecord) -> Bool) {
+        for peerId in peerIds {
+            let url = self.editsUrl(peerId: peerId)
+            guard let records = self.readRecords(url: url) else {
+                continue
+            }
+            let kept = records.filter(isKept)
+            if !kept.isEmpty && kept.count == records.count {
+                continue
+            }
+            self.writeRecords(kept, url: url)
+            let messageIds = Set(kept.map(\.messageId))
+            self.indexLock.lock()
+            self.editedMessageIds[peerId] = messageIds.isEmpty ? nil : messageIds
+            self.indexLock.unlock()
         }
     }
 
@@ -225,11 +261,11 @@ public final class AyuHistoryStore {
         }
     }
 
-    private static func kind(fileName: String) -> AyuHistoryRecord.Kind? {
+    private static func parse(fileName: String) -> (peerId: Int64, kind: AyuHistoryRecord.Kind)? {
         for kind in [AyuHistoryRecord.Kind.edited, .expired, .deleted] {
             let suffix = AyuHistoryStore.suffix(kind: kind)
-            if fileName.hasSuffix(suffix), Int64(fileName.dropLast(suffix.count)) != nil {
-                return kind
+            if fileName.hasSuffix(suffix), let peerId = Int64(fileName.dropLast(suffix.count)) {
+                return (peerId, kind)
             }
         }
         return nil
@@ -281,10 +317,21 @@ public final class AyuHistoryStore {
         }
     }
 
+    private func readRecords(url: URL) -> [AyuHistoryRecord]? {
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return self.decodeRecords(data, decoder: self.decoder).map(\.record)
+    }
+
     private func readStoredRecords(url: URL, decoder: JSONDecoder) -> [AyuStoredRecord] {
         guard let data = try? Data(contentsOf: url) else {
             return []
         }
+        return self.decodeRecords(data, decoder: decoder)
+    }
+
+    private func decodeRecords(_ data: Data, decoder: JSONDecoder) -> [AyuStoredRecord] {
         return data.split(separator: AyuHistoryStore.newline).compactMap { line in
             guard let record = try? decoder.decode(AyuHistoryRecord.self, from: Data(line)) else {
                 return nil
@@ -362,6 +409,6 @@ public struct AyuMediaEntry: Hashable {
 }
 
 public struct AyuDiskUsage {
-    public let recordBytes: [AyuHistoryRecord.Kind: Int64]
+    public let recordBytes: [Int64: [AyuHistoryRecord.Kind: Int64]]
     public let media: [AyuMediaEntry]
 }

@@ -87,12 +87,13 @@ enum AyuHistoryCapture {
             var media: [Media] = []
             for item in message.media {
                 let fits = expires || (mediaLimit > 0 && self.size(of: item, mediaBox: mediaBox) <= mediaLimit)
-                if fits, let mediaId = item.id {
+                guard fits || !ayuIsKeptMedia(item) else {
+                    continue
+                }
+                if let mediaId = item.id {
                     protectedMediaIds.insert(mediaId)
                 }
-                if fits || !ayuIsKeptMedia(item) {
-                    media.append(item)
-                }
+                media.append(item)
             }
             if message.text.isEmpty && media.isEmpty {
                 continue
@@ -111,14 +112,17 @@ enum AyuHistoryCapture {
     }
 
     static func captureEdit(transaction: Transaction, mediaBox: MediaBox, id: MessageId, updated: StoreMessage) {
-        guard AyuSettings.shared.saveEditedMessages, let message = transaction.getMessage(id), !message.ayuIsDeleted, !message.text.isEmpty, message.text != updated.text, self.isEligible(message: message, transaction: transaction) else {
+        guard AyuSettings.shared.saveEditedMessages, let edited = updated.attributes.lazy.compactMap({ $0 as? EditedMessageAttribute }).first, !edited.isHidden else {
+            return
+        }
+        guard let message = transaction.getMessage(id), !message.ayuIsDeleted, !message.text.isEmpty, message.text != updated.text, self.isEligible(message: message, transaction: transaction) else {
             return
         }
         if !AyuSettings.shared.saveChannelEdits, let channel = transaction.getPeer(id.peerId) as? TelegramChannel, case .broadcast = channel.info {
             return
         }
         let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
-        store.append([AyuHistoryRecord(kind: .edited, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: Int32(Date().timeIntervalSince1970), text: message.text, replacementText: updated.text)])
+        store.append([AyuHistoryRecord(kind: .edited, peerId: id.peerId.toInt64(), messageId: id.id, sentAt: message.timestamp, savedAt: edited.date, text: message.text, replacementText: updated.text)])
     }
 
     static func keepSelfDestructing(transaction: Transaction, mediaBox: MediaBox, message: Message, isRemove: Bool) -> Bool {

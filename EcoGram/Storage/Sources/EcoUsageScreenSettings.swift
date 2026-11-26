@@ -159,19 +159,40 @@ extension EcoUsageScreenComponent.View {
     }
 
     func requestClear() {
+        guard let component = self.component, let stats = self.stats else {
+            return
+        }
+        let categories = self.selectedCategories
+        guard !categories.isEmpty else {
+            return
+        }
+        let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
+        let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
+        let clearTitle = categories == self.existingCategories ? strings.get(.usageClearAll) : presentationData.strings.StorageManagement_ClearSelected
+        self.confirmClear(title: clearTitle, categories: categories, peerIds: component.peer.map { Set([$0.id]) }, clearedSize: stats.clearedSize(categories: categories))
+    }
+
+    func requestClearPeers() {
+        guard let component = self.component, !self.selectedPeers.isEmpty else {
+            return
+        }
+        let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
+        self.confirmClear(title: presentationData.strings.StorageManagement_ClearSelected, categories: Set(AyuKeptCategory.allCases), peerIds: self.selectedPeers, clearedSize: self.selectedPeersSize)
+    }
+
+    private func confirmClear(title: String, categories: Set<AyuKeptCategory>, peerIds: Set<EnginePeer.Id>?, clearedSize: Int64) {
         guard let component = self.component else {
             return
         }
         let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
         let strings = EcoStrings(languageCode: presentationData.strings.baseLanguageCode)
-        let clearTitle = self.selectedCategories == self.existingCategories ? strings.get(.usageClearAll) : presentationData.strings.StorageManagement_ClearSelected
         let alertController = textAlertController(
             context: component.context,
             title: strings.get(.usageClearTitle),
             text: strings.get(.usageClearText),
             actions: [
-                TextAlertAction(type: .defaultAction, title: clearTitle, action: { [weak self] in
-                    self?.commitClear()
+                TextAlertAction(type: .defaultAction, title: title, action: { [weak self] in
+                    self?.commitClear(categories: categories, peerIds: peerIds, clearedSize: clearedSize)
                 }),
                 TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {})
             ],
@@ -180,20 +201,15 @@ extension EcoUsageScreenComponent.View {
         self.controller?()?.present(alertController, in: .window(.root))
     }
 
-    private func commitClear() {
-        guard let component = self.component, let stats = self.stats else {
+    private func commitClear(categories: Set<AyuKeptCategory>, peerIds: Set<EnginePeer.Id>?, clearedSize: Int64) {
+        guard let component = self.component else {
             return
         }
-        let categories = self.selectedCategories
-        guard !categories.isEmpty else {
-            return
-        }
-        let clearedSize = stats.clearedSize(categories: categories)
 
         self.isClearing = true
         self.state?.updated(transition: .immediate)
 
-        self.clearDisposable.set((component.context.engine.messages.ayuClearKept(categories: categories)
+        self.clearDisposable.set((component.context.engine.messages.ayuClearKept(categories: categories, peerIds: peerIds)
         |> deliverOnMainQueue).start(next: { [weak self] progress in
             self?.clearingNode?.setProgress(progress)
         }, completed: { [weak self] in
@@ -205,13 +221,15 @@ extension EcoUsageScreenComponent.View {
         guard let component = self.component else {
             return
         }
-        self.reloadDisposable.set((component.context.engine.messages.ayuKeptStorage()
-        |> deliverOnMainQueue).start(next: { [weak self] stats in
+        self.reloadDisposable.set((ecoUsageData(context: component.context, storage: component.context.engine.messages.ayuKeptStorage(), peerId: component.peer?.id)
+        |> deliverOnMainQueue).start(next: { [weak self] data in
             guard let self else {
                 return
             }
-            self.stats = stats
+            self.apply(data: data)
             self.deselectedCategories.removeAll()
+            self.isSelectingPeers = false
+            self.selectedPeers = Set()
             self.isClearing = false
             self.state?.updated(transition: ComponentTransition(animation: .none).withUserData(EcoUsageScreenComponent.AnimationHint(value: .clearedItems)))
             if clearedSize != 0 {

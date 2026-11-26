@@ -11,6 +11,8 @@ import MultilineTextComponent
 import AnimatedTextComponent
 import Markdown
 import RadialStatusNode
+import AvatarNode
+import AccountContext
 import StorageUsageScreen
 import EcoStrings
 
@@ -103,7 +105,14 @@ extension EcoUsageScreenComponent.View {
 
         contentHeight += 23.0
 
-        let headerText = listCategories.isEmpty ? environment.strings.StorageManagement_TitleCleared : strings.get(.usageTitle)
+        let headerText: String
+        if listCategories.isEmpty {
+            headerText = environment.strings.StorageManagement_TitleCleared
+        } else if let peer = component.peer {
+            headerText = peer.id == component.context.account.peerId ? environment.strings.DialogList_SavedMessages : peer.displayTitle(strings: environment.strings, displayOrder: .firstLast)
+        } else {
+            headerText = strings.get(.usageTitle)
+        }
         let headerViewSize = self.headerView.update(
             transition: transition,
             component: AnyComponent(Text(text: headerText, font: Font.semibold(20.0), color: environment.theme.list.itemPrimaryTextColor)),
@@ -122,8 +131,15 @@ extension EcoUsageScreenComponent.View {
         contentHeight += headerViewSize.height
         contentHeight += 6.0
 
-        let usageFraction = self.usageFraction()
-        let descriptionText = listCategories.isEmpty ? strings.get(.usageEmpty) : strings.format(.usageDescription, ecoFractionString(usageFraction))
+        let usageFraction = component.peer == nil ? self.usageFraction() : self.chatFraction()
+        let descriptionText: String
+        if listCategories.isEmpty {
+            descriptionText = strings.get(.usageEmpty)
+        } else if component.peer != nil {
+            descriptionText = strings.format(.usageChatDescription, ecoFractionString(usageFraction))
+        } else {
+            descriptionText = strings.format(.usageDescription, ecoFractionString(usageFraction))
+        }
         let headerDescriptionSize = self.layoutFootnote(self.headerDescriptionView, text: descriptionText, isCentered: true, x: nil, y: contentHeight, layout: layout, theme: environment.theme, transition: transition)
         contentHeight += headerDescriptionSize.height
         contentHeight += 8.0
@@ -141,7 +157,12 @@ extension EcoUsageScreenComponent.View {
         contentHeight += 4.0
         contentHeight += 24.0
 
-        self.updateChartTotal(size: totalSelectedSize, pieChartFrame: pieChartFrame, environment: environment, transition: transition)
+        if let peer = component.peer {
+            self.chartTotalLabel.view?.removeFromSuperview()
+            self.updateChartAvatar(component: component, peer: peer, isVisible: !listCategories.isEmpty, pieChartFrame: pieChartFrame, environment: environment, transition: transition)
+        } else {
+            self.updateChartTotal(size: totalSelectedSize, pieChartFrame: pieChartFrame, environment: environment, transition: transition)
+        }
 
         if !listCategories.isEmpty {
             let categoriesSize = self.categoriesView.update(
@@ -151,7 +172,7 @@ extension EcoUsageScreenComponent.View {
                     strings: environment.strings,
                     categories: listCategories,
                     isOtherExpanded: false,
-                    displayAction: true,
+                    displayAction: component.peer == nil,
                     clearAllTitle: strings.get(.usageClearAll),
                     toggleCategorySelection: { [weak self] category in
                         guard let self else {
@@ -222,6 +243,35 @@ extension EcoUsageScreenComponent.View {
             }
             transition.setFrame(view: chartTotalLabelView, frame: CGRect(origin: CGPoint(x: pieChartFrame.minX + floor((pieChartFrame.width - chartTotalLabelSize.width) / 2.0), y: pieChartFrame.minY + floor((pieChartFrame.height - chartTotalLabelSize.height) / 2.0)), size: chartTotalLabelSize))
         }
+    }
+
+    private func updateChartAvatar(component: EcoUsageScreenComponent, peer: EnginePeer, isVisible: Bool, pieChartFrame: CGRect, environment: ViewControllerComponentContainer.Environment, transition: ComponentTransition) {
+        let avatarSize = CGSize(width: 72.0, height: 72.0)
+        let avatarFrame = CGRect(origin: CGPoint(x: pieChartFrame.minX + floor((pieChartFrame.width - avatarSize.width) / 2.0), y: pieChartFrame.minY + floor((pieChartFrame.height - avatarSize.height) / 2.0)), size: avatarSize)
+        let chartAvatarNode: AvatarNode
+        if let current = self.chartAvatarNode {
+            chartAvatarNode = current
+            transition.setFrame(view: chartAvatarNode.view, frame: avatarFrame)
+        } else {
+            chartAvatarNode = AvatarNode(font: avatarPlaceholderFont(size: 17.0))
+            self.chartAvatarNode = chartAvatarNode
+            self.headerOffsetContainer.addSubview(chartAvatarNode.view)
+            chartAvatarNode.frame = avatarFrame
+            if peer.id == component.context.account.peerId {
+                chartAvatarNode.setPeer(context: component.context, theme: environment.theme, peer: peer, overrideImage: .savedMessagesIcon, displayDimensions: avatarSize)
+            } else {
+                chartAvatarNode.setPeer(context: component.context, theme: environment.theme, peer: peer, displayDimensions: avatarSize)
+            }
+        }
+        chartAvatarNode.view.isHidden = !isVisible
+    }
+
+    private func chatFraction() -> Double {
+        let size = self.stats?.total ?? 0
+        guard size != 0, self.totalSize != 0 else {
+            return 0.0
+        }
+        return min(1.0, Double(size) / Double(self.totalSize))
     }
 
     private func usageFraction() -> Double {

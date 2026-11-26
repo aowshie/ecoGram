@@ -10,23 +10,32 @@ import TelegramPresentationData
 import AccountContext
 import RadialStatusNode
 import EdgeEffect
+import GlassBackgroundComponent
+import AvatarNode
 import StorageUsageScreen
 import AyuSettings
 import EcoStrings
+
+struct EcoUsagePeerItem: Equatable {
+    let peer: EnginePeer
+    let size: Int64
+}
 
 final class EcoUsageScreenComponent: Component {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
 
     let context: AccountContext
+    let peer: EnginePeer?
     let ready: Promise<Bool>
 
-    init(context: AccountContext, ready: Promise<Bool>) {
+    init(context: AccountContext, peer: EnginePeer?, ready: Promise<Bool>) {
         self.context = context
+        self.peer = peer
         self.ready = ready
     }
 
     static func ==(lhs: EcoUsageScreenComponent, rhs: EcoUsageScreenComponent) -> Bool {
-        return lhs.context === rhs.context
+        return lhs.context === rhs.context && lhs.peer == rhs.peer
     }
 
     final class AnimationHint {
@@ -66,6 +75,15 @@ final class EcoUsageScreenComponent: Component {
         let keepSizeDescriptionView = ComponentView<Empty>()
         let launchSection = ComponentView<Empty>()
         let launchDescriptionView = ComponentView<Empty>()
+        let chatsTitleView = ComponentView<Empty>()
+        let chatsSectionContainerView: UIView
+        var chatItemViews: [EnginePeer.Id: ComponentView<Empty>] = [:]
+        let chatsDescriptionView = ComponentView<Empty>()
+        var chartAvatarNode: AvatarNode?
+        let navigationRightButtonsBackground: GlassBackgroundView
+        let navigationEditButton = ComponentView<Empty>()
+        let navigationDoneButton = ComponentView<Empty>()
+        var selectionPanel: ComponentView<Empty>?
 
         var loadingView: UIActivityIndicatorView?
         var clearingNode: StorageUsageClearProgressOverlayNode?
@@ -79,7 +97,11 @@ final class EcoUsageScreenComponent: Component {
         var chartHasData = false
 
         var stats: AyuKeptStorage?
+        var totalSize: Int64 = 0
+        var peerItems: [EcoUsagePeerItem] = []
         var deselectedCategories = Set<AyuKeptCategory>()
+        var isSelectingPeers = false
+        var selectedPeers = Set<EnginePeer.Id>()
 
         private var statsDisposable: Disposable?
         let reloadDisposable = MetaDisposable()
@@ -113,6 +135,10 @@ final class EcoUsageScreenComponent: Component {
             self.keepDurationSectionContainerView = UIView()
             self.keepDurationSectionContainerView.clipsToBounds = true
             self.keepDurationSectionContainerView.layer.cornerRadius = 26.0
+            self.chatsSectionContainerView = UIView()
+            self.chatsSectionContainerView.clipsToBounds = true
+            self.chatsSectionContainerView.layer.cornerRadius = 26.0
+            self.navigationRightButtonsBackground = GlassBackgroundView()
 
             super.init(frame: frame)
 
@@ -130,11 +156,13 @@ final class EcoUsageScreenComponent: Component {
 
             self.scrollView.addSubview(self.scrollContainerView)
             self.scrollContainerView.addSubview(self.keepDurationSectionContainerView)
+            self.scrollContainerView.addSubview(self.chatsSectionContainerView)
             self.scrollView.layer.addSublayer(self.headerProgressBackgroundLayer)
             self.scrollView.layer.addSublayer(self.headerProgressForegroundLayer)
 
             self.addSubview(self.edgeEffectView)
             self.addSubview(self.headerOffsetContainer)
+            self.addSubview(self.navigationRightButtonsBackground)
         }
 
         required init?(coder: NSCoder) {
@@ -153,9 +181,15 @@ final class EcoUsageScreenComponent: Component {
 
         override var accessibilityElements: [Any]? {
             get {
-                let headerViews = self.headerOffsetContainer.subviews.filter { !$0.isHidden && $0.alpha > 0.01 }.sorted { $0.frame.minY < $1.frame.minY }
-                let contentViews = self.scrollContainerView.subviews.filter { !$0.isHidden && $0.alpha > 0.01 }.sorted { $0.frame.minY < $1.frame.minY }
-                return headerViews + contentViews
+                var elements: [Any] = self.headerOffsetContainer.subviews.filter { !$0.isHidden && $0.alpha > 0.01 }.sorted { $0.frame.minY < $1.frame.minY }
+                if !self.navigationRightButtonsBackground.isHidden, self.navigationRightButtonsBackground.alpha > 0.01 {
+                    elements.append(self.navigationRightButtonsBackground)
+                }
+                elements.append(contentsOf: self.scrollContainerView.subviews.filter { !$0.isHidden && $0.alpha > 0.01 }.sorted { $0.frame.minY < $1.frame.minY })
+                if let selectionPanelView = self.selectionPanel?.view, selectionPanelView.superview != nil {
+                    elements.append(selectionPanelView)
+                }
+                return elements
             } set(value) {
             }
         }
@@ -188,6 +222,14 @@ final class EcoUsageScreenComponent: Component {
             if let chartTotalLabelView = self.chartTotalLabel.view {
                 transition.setAlpha(view: chartTotalLabelView, alpha: chartContentsAlpha)
             }
+            if let chartAvatarNode = self.chartAvatarNode {
+                transition.setAlpha(view: chartAvatarNode.view, alpha: offsetFraction)
+            }
+
+            let navigationAlpha: CGFloat = abs(headerOffset - minOffset) < 4.0 ? 1.0 : 0.0
+            let buttonsAlpha: CGFloat = self.component?.peer == nil && !self.peerItems.isEmpty && !self.isClearing ? navigationAlpha : 0.0
+            ComponentTransition(animation: .curve(duration: 0.18, curve: .easeInOut)).setAlpha(view: self.navigationRightButtonsBackground, alpha: buttonsAlpha)
+            self.navigationRightButtonsBackground.isUserInteractionEnabled = buttonsAlpha != 0.0
         }
 
         func update(component: EcoUsageScreenComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<ViewControllerComponentContainer.Environment>, transition: ComponentTransition) -> CGSize {
@@ -238,10 +280,16 @@ final class EcoUsageScreenComponent: Component {
                 bandCenterX: environment.safeInsets.left + (availableSize.width - environment.safeInsets.left - environment.safeInsets.right) / 2.0
             )
 
+            self.updateNavigationButtons(environment: environment, availableSize: availableSize, transition: transition)
+            let bottomInset = self.updateSelectionPanel(component: component, environment: environment, strings: strings, availableSize: availableSize, transition: transition)
+
             var contentHeight = environment.statusBarHeight + 19.0
             contentHeight = self.updateHeader(component: component, environment: environment, strings: strings, layout: layout, contentHeight: contentHeight, animationHint: animationHint, transition: transition)
-            contentHeight = self.updateSettings(component: component, environment: environment, strings: strings, layout: layout, contentHeight: contentHeight, transition: transition)
-            contentHeight += environment.safeInsets.bottom
+            if component.peer == nil {
+                contentHeight = self.updateSettings(component: component, environment: environment, strings: strings, layout: layout, contentHeight: contentHeight, transition: transition)
+                contentHeight = self.updateChats(component: component, environment: environment, strings: strings, layout: layout, contentHeight: contentHeight, transition: transition)
+            }
+            contentHeight += bottomInset
 
             self.ignoreScrolling = true
             let contentOffset = self.scrollView.bounds.minY
@@ -298,13 +346,13 @@ final class EcoUsageScreenComponent: Component {
             guard self.statsDisposable == nil else {
                 return
             }
-            self.statsDisposable = (component.context.engine.messages.ayuKeptStorageUpdates()
-            |> deliverOnMainQueue).start(next: { [weak self] stats in
+            self.statsDisposable = (ecoUsageData(context: component.context, storage: component.context.engine.messages.ayuKeptStorageUpdates(), peerId: component.peer?.id)
+            |> deliverOnMainQueue).start(next: { [weak self] data in
                 guard let self else {
                     return
                 }
                 let isFirst = self.stats == nil
-                self.stats = stats
+                self.apply(data: data)
                 if isFirst {
                     self.state?.updated(transition: ComponentTransition(animation: .none).withUserData(AnimationHint(value: .firstStatsUpdate)))
                     self.component?.ready.set(.single(true))
@@ -387,9 +435,9 @@ public final class EcoUsageScreen: ViewControllerComponentContainer {
         return self.readyValue
     }
 
-    public init(context: AccountContext) {
+    public init(context: AccountContext, peer: EnginePeer? = nil) {
         let componentReady = Promise<Bool>()
-        super.init(context: context, component: EcoUsageScreenComponent(context: context, ready: componentReady), navigationBarAppearance: .transparent)
+        super.init(context: context, component: EcoUsageScreenComponent(context: context, peer: peer, ready: componentReady), navigationBarAppearance: .transparent)
         self.readyValue.set(componentReady.get() |> timeout(0.3, queue: .mainQueue(), alternate: .single(true)))
     }
 

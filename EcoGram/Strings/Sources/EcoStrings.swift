@@ -44,6 +44,8 @@ public struct EcoStrings {
         case usageMediaFooter
         case usageLaunchClear
         case usageLaunchFooter
+        case usageChatDescription
+        case usageChatsFooter
         case badgesHeader
         case badgesShow
         case ayuBadgesFooter
@@ -163,6 +165,8 @@ public struct EcoStrings {
         .usageMediaFooter: ("Media larger than this isn't kept when a message is deleted.", "Медиа больше этого размера не сохраняются при удалении сообщения.", "メッセージが削除されたとき、これより大きいメディアは保存されません。"),
         .usageLaunchClear: ("Clear on Launch", "Очищать при запуске", "起動時に消去"),
         .usageLaunchFooter: ("Each time ecoGram is fully closed and opened again, it clears everything it saved: deleted messages, their media, disappearing media and edit history.", "Каждый раз, когда ecoGram полностью закрывают и открывают снова, он очищает всё сохранённое: удалённые сообщения, их медиа, исчезающие медиа и историю правок.", "ecoGramを完全に終了して再び開くたびに、保存したすべてのデータ（削除されたメッセージ、そのメディア、消えるメディア、編集履歴）を消去します。"),
+        .usageChatDescription: ("This chat takes up **%@%** of what ecoGram saved.", "Этот чат занимает **%@%** от сохранённого ecoGram.", "このチャットはecoGramが保存したデータの**%@%**を占めています。"),
+        .usageChatsFooter: ("Tap a chat to see what ecoGram saved from it and clear it.", "Нажмите на чат, чтобы посмотреть, что ecoGram сохранил из него, и очистить это.", "チャットをタップすると、ecoGramがそこから保存したデータを確認して消去できます。"),
         .badgesHeader: ("BADGES", "ЗНАЧКИ", "バッジ"),
         .badgesShow: ("AyuGram Badges", "Значки AyuGram", "AyuGramバッジ"),
         .ayuBadgesFooter: ("Shows the badges of AyuGram developers and supporters next to their names. Badge order and ecoGram badges are in [ecoGram Settings].", "Показывает значки разработчиков и поддержавших AyuGram рядом с именем. Порядок значков и значки ecoGram — в [настройках ecoGram].", "AyuGramの開発者と支援者のバッジを名前の横に表示します。バッジの順番とecoGramのバッジは[ecoGramの設定]で変更できます。"),

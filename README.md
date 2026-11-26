@@ -53,6 +53,7 @@
 ### <img src="Branding/Readme/ecogram.svg" width="20" height="20"> Storage
 
 - ecoGram Usage in Data and Storage: what deleted messages, their media, disappearing media and edit history take up, cleared like Telegram's cache
+- Chats list like Telegram's: what each chat saved, opened per chat or selected and cleared together
 - Delete saved data older than a chosen period, from one day to a year
 - Clear everything ecoGram saved on each cold launch
 

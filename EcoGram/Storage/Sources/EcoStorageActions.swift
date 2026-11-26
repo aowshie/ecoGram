@@ -25,6 +25,7 @@ public func ecoStorageLaunchCleanup(context: AccountContext) {
     guard isFirstLaunch else {
         return
     }
+    context.engine.messages.ayuPrepareHistory()
     if AyuSettings.shared.clearHistoryOnLaunch {
         let _ = context.engine.messages.ayuClearKept(categories: Set(AyuKeptCategory.allCases)).startStandalone()
     } else {
