@@ -167,6 +167,45 @@ public final class AyuHistoryStore {
         }
     }
 
+    public func records(peerId: Int64) -> [AyuHistoryRecord] {
+        let urls = [AyuHistoryRecord.Kind.deleted, .expired, .edited].map { self.url(peerId: peerId, kind: $0) }
+        guard urls.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+            return []
+        }
+        return self.queue.sync {
+            return urls.flatMap { self.readStoredRecords(url: $0, decoder: self.decoder).map(\.record) }
+        }
+    }
+
+    public func forget(peerId: Int64, messageIds: Set<Int32>?, completion: @escaping (_ isChanged: Bool) -> Void) {
+        if let messageIds, messageIds.isEmpty {
+            completion(false)
+            return
+        }
+        self.queue.async {
+            var isChanged = false
+            for kind in [AyuHistoryRecord.Kind.deleted, .expired, .edited] {
+                let url = self.url(peerId: peerId, kind: kind)
+                guard let records = self.readRecords(url: url) else {
+                    continue
+                }
+                let kept = messageIds.map { messageIds in records.filter { !messageIds.contains($0.messageId) } } ?? []
+                if !kept.isEmpty && kept.count == records.count {
+                    continue
+                }
+                self.writeRecords(kept, url: url)
+                isChanged = true
+                if kind == .edited {
+                    let editedIds = Set(kept.map(\.messageId))
+                    self.indexLock.lock()
+                    self.editedMessageIds[peerId] = editedIds.isEmpty ? nil : editedIds
+                    self.indexLock.unlock()
+                }
+            }
+            completion(isChanged)
+        }
+    }
+
     public func removeEdits(olderThan threshold: Int32?, peerIds: Set<Int64>?, completion: @escaping () -> Void) {
         self.queue.async {
             let storedPeerIds = self.storedPeerIds(suffix: AyuHistoryStore.editsSuffix).filter { peerIds?.contains($0) ?? true }

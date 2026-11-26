@@ -112,7 +112,7 @@ enum AyuHistoryCapture {
     }
 
     static func captureEdit(transaction: Transaction, mediaBox: MediaBox, id: MessageId, updated: StoreMessage) {
-        guard AyuSettings.shared.saveEditedMessages, let edited = updated.attributes.lazy.compactMap({ $0 as? EditedMessageAttribute }).first, !edited.isHidden else {
+        guard AyuSettings.shared.saveEditedMessages, !updated.media.contains(where: { $0 is TelegramMediaAction }), let edited = updated.attributes.lazy.compactMap({ $0 as? EditedMessageAttribute }).first, !edited.isHidden else {
             return
         }
         guard let message = transaction.getMessage(id), !message.ayuIsDeleted, !message.text.isEmpty, message.text != updated.text, self.isEligible(message: message, transaction: transaction) else {
@@ -161,6 +161,28 @@ enum AyuHistoryCapture {
         retention.restore(transaction: transaction)
     }
 
+    static func keepsCleared(transaction: Transaction, mediaBox: MediaBox, id: MessageId, updated: StoreMessage) -> Bool {
+        let isHistoryCleared = updated.media.contains(where: { media in
+            if let action = media as? TelegramMediaAction, case .historyCleared = action.action {
+                return true
+            }
+            return false
+        })
+        guard isHistoryCleared, let message = transaction.getMessage(id) else {
+            return false
+        }
+        if message.ayuIsDeleted {
+            return true
+        }
+        let retention = self.retain(transaction: transaction, mediaBox: mediaBox, ids: [id])
+        guard !retention.retained.isEmpty else {
+            return false
+        }
+        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: [id])
+        retention.restore(transaction: transaction)
+        return true
+    }
+
     static func isKept(transaction: Transaction, id: MessageId) -> Bool {
         return transaction.getMessage(id)?.ayuIsDeleted == true
     }
@@ -202,10 +224,14 @@ enum AyuHistoryCapture {
         if message.media.contains(where: { $0 is TelegramMediaAction }) {
             return false
         }
-        if !AyuSettings.shared.saveInBots, let user = transaction.getPeer(message.id.peerId) as? TelegramUser, user.botInfo != nil {
+        if !AyuSettings.shared.saveInBots && (self.isBot(transaction.getPeer(message.id.peerId)) || self.isBot(message.author)) {
             return false
         }
         return true
+    }
+
+    private static func isBot(_ peer: Peer?) -> Bool {
+        return (peer as? TelegramUser)?.botInfo != nil
     }
 
     private static func size(of media: Media, mediaBox: MediaBox) -> Int64 {

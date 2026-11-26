@@ -142,7 +142,7 @@ public struct EcoStrings {
         .historySaveSelfDestructing: ("Save Self-Destructing Messages", "Сохранять самоудаляющиеся", "自動削除メッセージを保存"),
         .historySaveEdited: ("Save Edit History", "Сохранять историю изменений", "編集履歴を保存"),
         .historySaveChannelEdits: ("Edits in Channels", "Правки в каналах", "チャンネルの編集"),
-        .historySaveBots: ("Include Chats with Bots", "Включая чаты с ботами", "ボットとのチャットも含める"),
+        .historySaveBots: ("Include Bots", "Включая ботов", "ボットも含める"),
         .historyMediaLimit: ("Keep Media up To", "Сохранять медиа до", "メディアの保存上限"),
         .historyMediaOff: ("Off", "Выкл.", "オフ"),
         .historyCleanup: ("Delete Older Than", "Удалять старше", "古い履歴を削除"),

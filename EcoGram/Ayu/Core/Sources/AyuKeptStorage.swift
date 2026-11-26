@@ -107,6 +107,51 @@ public extension TelegramEngine.Messages {
     }
 }
 
+extension AyuHistoryCapture {
+    static func forgetCleared(transaction: Transaction, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, timestamps: ClosedRange<Int32>?, maxId: Int32?) {
+        guard peerId.namespace != Namespaces.Peer.SecretChat else {
+            return
+        }
+        let store = AyuHistoryStore.store(mediaBoxBasePath: mediaBox.basePath)
+        let peerIdValue = peerId.toInt64()
+        let isPartial = threadId != nil || timestamps != nil || maxId != nil
+        var messageIds = Set<Int32>()
+        var entries: [AyuMediaEntry] = []
+        for record in store.records(peerId: peerIdValue) {
+            let message = transaction.getMessage(MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: record.messageId))
+            if let threadId, message?.threadId != threadId {
+                continue
+            }
+            if let timestamps, !timestamps.contains(record.sentAt) {
+                continue
+            }
+            if let maxId, record.messageId > maxId {
+                continue
+            }
+            messageIds.insert(record.messageId)
+            if let message, record.kind != .edited {
+                entries.append(contentsOf: ayuKeptMediaEntries(message, kind: ayuMediaKind(record: record.kind)))
+            }
+        }
+        if isPartial && messageIds.isEmpty {
+            return
+        }
+        store.forget(peerId: peerIdValue, messageIds: isPartial ? messageIds : nil, completion: { isChanged in
+            store.removeMedia(kinds: [], entries: entries, completion: { removed, remaining in
+                let resourceIds = Set(removed.map(\.resourceId)).subtracting(remaining.map(\.resourceId)).map { MediaResourceId($0) }
+                let notify = {
+                    NotificationCenter.default.post(name: AyuHistoryStore.didRemove, object: store)
+                }
+                if !resourceIds.isEmpty {
+                    let _ = mediaBox.removeCachedResources(resourceIds, force: true).startStandalone(completed: notify)
+                } else if isChanged {
+                    notify()
+                }
+            })
+        })
+    }
+}
+
 private func ayuCategory(record kind: AyuHistoryRecord.Kind) -> AyuKeptCategory {
     switch kind {
     case .deleted:

@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: aowshie <anekq@icloud.com>
-Date: Sat, 21 Nov 2026 21:20:37 +0200
+Date: Tue, 24 Nov 2026 00:14:50 +0200
 Subject: [PATCH] ayu: ghost mode and deleted message history in TelegramCore
 
 
@@ -306,10 +306,10 @@ index 49d68a3791e25e97ce82d98076fc54ae4d50aca6..c5f4d81eb88f4c6e346bf1e62263dd6b
      // its deletions inside its own; the deletedMessages pipe fires once it has committed.
      StoredMessageConfirmationDeletionReporters.shared.report(deletedIds, mediaBox: mediaBox, transaction: transaction)
 diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
-index cf1ab15d9cfae956abcb53bf5060db525b32448d..27279ce31c292dbb4d41bc61bee63b9d164270cc 100644
+index cf1ab15d9cfae956abcb53bf5060db525b32448d..7bb2fa07ab6123fb8282b4990d1b5773aaa13552 100644
 --- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 +++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
-@@ -274,21 +274,28 @@ extension ReplayContext {
+@@ -274,27 +274,37 @@ extension ReplayContext {
      }
      
      func applyDeleteMessagesWithGlobalIds(_ ids: [Int32]) {
@@ -342,10 +342,22 @@ index cf1ab15d9cfae956abcb53bf5060db525b32448d..27279ce31c292dbb4d41bc61bee63b9d
      }
      
      func applyUpdateMinAvailableMessage(_ id: MessageId) {
-@@ -305,6 +312,8 @@ extension ReplayContext {
+         if let message = transaction.getMessage(id) {
+             updatePeerChatInclusionWithMinTimestamp(transaction: transaction, id: id.peerId, minTimestamp: message.timestamp, forceRootGroupIfNotExists: false)
+         }
++        if id.namespace == Namespaces.Message.Cloud {
++            AyuHistoryCapture.forgetCleared(transaction: transaction, mediaBox: mediaBox, peerId: id.peerId, threadId: nil, timestamps: nil, maxId: id.id)
++        }
+         var resourceIds: [MediaResourceId] = []
+         transaction.deleteMessagesInRange(peerId: id.peerId, namespace: id.namespace, minId: 1, maxId: id.id, forEachMedia: { media in
+             addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
+@@ -305,6 +315,11 @@ extension ReplayContext {
      }
      
      func applyEditMessage(_ id: MessageId, _ message: StoreMessage) {
++        if AyuHistoryCapture.keepsCleared(transaction: transaction, mediaBox: mediaBox, id: id, updated: message) {
++            return
++        }
 +        AyuHistoryCapture.captureEdit(transaction: transaction, mediaBox: mediaBox, id: id, updated: message)
 +        let message = AyuHistoryCapture.preserveSelfDestructing(transaction: transaction, mediaBox: mediaBox, id: id, updated: message)
          var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
@@ -482,6 +494,30 @@ index 0e26cab4c2631a986deb1f9bbdbd6b056a7087b4..948db1aa901c255975e135fefc934b18
                      }
                  }
              }
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/DeleteMessages.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/DeleteMessages.swift
+index 31699c8d20440a8f109e415812e5bec368773a12..d3e12c7b99fc474495fad28a050682aafbf7fc7d 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/DeleteMessages.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/DeleteMessages.swift
+@@ -292,6 +292,9 @@ func _internal_deleteReaction(account: Account, messageId: MessageId, authorId:
+ }
+ 
+ func _internal_clearHistory(transaction: Transaction, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, namespaces: MessageIdNamespaces) {
++    if namespaces.contains(Namespaces.Message.Cloud) {
++        AyuHistoryCapture.forgetCleared(transaction: transaction, mediaBox: mediaBox, peerId: peerId, threadId: threadId, timestamps: nil, maxId: nil)
++    }
+     if peerId.namespace == Namespaces.Peer.SecretChat {
+         var resourceIds: [MediaResourceId] = []
+         transaction.withAllMessages(peerId: peerId, { message in
+@@ -307,6 +310,9 @@ func _internal_clearHistory(transaction: Transaction, mediaBox: MediaBox, peerId
+ }
+ 
+ func _internal_clearHistoryInRange(transaction: Transaction, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, minTimestamp: Int32, maxTimestamp: Int32, namespaces: MessageIdNamespaces) {
++    if namespaces.contains(Namespaces.Message.Cloud), minTimestamp <= maxTimestamp {
++        AyuHistoryCapture.forgetCleared(transaction: transaction, mediaBox: mediaBox, peerId: peerId, threadId: threadId, timestamps: minTimestamp ... maxTimestamp, maxId: nil)
++    }
+     if peerId.namespace == Namespaces.Peer.SecretChat {
+         var resourceIds: [MediaResourceId] = []
+         transaction.withAllMessages(peerId: peerId, { message in
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift
 index 79f901067eec4df0881d7bf03d06e8b86893b716..bd4e3be8a36e3e29045d02f7cd5d3b2405f503c4 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift
